@@ -15,3 +15,4 @@ saving/loading
 penalty for fighting unarmed with something in your hands?
 make monsters fill in around the player (if i'm next to player and an empty space that's also next to player, and around
   me is a monster that's not next to player, move into the empty space)
+Check all the Global.Rand(100)'s for correctness

@@ -29,3 +29,8 @@ allow attacking ground/ceiling
 truly copy items when updating memory (so changes to them won't be known)
 implement cloaks
 implement falling down stairs
+don't allow user to equip incompatible weapons
+spawn monsters where they can't be seen
+add the ability to select the default ammo
+add the ability to unequip items
+make wield nothing only unequip weapons

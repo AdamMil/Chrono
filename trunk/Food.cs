@@ -15,7 +15,7 @@ public class Food : Item
   public sealed class Flag
   { private Flag() { }
     public const uint None=0, Partial=1, Rotten=2, Tainted=4, NextFlag=8;
-  };
+  }
 
   public int FoodLeft { get { return Weight*FoodPerWeight; } }
 
@@ -41,7 +41,7 @@ public class Food : Item
     
     if((Flags&(Flag.Rotten|Flag.Tainted))!=0)
     { if(user==App.Player) App.IO.Print("Ulch! There is something wrong with this food.");
-      user.Sickness++;
+      user.AddEffect(new Effect(Clone(), Attr.Sickness, 1, -1));
     }
 
     return Weight<=0;

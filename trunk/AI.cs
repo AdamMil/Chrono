@@ -9,8 +9,7 @@ public enum AIState { Idle, Alerted };
 public abstract class AI : Entity
 { public AIState State { get { return state; } }
 
-  public override void Die(Entity killer, Item impl) { Die(); }
-  public override void Die(Death cause)
+  public override void Die(object killer, Death cause)
   { if((cause==Death.Sickness || cause==Death.Starvation) && App.Player.CanSee(this))
       App.IO.Print(TheName+" falls to the ground, dead.");
     Die();

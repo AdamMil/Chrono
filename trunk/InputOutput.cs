@@ -6,7 +6,7 @@ namespace Chrono
 
 public enum Action
 { None, Quit, Rest, Move, MoveToInteresting, MoveToDanger, MoveAFAP, OpenDoor, CloseDoor, Pickup, Drop, DropType,
-  GoUp, GoDown, Eat, Wear, Wield
+  GoUp, GoDown, Eat, Wear, Remove, Wield, Inventory,
 }
 
 public struct Input
@@ -29,8 +29,8 @@ public enum Color
 [Flags] public enum MenuFlag { None=0, Reletter=1, Multi=2, AllowNum=4, AllowNothing=8 };
 
 public struct MenuItem
-{ public MenuItem(Item item) { Item=item; Count=0; Char=item.Char; }
-  public MenuItem(Item item, int count) { Item=item; Count=count; Char=item.Char; }
+{ public MenuItem(Item item) { Item=item; Count=0; Char = item==null ? '\0' : item.Char; }
+  public MenuItem(Item item, int count) { Item=item; Count=count; Char = item==null ? '\0' : item.Char; }
   public Item Item;
   public int  Count;
   public char Char;
@@ -78,7 +78,9 @@ public abstract class InputOutput
                                         params ItemClass[] classes);
 
   public void DisplayInventory(IKeyedInventory items) { DisplayInventory(items, ItemClass.Any); }
-  public abstract void DisplayInventory(IKeyedInventory items, ItemClass itemClass);
+  public abstract void DisplayInventory(IKeyedInventory items, params ItemClass[] classes);
+  
+  public abstract void DisplayMap(Creature viewer);
 
   public abstract Input GetNextInput();
   

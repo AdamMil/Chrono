@@ -81,8 +81,10 @@ public sealed class ConsoleIO : InputOutput
                                         params ItemClass[] classes)
   { string chars = items.CharString(classes);
     if((flags&MenuFlag.AllowNothing)!=0) chars = "-"+chars;
-    if(Array.IndexOf(classes, ItemClass.Any)!=-1 && chars.Length==0) return new MenuItem[0];
-    chars += chars.Length==0 ? "*" : "?*";
+    bool any = Array.IndexOf(classes, ItemClass.Any)!=-1;
+    if(any && chars.Length==0) return new MenuItem[0];
+    if(chars.Length>0) chars += '?';
+    if(!any || chars.Length==0) chars += '*';
 
     string sprompt = prompt + " [" + chars + "] ";
     bool doRebuke  = false;
@@ -109,39 +111,68 @@ public sealed class ConsoleIO : InputOutput
     }
   }
 
-  public override void DisplayInventory(IKeyedInventory items, ItemClass itemClass)
-  {
+  public override void DisplayInventory(IKeyedInventory items, params ItemClass[] classes)
+  { SetupMenu(items, MenuFlag.None, classes);
+
+    int cs=0, width=Math.Min(MapWidth, console.Width), height=console.Height, iheight=height-2;
+    ClearScreen();
+
+    while(true)
+    { redraw:
+      ItemClass head = ItemClass.Invalid;
+      int mc=cs, yi=0;
+      for(; yi<iheight && mc<menu.Length; yi++) // draw the menu items
+      { if(menu[mc].Item.Class != head)
+        { head = menu[mc].Item.Class;
+          PutString(NTConsole.Attribute.White, 0, yi, head.ToString());
+        }
+        else
+        { PutString(0, yi, "{0} - {1}", menu[mc].Char, menu[mc].Item.FullName);
+          mc++;
+        }
+      }
+      PutString(0, yi, cs+mc<menu.Length ? "--more--" : "--bottom--");
+
+      while(true)
+      { char c = ReadChar();
+        if(c=='\r' || c=='\n') goto done;
+        if(c==' ') rec.Key.VirtualKey = NTConsole.Key.Next;
+        switch(rec.Key.VirtualKey)
+        { case NTConsole.Key.Prior: case NTConsole.Key.Up: case NTConsole.Key.Numpad8:
+            if(cs>0) // page up
+            { cs -= Math.Min(iheight, cs);
+              console.Fill(0, 0, width, height); // clear the area we'll be using
+              goto redraw;
+            }
+            break;
+          case NTConsole.Key.Next: case NTConsole.Key.Down: case NTConsole.Key.Numpad2:
+            if(menu.Length>cs+mc) // page down
+            { cs += mc;
+              console.Fill(0, 0, width, height); // clear the area we'll be using
+              goto redraw;
+            }
+            break;
+          case NTConsole.Key.Escape: goto done;
+        }
+      }
+    }
+    done:
+    RestoreScreen();
   }
+  
+  public override void DisplayMap(Creature viewer) { }
 
   public override MenuItem[] Menu(System.Collections.ICollection items, MenuFlag flags, params ItemClass[] classes)
-  { if(items.Count==0) throw new ArgumentException("No items in the collection.", "items");
-    if(items.Count>52 && (flags&MenuFlag.Reletter)==0)
-      throw new NotSupportedException("Too many items in the collection.");
+  { SetupMenu(items, flags, classes);
 
-    Item[] itemarr = new Item[items.Count]; // first sort by character
-    items.CopyTo(itemarr, 0);
-    Array.Sort(itemarr, ItemComparer.Default);
-    
+    MenuItem[] ret;
     bool reletter=(flags&MenuFlag.Reletter)!=0, allownum=(flags&MenuFlag.AllowNum)!=0;
-
-    if(Array.IndexOf(classes, ItemClass.Any)!=-1)
-    { menu = new MenuItem[items.Count];
-      for(int i=0,mi=0; i<(int)ItemClass.NumClasses; i++) // then group by item class
-        for(int j=0; j<itemarr.Length; j++) if(itemarr[j].Class==(ItemClass)i) menu[mi++] = new MenuItem(itemarr[j]);
-    }
-    else
-    { System.Collections.ArrayList list = new System.Collections.ArrayList();
-      for(int i=0; i<itemarr.Length; i++)
-        if(Array.IndexOf(classes, itemarr[i].Class)!=-1) list.Add(new MenuItem(itemarr[i]));
-      menu = (MenuItem[])list.ToArray(typeof(MenuItem));
-    }
-
     int cs=0, width=Math.Min(MapWidth, console.Width);
     int height=reletter ? Math.Min(54, console.Height) : console.Height, iheight=height-2;
 
-    console.Fill(0, 0, width, height); // clear the area we'll be using
-    while(true)
+    while(true) // drawing
     { redraw:
+      ClearScreen(); // clear the area we'll be using
       ItemClass head = ItemClass.Invalid;
       int mc=cs, yi=0;
       char c='a';
@@ -158,7 +189,7 @@ public sealed class ConsoleIO : InputOutput
       }
       PutString(0, yi, "Enter selection:");
 
-      while(true)
+      while(true) // key handling
       { int num=-1;
         c = ReadChar();
         
@@ -188,39 +219,42 @@ public sealed class ConsoleIO : InputOutput
             }
           }
         }
-        else if(c==0) switch(rec.Key.VirtualKey)
-        { case NTConsole.Key.Prior: case NTConsole.Key.Up: case NTConsole.Key.Numpad8:
-            if(cs>0) // page up
-            { cs -= Math.Min(iheight, cs);
-              console.Fill(0, 0, width, height); // clear the area we'll be using
-              goto redraw;
-            }
-            break;
-          case NTConsole.Key.Next: case NTConsole.Key.Down: case NTConsole.Key.Numpad2:
-            if(menu.Length>cs+mc) // page down
-            { cs += mc;
-              console.Fill(0, 0, width, height); // clear the area we'll be using
-              goto redraw;
-            }
-            break;
-          case NTConsole.Key.Escape: return new MenuItem[0];
-        }
-        else switch(c)
-        { case '+': for(int i=0; i<menu.Length; i++) menu[i].Count = menu[i].Item.Count; goto redraw;
-          case '-': for(int i=0; i<menu.Length; i++) menu[i].Count = 0; goto redraw;
-          case '\r': case '\n': goto done;
+        else
+        { switch(c)
+          { case '+': for(int i=0; i<menu.Length; i++) menu[i].Count = menu[i].Item.Count; goto redraw;
+            case '-': for(int i=0; i<menu.Length; i++) menu[i].Count = 0; goto redraw;
+            case '\r': case '\n': goto done;
+            case ' ': rec.Key.VirtualKey=NTConsole.Key.Next; break;
+          }
+          switch(rec.Key.VirtualKey)
+          { case NTConsole.Key.Prior: case NTConsole.Key.Up: case NTConsole.Key.Numpad8:
+              if(cs>0) // page up
+              { cs -= Math.Min(iheight, cs);
+                console.Fill(0, 0, width, height); // clear the area we'll be using
+                goto redraw;
+              }
+              break;
+            case NTConsole.Key.Next: case NTConsole.Key.Down: case NTConsole.Key.Numpad2:
+              if(menu.Length>cs+mc) // page down
+              { cs += mc;
+                console.Fill(0, 0, width, height); // clear the area we'll be using
+                goto redraw;
+              }
+              break;
+            case NTConsole.Key.Escape: ret=new MenuItem[0]; goto doreturn;
+          }
         }
       }
     }
     done:
     cs = 0;
     for(int i=0; i<menu.Length; i++) if(menu[i].Count>0) cs++;
-    MenuItem[] ret = new MenuItem[cs];
+    ret = new MenuItem[cs];
     for(int i=0,mi=0; i<menu.Length; i++) if(menu[i].Count>0) { menu[i].Char=menu[i].Item.Char; ret[mi++]=menu[i]; }
 
+    doreturn:
     if(buf!=null) console.PutBlock(0, 0, 0, 0, mapW, mapH, buf); // replace what we've overwritten
     DrawLines();
-
     return ret;
   }
 
@@ -254,7 +288,9 @@ public sealed class ConsoleIO : InputOutput
         case 'd': inp.Action = Action.Drop; break;
         case 'D': inp.Action = Action.DropType; break;
         case 'e': inp.Action = Action.Eat; break;
+        case 'i': inp.Action = Action.Inventory; break;
         case 'o': inp.Action = Action.OpenDoor; break;
+        case 'R': inp.Action = Action.Remove; break;
         case 'w': inp.Action = Action.Wield; break;
         case 'W': inp.Action = Action.Wear; break;
         case '<': inp.Action = Action.GoUp; break;
@@ -264,6 +300,7 @@ public sealed class ConsoleIO : InputOutput
           if(inp.Direction==Direction.Self) { count=100; inp.Action=Action.Rest; }
           else if(inp.Direction!=Direction.Invalid) inp.Action = Action.MoveToInteresting;
           break;
+        case '?': ShowHelp(); break;
       }
       if(inp.Action != Action.None)
       { inp.Count = count;
@@ -399,6 +436,12 @@ public sealed class ConsoleIO : InputOutput
       case '>': return allowVertical ? Direction.Below : Direction.Invalid;
       default: return Direction.Invalid;
     }
+  }
+
+  void ClearScreen() // doesn't clear stat area
+  { int width=Math.Min(MapWidth, console.Width), height=console.Height, mheight=MapHeight;
+    console.Fill(0, 0, width, height); // clear map area
+    console.Fill(0, mheight, console.Width, height-mheight); // clear message area
   }
 
   bool Diff(Creature player, Attr attr) { return player.GetAttr(attr)!=stats[(int)attr]; }
@@ -545,8 +588,74 @@ public sealed class ConsoleIO : InputOutput
     statLines=xlines;
   }
 
+  void RestoreScreen()
+  { if(buf!=null) console.PutBlock(0, 0, 0, 0, mapW, mapH, buf); // replace what we've overwritten
+    DrawLines();
+  }
+
   void SetCursorAtEOBL() { console.SetCursorPosition(blX, blY); }
   void SetCursorToPlayer() { console.SetCursorPosition(mapW/2, mapH/2); }
+  
+  void SetupMenu(System.Collections.ICollection items, MenuFlag flags, ItemClass[] classes)
+  { if(items.Count==0) throw new ArgumentException("No items in the collection.", "items");
+    if(items.Count>52 && (flags&MenuFlag.Reletter)==0)
+      throw new NotSupportedException("Too many items in the collection.");
+
+    Item[] itemarr = new Item[items.Count]; // first sort by character
+    items.CopyTo(itemarr, 0);
+    Array.Sort(itemarr, ItemComparer.Default);
+    
+    if(Array.IndexOf(classes, ItemClass.Any)!=-1)
+    { menu = new MenuItem[items.Count];
+      for(int i=0,mi=0; i<(int)ItemClass.NumClasses; i++) // then group by item class
+        for(int j=0; j<itemarr.Length; j++) if(itemarr[j].Class==(ItemClass)i) menu[mi++] = new MenuItem(itemarr[j]);
+    }
+    else
+    { System.Collections.ArrayList list = new System.Collections.ArrayList();
+      for(int i=0; i<itemarr.Length; i++)
+        if(Array.IndexOf(classes, itemarr[i].Class)!=-1) list.Add(new MenuItem(itemarr[i]));
+      menu = (MenuItem[])list.ToArray(typeof(MenuItem));
+    }
+  }
+  
+  void ShowHelp()
+  { ClearScreen();
+    string helptext =
+@"                   Chrono Help
+a - use special ability     A - list abilities
+c - close door              C - check experience
+d - drop item(s)
+e - eat food                E - evoke item power
+f - fire weapon/attack
+i - inventory listing
+o - open door               O - dungeon overview
+p - pray
+q - quaff a potion
+r - read scroll or book     R - remove a worn item
+s - search adjacent tiles   S - manage skills
+t - throw an item
+u - use item
+v - view item description   V - version info
+w - wield an item           W - wear an item
+x - examine surroundings    X - examine level map
+z - zap a wand              Z - cast a spell
+! - shout or command allies ' - wield item a/b
+, - pick up item(s)         . - rest one turn
+: - examine occupied tile   \ - check knowledge
+< - ascend staircase        > - descend staircase
+= - reassign item letters   ^ - describe religion
+/ . - rest 100 turns        / DIR - long walk
+Ctrl-A - toggle autopickup  Ctrl-Q - quit
+Ctrl-P - see old messages   Ctrl-X - quit + save";
+
+    console.SetCursorPosition(0, 0);
+    NTConsole.OutputModes mode = console.OutputMode;
+    console.OutputMode = NTConsole.OutputModes.Processed;
+    console.Write(helptext);
+    console.ReadChar();
+    console.OutputMode = mode;
+    RestoreScreen();
+  }
   
   void UpdateStats(Creature player)
   { for(int i=0; i<(int)Attr.NumAttributes; i++) stats[i] = player.GetAttr((Attr)i);

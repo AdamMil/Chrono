@@ -17,6 +17,9 @@ public class Player : Creature
   { if(interrupt) { inp.Count=0; interrupt=false; }
     base.Think();
     Point[] vis = VisibleTiles();
+    goto next;
+    
+    nevermind: App.IO.Print("Never mind.");
 
     next:
     int count = inp.Count;
@@ -45,7 +48,7 @@ public class Player : Creature
       case Action.Drop:
       { if(Inv.Count==0) { App.IO.Print("You're not carrying anything."); goto next; }
         MenuItem[] items = App.IO.ChooseItem("Drop what?", Inv, MenuFlag.AllowNum|MenuFlag.Multi, ItemClass.Any);
-        if(items.Length==0) { App.IO.Print("Never mind."); goto next; }
+        if(items.Length==0) goto nevermind;
         foreach(MenuItem i in items)
         { if(Wearing(i.Item) && TryRemove(i.Item)) break;
           Drop(i.Char, i.Count);
@@ -70,7 +73,7 @@ public class Player : Creature
         if(toEat==null)
         { if(!Inv.Has(ItemClass.Food)) { App.IO.Print("You have nothing to eat!"); goto next; }
           MenuItem[] items = App.IO.ChooseItem("What do you want to eat?", Inv, MenuFlag.None, ItemClass.Food);
-          if(items.Length==0) { App.IO.Print("Never mind."); goto next; }
+          if(items.Length==0) goto nevermind;
           toEat = items[0].Item as Food;
           if(toEat==null) { App.IO.Print("You can't eat that!"); goto next; }
           inv = Inv;
@@ -92,7 +95,7 @@ public class Player : Creature
         break;
       }
 
-      case Action.MoveToInteresting: // this needs to be improved, and made continuable
+      case Action.MoveToInteresting: // this needs to be improved
       { Point np = Global.Move(Position, inp.Direction);
         if(!Map.IsPassable(np)) goto next;
         Position = np;
@@ -106,23 +109,24 @@ public class Player : Creature
           if(Map.IsPassable(np) || Map.IsDoor(np)) options++;
         }
         while(true)
-        { if(ThinkUpdate(ref vis)) break;
+        { if(ThinkUpdate(ref vis)) goto next;
           TileType type = Map[np].Type;
-          if(type==TileType.UpStairs || type==TileType.DownStairs || Map.HasItems(np)) break;
+          if(type==TileType.UpStairs || type==TileType.DownStairs || Map.HasItems(np)) goto next;
 
           int newopts=0;
           for(int i=0; i<5; i++)
           { np = Global.Move(Position, (Direction)chk[i]);
             if(Map.IsPassable(np) || Map.IsDoor(np)) newopts++;
           }
-          if(newopts!=options || IsMonsterVisible(vis)) break;
+          if(newopts!=options || IsMonsterVisible(vis)) goto next;
 
           np = Global.Move(Position, inp.Direction);
           if(Map.IsPassable(np) && !Map.IsDangerous(np)) Position = np;
-          else break;
+          else goto next;
         }
-        break;
       }
+
+      case Action.Inventory: App.IO.DisplayInventory(Inv); goto next;
 
       case Action.OpenDoor:
       { Direction dir = App.IO.ChooseDirection(false, false);
@@ -158,6 +162,16 @@ public class Player : Creature
         if(App.IO.YesNo(Color.Warning, "Do you really want to quit?", false)) App.Quit=true;
         break;
 
+      case Action.Remove:
+      { Inventory inv = new Inventory();
+        for(int i=0; i<Slots.Length; i++) if(Slots[i]!=null) inv.Add(Slots[i]);
+        if(inv.Count==0) { App.IO.Print("You're not wearing anything!"); goto next; }
+        MenuItem[] items = App.IO.ChooseItem("Remove what?", inv, MenuFlag.Multi, ItemClass.Any);
+        if(items.Length==0) goto nevermind;
+        foreach(MenuItem i in items) TryRemove(i.Item);
+        break;
+      }
+
       case Action.Rest:
         if(IsMonsterVisible(vis)) break;
         inp.Count = count;
@@ -165,12 +179,25 @@ public class Player : Creature
       
       case Action.Wear:
       { MenuItem[] items = App.IO.ChooseItem("Wear what?", Inv, MenuFlag.None, wearableClasses);
-        if(items.Length==0) { App.IO.Print("Never mind."); goto next; }
+        if(items.Length==0) goto nevermind;
         Wearable item = items[0].Item as Wearable;
         if(item==null) { App.IO.Print("You can't wear that!"); goto next; }
         if(Wearing(item)) { App.IO.Print("You're already wearing that!"); goto next; }
         if(Wearing(item.Slot) && !TryRemove(item.Slot)) goto next;
         Wear(item);
+        break;
+      }
+      
+      case Action.Wield:
+      { MenuItem[] items = App.IO.ChooseItem("Wield what?", Inv, MenuFlag.AllowNothing, ItemClass.Weapon);
+        if(items.Length==0) goto nevermind;
+        if(items[0].Item==null) TryEquip(null);
+        else
+        { Wieldable item = items[0].Item as Wieldable;
+          if(item==null) { App.IO.Print("You can't wield that!"); goto next; }
+          if(Equipped(item)) { App.IO.Print("You're already wielding that!"); goto next; }
+          TryEquip(item);
+        }
         break;
       }
     }
@@ -195,7 +222,9 @@ public class Player : Creature
   }
 
   public override void OnDrop(Item item) { App.IO.Print("You drop {0}.", item); }
+  public override void OnEquip(Wieldable item) { App.IO.Print("You equip {0}.", item); }
   public override void OnRemove(Wearable item) { App.IO.Print("You remove {0}.", item); }
+  public override void OnUnequip(Wieldable item) { App.IO.Print("You unequip {0}.", item); }
   public override void OnWear(Wearable item)
   { if(item.EquipText!=null) App.IO.Print(item.EquipText);
     else App.IO.Print("You put on {0}.", item);

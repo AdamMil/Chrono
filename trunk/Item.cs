@@ -5,7 +5,7 @@ namespace Chrono
 
 public enum ItemClass
 { Invalid, Any=Invalid,
-  Amulet, Weapon, Armor, Missile, Food, Corpse, Ring, Potion, Wand, Tool, Container, Treasure,
+  Amulet, Weapon, Armor, Ammo, Food, Corpse, Ring, Potion, Wand, Tool, Container, Treasure,
   NumClasses
 }
 
@@ -18,7 +18,6 @@ public abstract class Item : ICloneable
   { Name=item.Name; Title=item.Title;
     Prefix=item.Prefix; PluralPrefix=item.PluralPrefix; PluralSuffix=item.PluralSuffix;
     Age=item.Age; Count=item.Count; Weight=item.Weight; Color=item.Color; Char=item.Char;
-    AllHandWield=item.AllHandWield;
   }
 
   public virtual void Think(Creature holder) { Age++; }
@@ -67,7 +66,6 @@ public abstract class Item : ICloneable
   public ItemClass Class;
   public Color Color;
   public char Char;
-  public bool AllHandWield;
 
   static readonly Type[] copyCons = new Type[] { typeof(Item) };
 }
@@ -108,6 +106,24 @@ public abstract class Wearable : Modifying
   public string EquipText;
   public Slot Slot;
   bool worn;
+}
+
+public abstract class Wieldable : Modifying
+{ 
+  public override string FullName
+  { get
+    { string ret = base.FullName;
+      if(equipped) ret += " (equipped)";
+      return ret;
+    }
+  }
+
+  public virtual void OnEquip  (Creature equipper) { equipped=true;  }
+  public virtual void OnUnequip(Creature equipper) { equipped=false; }
+
+  public Attr Exercises;
+  public bool AllHandWield;
+  bool equipped;
 }
 
 } // namespace Chrono

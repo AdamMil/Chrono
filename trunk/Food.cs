@@ -78,12 +78,16 @@ public class FortuneCookie : Food
     }
     return base.Eat(user);
   }
+
+  public static readonly int SpawnChance=50; // 0.5% chance
 }
 
 [Serializable]
 public class Hamburger : Food
 { public Hamburger() { name="hamburger"; Color=Color.Red; Weight=5; }
   public Hamburger(SerializationInfo info, StreamingContext context) : base(info, context) { }
+
+  public static readonly int SpawnChance=250; // 2.5% chance
 }
 
 [Serializable]
@@ -98,6 +102,8 @@ public class Flesh : Food
   public Flesh(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public Corpse FromCorpse;
+
+  public static readonly int SpawnChance=0; // 0% chance
 }
 
 } // namespace Chrono

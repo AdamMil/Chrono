@@ -96,6 +96,7 @@ public abstract class Spell : UniqueObject
   public int Difficulty; // 1-18, 1,2=level 1, 3,4=level 2, etc
   public int Memory; // memory of this spell, decreased every turn that the spell isn't cast, forgotten at zero
   public int Power;  // MP usage
+  public int Range;  // the approximate range of the wand, in tiles, if applicable
   public bool AutoIdentify;
   
   protected static ArrayList path = new ArrayList();
@@ -108,7 +109,7 @@ public abstract class Spell : UniqueObject
 
 #region BeamSpell
 public abstract class BeamSpell : Spell
-{ protected BeamSpell() { Target=SpellTarget.Tile; }
+{ protected BeamSpell() { Target=SpellTarget.Tile; Range=10; }
   protected BeamSpell(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override void Cast(Entity user, ItemStatus buc, Point tile, Direction dir)
@@ -117,7 +118,7 @@ public abstract class BeamSpell : Spell
     else if(user.Position==tile) Affect(user, user);
     else
     { bounces=0; oldPt=user.Position;
-      Global.TraceLine(oldPt, tile, 10, false, new LinePoint(ZapPoint), user);
+      Global.TraceLine(oldPt, tile, Range, false, new LinePoint(ZapPoint), user);
     }
   }
 
@@ -126,7 +127,7 @@ public abstract class BeamSpell : Spell
     if(user.Position==tile) path.Add(tile);
     else
     { bounces=0; oldPt=user.Position;
-      Global.TraceLine(oldPt, tile, 10, false, new LinePoint(TracePoint), user);
+      Global.TraceLine(oldPt, tile, Range, false, new LinePoint(TracePoint), user);
     }
     return path;
   }

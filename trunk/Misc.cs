@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Drawing;
 using System.Reflection;
 using System.Runtime.Serialization;
@@ -6,7 +7,7 @@ using System.Runtime.Serialization;
 namespace Chrono
 {
 
-public class EmptyEnumerator : System.Collections.IEnumerator
+public class EmptyEnumerator : IEnumerator
 { public object Current { get { throw new InvalidOperationException(); } }
   public bool MoveNext() { return false; }
   public void Reset() { }
@@ -64,8 +65,35 @@ public class UniqueObject : ISerializable
   public ulong ID;
 }
 
+public struct SpawnInfo
+{ public SpawnInfo(Type t)
+  { ItemType=t;
+  
+    BindingFlags flags = BindingFlags.FlattenHierarchy|BindingFlags.Static|BindingFlags.Public;
+    FieldInfo f = t.GetField("SpawnChance", flags);
+    SpawnChance = (int)f.GetValue(null);
+
+    f = t.GetField("SpawnMin", flags);
+    SpawnMin = f==null ? 1 : (int)f.GetValue(null);
+
+    f = t.GetField("SpawnMax", flags);
+    SpawnMax = f==null ? SpawnMin : (int)f.GetValue(null);
+  }
+
+  public Type ItemType;
+  public int SpawnChance, SpawnMin, SpawnMax;
+}
+
 public sealed class Global
 { private Global() { }
+
+  static Global()
+  { Type[] types = typeof(Item).Assembly.GetTypes(); // build a table of items and their spawn chances
+    ArrayList list = new ArrayList();
+    foreach(Type t in types)
+      if(!t.IsAbstract && t.IsSerializable && t.IsSubclassOf(typeof(Item))) list.Add(new SpawnInfo(t));
+    objSpawns = (SpawnInfo[])list.ToArray(typeof(SpawnInfo));
+  }
 
   public static ulong NextID { get { return nextID++; } }
 
@@ -96,6 +124,15 @@ public sealed class Global
   { int val=0;
     while(ndice-->0) { val += Random.Next(nsides)+1; }
     return val;
+  }
+
+  public static SpawnInfo NextSpawn()
+  { int n = Random.Next(10000)+1, total=0;
+    while(true)
+    { total += objSpawns[spawnIndex].SpawnChance;
+      if(++spawnIndex==objSpawns.Length) spawnIndex=0;
+      if(total>=n) return objSpawns[spawnIndex==0 ? objSpawns.Length-1 : spawnIndex-1];
+    }
   }
 
   public static Direction PointToDir(Point off)
@@ -169,10 +206,12 @@ public sealed class Global
     new Point(0, 1),  new Point(-1, 1), new Point(-1, 0), new Point(-1, -1)
   };
   
-  public static System.Collections.Hashtable ObjHash;
+  public static Hashtable ObjHash;
 
+  static SpawnInfo[] objSpawns;
   static Random Random = new Random();
   static ulong nextID=1;
+  static int spawnIndex;
 }
 
 } // namespace Chrono

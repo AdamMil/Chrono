@@ -23,6 +23,8 @@ public class FoolsBook : Spellbook
     Spells = new Spell[] { AmnesiaSpell.Default, ForceBolt.Default, TeleportSpell.Default, FireSpell.Default, };
   }
   public FoolsBook(SerializationInfo info, StreamingContext context) : base(info, context) { }
+
+  public static readonly int SpawnChance = 10; // 0.1% chance
 }
 
 } // namespace Chrono

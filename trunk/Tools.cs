@@ -24,6 +24,8 @@ public class Deodorant : Chargeable
     }
     else return base.Use(user, dir);
   }
+
+  public static readonly int SpawnChance=50; // 0.5% chance
 }
 
 } // namespace Chrono

@@ -20,11 +20,11 @@ public abstract class Scroll : Readable
   { return base.CanStackWith(item) && ((Scroll)item).Name==Name;
   }
 
-  public override string GetFullName(Entity e)
-  { if(e==null || e.KnowsAbout(this)) return FullName;
+  public override string GetFullName(Entity e, bool forceSingular)
+  { if(e==null || e.KnowsAbout(this)) return base.GetFullName(e, forceSingular);
     string tn = GetType().ToString(), rn = (string)namemap[tn];
     if(rn==null) namemap[tn] = rn = names[namei++];
-    rn = (Count>1 ? Count+" scrolls" : "scroll") + " labeled "+rn;
+    rn = (!forceSingular && Count>1 ? Count+" scrolls" : "scroll") + " labeled "+rn;
     if(Title!=null) rn += " named "+Title;
     return rn;
   }
@@ -80,6 +80,8 @@ public abstract class Scroll : Readable
 public class TeleportScroll : Scroll
 { public TeleportScroll() { name="teleport"; Color=Color.White; Spell=TeleportSpell.Default; }
   public TeleportScroll(SerializationInfo info, StreamingContext context) : base(info, context) { }
+
+  public static readonly int SpawnChance=100; // 1% chance
 }
 
 [Serializable]
@@ -103,6 +105,8 @@ public class IdentifyScroll : Scroll
       else foreach(Item i in user.Inv) if(!i.Identified) Spell.Cast(user, i);
     }
   }
+
+  public static readonly int SpawnChance=250; // 2.5% chance
 }
 
 } // namespace Chrono

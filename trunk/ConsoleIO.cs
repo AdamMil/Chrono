@@ -148,7 +148,7 @@ public sealed class ConsoleIO : InputOutput
     { if(clear)
       { ClearScreen();
         console.SetCursorPosition(0, 0);
-        WriteLine(Color.Normal, "The "+book.FullName);
+        WriteLine(Color.Normal, "The "+book.GetFullName(reader));
         console.WriteLine();
         clear=false;
       }
@@ -355,22 +355,24 @@ public sealed class ConsoleIO : InputOutput
     RestoreScreen();
   }
 
-  public override void DisplayTileItems(IInventory items) { DisplayTileItems(items, true); }
-  public void DisplayTileItems(IInventory items, bool visible)
+  public override void DisplayTileItems(Entity entity, IInventory items) { DisplayTileItems(entity, items, true); }
+  public void DisplayTileItems(Entity entity, IInventory items, bool visible)
   { if(items.Count==0) return;
-    if(items.Count==1) AddLine((visible ? "You see here: " : "You saw here: ")+items[0]);
+    if(items.Count==1) AddLine((visible ? "You see here: " : "You saw here: ")+items[0].GetAName(entity));
     else
     { int nitems=items.Count+1, space=LineSpace-uncleared-2;
       bool other=false;
       if(nitems>space)
       { nitems = space;
         if(nitems<=1) AddLine("There are several items here.");
-        else if(nitems==2) { AddLine((visible ? "You see here: " : "You saw here: ")+items[0]); other=true; }
+        else if(nitems==2)
+        { AddLine((visible ? "You see here: " : "You saw here: ")+items[0].GetAName(entity)); other=true;
+        }
       }
       if(nitems<=space || nitems>2)
       { AddLine("You see here:"); nitems--;
         if(nitems<items.Count) { other=true; nitems--; }
-        for(int i=0; i<nitems; i++) AddLine(items[i].ToString());
+        for(int i=0; i<nitems; i++) AddLine(items[i].GetAName(entity));
       }
       if(other) AddLine(visible ? "There are other items here as well." : "There were other items there as well.");
     }
@@ -382,7 +384,7 @@ public sealed class ConsoleIO : InputOutput
     string[] arr = new string[items.Count];
     int i=0;
     foreach(string s in items)
-      arr[i++] = ((Item)Type.GetType(s).GetConstructor(Type.EmptyTypes).Invoke(null)).FullName;
+      arr[i++] = ((Item)Type.GetType(s).GetConstructor(Type.EmptyTypes).Invoke(null)).GetFullName(null);
     Array.Sort(arr, System.Collections.Comparer.Default);
     for(i=0; i<arr.Length; i++) AddLine(arr[i]);
     DisplayMessages(true);
@@ -492,7 +494,7 @@ public sealed class ConsoleIO : InputOutput
       console.WriteLine("This item is made of {0}.", ((Wearable)item).Material.ToString().ToLower());
 
     if(item.Count>1)
-      console.WriteLine("They weigh about {0} mt. each ({1} total).", item.Weight, item.Weight*item.Count);
+      console.WriteLine("They weigh about {0} mt. each ({1} total).", item.Weight, item.FullWeight);
     else console.WriteLine("It weighs about {0} mt.", item.Weight);
     if(item.LongDesc!=null)
     { console.WriteLine();
@@ -856,7 +858,7 @@ public sealed class ConsoleIO : InputOutput
         default: AddLine("UNKNOWN AI STATE"); break;
       }
     }
-    if(viewer.Map.HasItems(pos)) DisplayTileItems(map[pos].Items, visible);
+    if(viewer.Map.HasItems(pos)) DisplayTileItems(viewer, map[pos].Items, visible);
     DrawLines();
     uncleared = 0;
   }
@@ -1117,7 +1119,7 @@ Ctrl-P - see old messages";
       if(player.Hands[i]!=null)
       { Item item = player.Hands[i];
         x += Write(item.Class==ItemClass.Weapon ? Color.LightCyan : Color.LightGreen, "{0}:{1} ",
-                   item.Char, item.FullName);
+                   item.Char, item.GetFullName(null));
       }
     while(x++<width) console.WriteChar(' ');
   }

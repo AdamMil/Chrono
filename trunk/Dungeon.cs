@@ -23,15 +23,10 @@ public class Dungeon
     maps[mi] = map = lg.Generate();
     map.Index = mi;
 
-    for(int i=0; i<10; i++) map.SpawnMonster();
-    for(int i=0; i<2; i++) map.AddItem(map.FreeSpace(true, true), new Hamburger());
-    for(int i=0; i<5; i++)
-    { Item item = new Gold();
-      item.Count = Global.NdN(2, 15);
-      map.AddItem(map.FreeSpace(true, true), item);
-    }
-    if(Global.Coinflip()) map.AddItem(map.FreeSpace(true, true), new HealPotion());
-    else map.AddItem(map.FreeSpace(true, true), new TeleportScroll());
+    int min = map.Width*map.Height/500, max = map.Width*map.Height/250;
+
+    for(int i=0,num=Global.Rand(max-min)+min+2; i<num; i++) map.SpawnItem();
+    for(int i=0,num=Global.Rand(max-min)+min; i<num; i++) map.SpawnMonster();
 
     for(int i=0; i<map.Links.Length; i++) map.Links[i].ToLevel = map.Links[i].Down ? mi+1 : mi-1;
   }

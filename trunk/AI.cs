@@ -9,7 +9,7 @@ namespace Chrono
 public enum AIState  { Wandering, Idle, Asleep, Patrolling, Attacking, Escaping };
 
 public abstract class AI : Entity
-{ public AI() { defaultState=state=AIState.Wandering; Eyesight=Hearing=Smelling=100; }
+{ protected AI() { }
   protected AI(SerializationInfo info, StreamingContext context) : base(info, context) { }
   
   public AIState State { get { return state; } }
@@ -64,11 +64,17 @@ public abstract class AI : Entity
   }
   public override void OnHitBy(Entity attacker, object item, Damage damage)
   { base.OnHitBy(attacker, item, damage);
-    if(state!=AIState.Attacking) GotoState(AIState.Attacking);
+    if(state!=AIState.Attacking)
+    { if(this.attacker!=null && CanSee(attacker)) this.attacker=attacker;
+      GotoState(AIState.Attacking);
+    }
   }
   public override void OnMissBy(Entity attacker, object item)
   { base.OnMissBy(attacker, item);
-    if(state!=AIState.Asleep && state!=AIState.Attacking && Global.Coinflip()) GotoState(AIState.Attacking);
+    if(state!=AIState.Asleep && state!=AIState.Attacking && Global.Coinflip())
+    { if(this.attacker!=null && CanSee(attacker)) this.attacker=attacker;
+      GotoState(AIState.Attacking);
+    }
   }
   public override void OnNoise(Entity source, Noise type, int volume)
   { volume = volume * Hearing / 100;
@@ -87,10 +93,13 @@ public abstract class AI : Entity
         case AIState.Idle: case AIState.Wandering: thresh *= 2; break; // 1/2 as likely to notice if unalert
         case AIState.Patrolling: thresh += thresh/2; break;            // 2/3 as likely to notice if patrolling
       }
+
+      // TODO: change this? maybe we want all monsters to shout..
+      alertOthers = type!=Noise.Alert; // don't shout if we ourselves were alerted by a shout
       if(volume>Map.MaxSound*thresh/100) GotoState(AIState.Attacking);
+      alertOthers = true;
     }
 
-    byte maxNoise = 0;
     if(state==AIState.Attacking)
       for(int i=0; i<8; i++)
       { Tile t = Map[Global.Move(Position, i)];
@@ -109,21 +118,31 @@ public abstract class AI : Entity
   public override void OnUnequip(Wieldable item) { Does("unequips", item); }
   public override void OnWear(Wearable item) { Does("puts on", item); }
   
-  public new void Pickup(Item item)
+  public new void Pickup(IInventory inv, Item item)
   { if(items==null) items=new ArrayList();
-    items.Add(base.Pickup(item));
+    items.Add(base.Pickup(inv, item));
   }
 
   public override void Think()
   { base.Think();
+    if(HP<=0) return;
+    if(attacker!=null && attacker.HP<=0) attacker=null;
     HandleState(state);
+    noiseDir=Direction.Invalid; maxNoise=0;
   }
 
-  public byte Eyesight, Hearing, Smelling; // effectiveness of these senses, 0-100%
-  public byte CorpseChance; // chance of leaving a corpse, 0-100%
-  public bool HasInventory; // whether the monster will pick up and use items
+  public byte Eyesight=100, Hearing=100, Smelling=100; // effectiveness of these senses, 0-100%
+  public byte CorpseChance=30; // chance of leaving a corpse, 0-100%
+  public bool HasInventory=true; // whether the monster will pick up and use items
   
-  protected enum Combat { Ranged, Melee };
+  protected enum Combat { None, Melee, Ranged };
+
+  protected Item AddItem(Item item)
+  { if(items==null) items=new ArrayList();
+    item = Inv.Add(item);
+    items.Add(item);
+    return item;
+  }
 
   protected virtual int AmuletScore(Amulet amulet)
   { int score = 0;
@@ -150,6 +169,81 @@ public abstract class AI : Entity
     }
 
     return score;
+  }
+
+  protected virtual bool Attack()
+  { int dist;
+
+    if(targetPoint.X!=-1)
+    { int xd=X-targetPoint.X, yd=Y-targetPoint.Y;
+      dist = (int)Math.Round(Math.Sqrt(xd*xd+yd*yd));
+    }
+    else dist = 0;
+
+    if(wakeup>0) // if we have a wakeup delay, don't attack yet
+    { wakeup--;
+      if(dist>4) // but we can prepare for combat
+      { if(combat!=Combat.Ranged && PrepareRanged(true)) return true;
+      }
+      else if(combat!=Combat.Melee && PrepareMelee(true)) return true;
+      return false;
+    }
+
+    if(targetPoint.X!=-1 && CanSee(targetPoint)) // we have a line of sight to the enemy
+    { timeout=5; // we know where the enemy is! our vigor is renewed!
+      if(dist>4 || bestWand!=null) // we know exactly where the target is and we want to use a ranged attack
+      { if(bestWand!=null && bestWand.Spell.Range>=dist) // use a wand if possible
+        { bool discard = bestWand.Charges==0;
+          App.IO.Print("{0} zaps {1}!", TheName, bestWand.GetAName(App.Player));
+          if(bestWand.Zap(this, targetPoint)) { Inv.Remove(bestWand); bestWand=null; }
+          else if(discard) bestWand=null;
+          return true;
+        }
+        if(combat!=Combat.Ranged && PrepareRanged(true)) return true; // switch to ranged weapon
+        // TODO: check to make sure the enemy is in range of our weapon
+        Weapon w = Weapon;
+        Ammo   a = SelectAmmo(w);
+        if(a!=null || w!=null && w.wClass==WeaponClass.Thrown)
+        { App.IO.Print("{0} attacks with {1}.", TheName, w.GetAName(App.Player, true));
+          Attack(w, a, targetPoint); return true;
+        }
+      }
+      if(combat!=Combat.Melee && PrepareMelee(true)) return true; // it's close or we have no ranged attack. use melee.
+    }
+    
+    // try our senses in the orders that are most reliable (sight, sound, scent, memory)
+    Direction dir = sightDir!=Direction.Invalid ? sightDir : noiseDir!=Direction.Invalid ? noiseDir :
+                    scentDir!=Direction.Invalid ? scentDir : lastDir;
+
+    if(dir!=Direction.Invalid) // we have some clue as to the target's direction
+    { bool usedSight=sightDir!=Direction.Invalid, usedSound=noiseDir!=Direction.Invalid;
+      Direction pdir = lastDir, nd; // lastDir is going to change on the next line, and we need the old value
+      lastDir = dir;
+
+      for(int i=-1; i<=1; i++) // if enemy is in front, attack. // TODO: prefer target, then any enemy
+      { nd = (Direction)((int)dir+i);
+        if(Map.GetEntity(Global.Move(Position, nd))==App.Player)
+        { if(combat!=Combat.Melee && PrepareMelee(true)) return true; // there's something close. goto melee
+          if(usedSight || pdir==nd || Global.Rand(100)<(usedSound?75:50))
+            Attack(Weapon, null, lastDir=nd);
+          else if(!usedSight && pdir!=nd && Map.GetEntity(Global.Move(Position, pdir))==null)
+          { Attack(Weapon, null, pdir);
+            App.IO.Print(TheName+" attacks empty space.");
+          }
+          timeout = 5; // we attacked something, so our vigor is renewed!
+          return true;
+        }
+      }
+
+      if(timeout==0) { lastDir=Direction.Invalid; GotoState(defaultState); return false; } // we give up
+
+      Point np = Global.Move(Position, dir); // we couldn't find anything to attack, so we try to move towards target
+      if(TryMove(np)) return true;
+      else if(TryMove(dir-1)) { lastDir--; return true; }
+      else if(TryMove(dir+1)) { lastDir++; return true; }
+      if(!usedSight && !usedSound) timeout--;
+    }
+    return false;
   }
 
   protected virtual void Die()
@@ -225,13 +319,21 @@ public abstract class AI : Entity
 
   protected virtual bool GotoState(AIState newstate) // returns true if we switched to the specified state
   { if(newstate==state) return true;
+    if(state==AIState.Attacking) alertOthers=true;
+    timeout = 0;
+
     if(newstate==AIState.Asleep && App.Player.CanSee(this)) App.IO.Print(TheName+" appears to have fallen asleep.");
     else if(newstate==AIState.Escaping)
     { if(App.Player.CanSee(this)) App.IO.Print(TheName+" turns to flee!");
       lastDir = Direction.Invalid; // force us to calculate a new direction
     }
-    else if(newstate==AIState.Attacking && state==AIState.Escaping && App.Player.CanSee(this))
-      App.IO.Print(TheName+" rejoins the battle!");
+    else if(newstate==AIState.Attacking)
+    { wakeup = state==AIState.Idle || state==AIState.Wandering ? 1 : state==AIState.Asleep ? 2 : 0;
+      if(alertOthers) Map.MakeNoise(Position, this, Noise.Alert, 150);
+      if(state==AIState.Escaping && App.Player.CanSee(this)) App.IO.Print(TheName+" rejoins the battle!");
+      timeout = 5; // we'll be in the attack state for at least 5 turns
+      lastDir = Direction.Invalid; // force us to calculate a new direction
+    }
     state = newstate;
     return true;
   }
@@ -239,6 +341,12 @@ public abstract class AI : Entity
   protected virtual bool HandleState(AIState state) // returns true if our turn was used up
   { switch(state)
     { case AIState.Asleep: return true;
+      case AIState.Attacking:
+        SenseEnemy();
+        if(PickupItems()) return true;
+        if(ProcessItems()) return true;
+        return Attack();
+      case AIState.Escaping: SenseEnemy(); return Escape();
       case AIState.Idle:   return DoIdleStuff();
       case AIState.Patrolling: case AIState.Wandering: return DoIdleStuff() ? true : Wander(); // TODO: implement AIState.Patrol
     }
@@ -287,37 +395,50 @@ public abstract class AI : Entity
   }
 
   protected virtual bool PickupItems()
-  { if(Inv.IsFull || !Map.HasItems(Position)) return false;
+  { if(!HasInventory || Inv.IsFull || !Map.HasItems(Position)) return false;
 
-    int weight = CarryWeight;
+    int weight = CarryWeight, burdenedAt = BurdenedAt*CarryMax/100;
     bool pickup=false;
-    if(weight<BurdenedAt)
-      foreach(Item i in Map[Position].Items)
-        if(weight+i.FullWeight<BurdenedAt && IsUseful(i)) { Pickup(i); pickup=true; weight += i.FullWeight; }
+    if(weight<burdenedAt)
+    { ItemPile items = Map[Position].Items;
+      for(int i=0; i<items.Count; i++)
+      { Item item = items[i];
+        if(weight+item.FullWeight<burdenedAt && IsUseful(item))
+        { Pickup(items, item); pickup=true;
+          weight += item.FullWeight;
+        }
+      }
+    }
     return pickup;
   }
 
-  protected virtual bool PrepareMelee()
+  protected bool Prepare(Combat type, bool forceEval)
+  { return type==Combat.Ranged ? PrepareRanged(forceEval) : PrepareMelee(forceEval);
+  }
+
+  protected bool PrepareMelee() { return PrepareMelee(false); }
+  protected virtual bool PrepareMelee(bool forceEval)
   { Item item=null;
     int quality=0;
     Weapon w = Weapon;
-    if(w==null || w.Ranged)
+    if(forceEval || w==null || w.Ranged)
     { EvaluateMelee(null, ref item, ref quality);
       foreach(Item i in Inv) if(i.Class==ItemClass.Weapon) EvaluateMelee((Weapon)i, ref item, ref quality);
-      if(item!=null && TryEquip((Wieldable)item)) return true;
-      if(w!=null && TryUnequip(w)) return true;
+      if(item!=w && (item!=null && TryEquip((Wieldable)item) || item==null && (w==null || TryUnequip(w))))
+      { combat=Combat.Melee; return true;
+      }
     }
     return false;
   }
-  
-  protected virtual bool PrepareRanged()
+
+  protected bool PrepareRanged() { return PrepareRanged(false); }
+  protected virtual bool PrepareRanged(bool forceEval)
   { Item item=null;
     int quality=0;
     Weapon w = Weapon;
-    if(w==null || !w.Ranged)
+    if(forceEval || w==null || !w.Ranged)
     { foreach(Item i in Inv) if(i.Class==ItemClass.Weapon) EvaluateRanged((Weapon)i, ref item, ref quality);
-      if(item!=null && TryEquip((Wieldable)item)) return true;
-      if(w!=null && TryUnequip(w)) return true;
+      if(item!=w && item!=null && TryEquip((Wieldable)item)) { combat=Combat.Ranged; return true; }
     }
     return false;
   }
@@ -326,12 +447,17 @@ public abstract class AI : Entity
   { if(i.Class==ItemClass.Armor || i.Class==ItemClass.Shield)
     { Modifying cur = i.Class==ItemClass.Shield ? (Modifying)Shield : (Modifying)Slots[(int)((Armor)i).Slot];
       int score = cur==null ? 0 : ArmorScore(cur);
-      if(ArmorScore((Modifying)i)>score && (i.Class==ItemClass.Shield && TryUnequip(cur) ||
-                                            i.Class!=ItemClass.Shield && TryRemove(cur)))
-      { if(i.Class==ItemClass.Shield) Equip((Shield)cur);
-        else Wear((Armor)cur);
+      if(ArmorScore((Modifying)i)>score && (cur==null || (i.Class==ItemClass.Shield && TryUnequip(cur) ||
+                                                          i.Class!=ItemClass.Shield && TryRemove(cur))))
+      { if(i.Class==ItemClass.Shield) Equip((Shield)i);
+        else Wear((Armor)i);
         return true;
       }
+    }
+    else if(i.Class==ItemClass.Weapon)
+    { Weapon w = (Weapon)i;
+      if(combat==Combat.Ranged && w.Ranged) return PrepareRanged(true);
+      else if(combat!=Combat.Ranged && !w.Ranged) return PrepareMelee(true);
     }
     else if(i.Class==ItemClass.Amulet)
     { Amulet cur = (Amulet)Slots[(int)Slot.Neck];
@@ -345,13 +471,19 @@ public abstract class AI : Entity
       if(score2<score) worst=ring2;
       if(RingScore((Ring)i)>score) { Remove(worst); Wear((Ring)i); return true; }
     }
+    else if(i.Class==ItemClass.Wand)
+    { Wand ni = (Wand)i;
+      int score = bestWand==null ? 0 : WandScore(bestWand);
+      if(WandScore(ni)>score) bestWand = ni;
+    }
     return false;
   }
 
   protected bool ProcessItems()
-  { int i;
+  { if(items==null) return false;
+    int i;
     bool processed=false;
-    for(i=0; i<items.Count; i++) if(ProcessItem((Item)items[i])) { processed=true; break; }
+    for(i=0; i<items.Count; i++) if(ProcessItem((Item)items[i])) { processed=true; i++; break; }
     items.RemoveRange(0, i);
     return processed;
   }
@@ -414,6 +546,26 @@ public abstract class AI : Entity
     return true;
   }
 
+  protected bool SenseEnemy()
+  { if(target==null) target = App.Player; // TODO: look for any enemy in the area (when we have entity<->entity relationships)
+    bool dontignore = state==AIState.Attacking || Global.Rand(100)>=target.Stealth*10-3; // ignore stealthy entities
+
+    sightDir = dontignore && Global.Rand(100)<Eyesight ? LookAt(target) : Direction.Invalid; // eyesight
+    targetPoint = sightDir!=Direction.Invalid ? target.Position : new Point(-1, -1);
+    if(Smelling>0) // try smell (not dampened by stealth, sound is handled elsewhere)
+    { int maxScent=0;
+      for(int i=0; i<8; i++)
+      { Tile t = Map[Global.Move(Position, i)];
+        if(Map.IsPassable(t.Type) && t.Scent>maxScent) { maxScent=t.Scent; scentDir=(Direction)i; }
+      }
+      if(maxScent!=100) maxScent = maxScent*Smelling/100; // scale by our smelling ability
+      if(state!=AIState.Attacking && maxScent<(Map.MaxScent/10)) // ignore light scents if not alerted
+        scentDir=Direction.Invalid;
+    }
+    else scentDir=Direction.Invalid;
+    return sightDir!=Direction.Invalid || noiseDir!=Direction.Invalid || scentDir!=Direction.Invalid;
+  }
+
   protected bool UseItem(IInventory inv, Item i)
   { switch(i.Class)
     { case ItemClass.Potion: ((Potion)i).Drink(this); break;
@@ -430,17 +582,33 @@ public abstract class AI : Entity
     return true;
   }
 
+  protected virtual int WandScore(Wand wand)
+  { if(wand.Charges==0) return 0;
+    if(wand is WandOfFire) return 10;
+    return 0;
+  }
+
   protected virtual bool Wander()
   { attacker = null;
     return RunAway();
   }
-  
+
   protected Entity attacker;      // the entity that last attacked us
-  protected Direction noiseDir;   // the direction of the last noise we heard
-  protected Direction lastDir;    // the direction we moved/acted in last time
-  protected AIState defaultState; // our default state (the one we go to when we have nothing to do)
-  protected AIState state;        // our current state
+  protected Entity target;        // the entity we're attacking
+  protected Wand bestWand;        // the best wand for attacking
   protected ArrayList items;      // items we've pickup up but haven't considered yet
+  protected Point targetPoint;    // where the target is (if we know) or -1,-1 if we don't
+  protected int timeout;          // how long we keep trying the current action
+  protected int wakeup;           // how long it takes us to get into attack mode
+  protected Direction noiseDir=Direction.Invalid;   // the direction of the last noise we heard
+  protected Direction sightDir=Direction.Invalid;   // the direction we saw the enemy in
+  protected Direction scentDir=Direction.Invalid;   // the direction in which we smell the enemy
+  protected Direction lastDir=Direction.Invalid;    // the direction we moved/acted in last time
+  protected AIState defaultState=AIState.Wandering; // our default state (the one we go to when we have nothing to do)
+  protected AIState state=AIState.Wandering;        // our current state
+  protected Combat combat;        // the type of combat we're prepared for
+  protected byte maxNoise;        // the loudest noise we've heard so far (reset at the end of every turn)
+  protected bool alertOthers=true;// true if we should alert others when we goto to the attack state
 
   void AddSkills(int points, Skill[] skills)
   { int[] skillTable = RaceSkills[(int)Race];

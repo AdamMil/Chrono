@@ -372,7 +372,7 @@ public class Player : Entity
         { Position = np;
           int noise = (10-Stealth)*12; // stealth = 0 to 10
           if(noise>0) Map.MakeNoise(np, this, Noise.Walking, (byte)noise);
-          if(count<=1 && Map.HasItems(np)) App.IO.DisplayTileItems(Map[np].Items);
+          if(count<=1 && Map.HasItems(np)) App.IO.DisplayTileItems(this, Map[np].Items);
           inp.Count = count;
         }
         else goto next;
@@ -398,7 +398,7 @@ public class Player : Entity
         { if(ThinkUpdate(ref vis)) goto next;
           TileType type = Map[np].Type;
           if(type==TileType.UpStairs || type==TileType.DownStairs) goto next;
-          if(Map.HasItems(np)) { App.IO.DisplayTileItems(Map[np].Items); goto next; }
+          if(Map.HasItems(np)) { App.IO.DisplayTileItems(this, Map[np].Items); goto next; }
 
           int newopts=0;
           for(int i=0; i<5; i++)
@@ -573,11 +573,11 @@ public class Player : Entity
         if(other!=null && other!=items[0].Item)
         { other.Char = items[0].Item.Char;
           Inv.Add(other);
-          App.IO.Print("{0} - {1}", other.Char, other);
+          App.IO.Print("{0} - {1}", other.Char, other.GetFullName(this));
         }
         items[0].Item.Char = c;
         Inv.Add(items[0].Item);
-        App.IO.Print("{0} - {1}", c, items[0].Item);
+        App.IO.Print("{0} - {1}", c, items[0].Item.GetFullName(this));
         goto next;
       }
 
@@ -635,7 +635,7 @@ public class Player : Entity
             }
           }
         } while(!ThinkUpdate(ref vis) && Position!=pt);
-        if(Map.HasItems(Position)) App.IO.DisplayTileItems(Map[Position].Items);
+        if(Map.HasItems(Position)) App.IO.DisplayTileItems(this, Map[Position].Items);
         goto next;
       }
       
@@ -883,8 +883,8 @@ public class Player : Entity
   }
   public override void OnHitBy(Entity attacker, object item, Damage damage)
   { Interrupt();
-    if(attacker!=this)
-      App.IO.Print(damage.Total>0 ? "{0} hits you!" : "{0} hits you, but does no damage.", attacker.TheName);
+    if(attacker!=this) App.IO.Print(damage.Total>0 ? "{0} hits you!" : "{0} hits you, but does no damage.",
+                                    item is Spell ? "The spell" : attacker.TheName);
   }
   public override void OnInvoke(Item item) { App.IO.Print("You invoke {0}.", item.GetAName(this)); }
   public override void OnKill(Entity killed) { App.IO.Print("You kill {0}!", killed.TheName); }
@@ -894,7 +894,8 @@ public class Player : Entity
       App.IO.Print("The spell {0} {1}.", Global.Coinflip() ? "misses" : "whizzes by", hit==this ? "you" : hit.theName);
   }
   public override void OnMissBy(Entity attacker, object item)
-  { if(attacker!=this) App.IO.Print("{0} misses you.", attacker.TheName);
+  { if(Global.Coinflip()) Interrupt();
+    if(attacker!=this) App.IO.Print("{0} misses you.", item is Spell ? "The spell" : attacker.TheName);
   }
   public override void OnNoise(Entity source, Noise type, int volume)
   { if(type==Noise.Alert) { App.IO.Print("You hear a shout!"); Interrupt(); }

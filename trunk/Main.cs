@@ -30,39 +30,34 @@ public sealed class App
     else
     { Map map = Dungeon[0];
 
-      Player = Player.Generate(EntityClass.Wizard, Race.Human);
+      char c = IO.CharChoice("(w)izard or (f)ighter?", "wf");
+      Player = Player.Generate(c=='w' ? EntityClass.Wizard : EntityClass.Fighter, Race.Human);
       Player.Name = IO.Ask("Enter your name:", false, "I need to know what to call you!");
-      
+
       for(int y=0; y<map.Height; y++) // place Player on the up staircase of the first level
         for(int x=0; x<map.Width; x++)
           if(map[x, y].Type==TileType.UpStairs) { Player.X = x; Player.Y = y; break; }
-      Player.SetBaseAttr(Attr.AC, 5);
-      Player.SetBaseAttr(Attr.EV, 5);
-      Player.SetSkill(Skill.Casting, 1);
-      Player.SetSkill(Skill.Elemental, 1);
-      Player.SetSkill(Skill.Telekinesis, 1);
-      /*Player.SetSkill(Skill.Fighting, 1);
-      Player.SetSkill(Skill.Armor, 1);*/
-      Player.Pickup(new Bow());
-      Player.Pickup(new ShortSword());
-      Player.Pickup(new Dart()).Count = 20;
-      Player.Pickup(new Buckler());
-      Player.Pickup(new PaperBag());
-      Player.Pickup(new BasicArrow()).Count = 20;
-      Player.Pickup(new FlamingArrow()).Count = 10;
-      Player.Pickup(new Hamburger());
-      Player.Pickup(new InvisibilityRing());
-      Player.Pickup(new SeeInvisibleRing());
-      Player.Pickup(new TeleportScroll());
-      Player.Pickup(new IdentifyScroll()).Count=2;
-      Player.Pickup(new HealPotion()).Count=2;
-      Player.Pickup(new Deodorant());
-      Player.Pickup(new WandOfFire());
-      Player.Pickup(new FoolsBook());
 
-      Player.Inv[0].Curse();
-      Player.Inv[3].Curse();
-      Player.Inv[4].Curse();
+      if(Player.Class==EntityClass.Fighter)
+      { Player.SetSkill(Skill.Fighting, 1);
+        Player.SetSkill(Skill.Armor, 1);
+        Player.SetSkill(Skill.Bow, 1);
+        Player.SetSkill(Skill.ShortBlade, 1);
+        Player.Pickup(new ShortSword());
+      }
+      else
+      { Player.SetSkill(Skill.Casting, 1);
+        Player.SetSkill(Skill.Elemental, 1);
+        Player.SetSkill(Skill.Telekinesis, 1);
+        Player.SetSkill(Skill.Divination, 1);
+        Player.Pickup(new PoisonDart()).Count = 10;
+        Player.Pickup(new FoolsBook());
+      }
+      Player.Pickup(new Hamburger()).Count = 2;
+      Player.Pickup(new TeleportScroll());
+      Player.Pickup(new HealPotion()).Count = 2;
+      Player.Pickup(new Deodorant());
+      foreach(Item i in Player.Inv) Player.AddKnowledge(i);
 
       map.Entities.Add(Player);
     }

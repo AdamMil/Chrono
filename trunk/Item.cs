@@ -48,15 +48,6 @@ public abstract class Item : UniqueObject, ICloneable
   { get { return (Status&(ItemStatus.KnowCB|ItemStatus.Cursed|ItemStatus.Blessed))==ItemStatus.KnowCB; }
   }
 
-  public virtual string FullName
-  { get
-    { string status = StatusString;
-      if(status!="") status += ' ';
-      string ret = Count>1 ? Count.ToString()+' '+status+PluralPrefix+Name+PluralSuffix : status+Prefix+Name;
-      if(Title!=null) ret += " named "+Title;
-      return ret;
-    }
-  }
   public int FullWeight { get { return Weight*Count; } }
 
   public bool Identified { get { return (Status&ItemStatus.Identified)!=0; } }
@@ -82,7 +73,7 @@ public abstract class Item : UniqueObject, ICloneable
     }
   }
 
-  public virtual object Clone()
+  public object Clone()
   { buffer.Position = 0;
     formatter.Serialize(buffer, this);
     buffer.Position = 0;
@@ -101,8 +92,17 @@ public abstract class Item : UniqueObject, ICloneable
   public void Curse() { Status = Status&~ItemStatus.Blessed|ItemStatus.Cursed; }
   public void Uncurse() { Status &= ~(ItemStatus.Blessed|ItemStatus.Cursed); }
 
-  public string GetAName(Entity e) { return Global.WithAorAn(GetFullName(e)); }
-  public virtual string GetFullName(Entity e) { return FullName; }
+  public string GetAName(Entity e) { return Global.WithAorAn(GetFullName(e, false)); }
+  public string GetAName(Entity e, bool forceSingluar) { return Global.WithAorAn(GetFullName(e, forceSingluar)); }
+  public string GetFullName(Entity e) { return GetFullName(e, false); }
+  public virtual string GetFullName(Entity e, bool forceSingular)
+  { string status = StatusString;
+    if(status!="") status += ' ';
+    string ret = !forceSingular && Count>1 ? Count.ToString()+' '+status+PluralPrefix+Name+PluralSuffix
+                                           : status+Prefix+Name;
+    if(Title!=null) ret += " named "+Title;
+    return ret;
+  }
   public virtual string GetInvName(Entity e) { return Global.WithAorAn(GetFullName(e)); }
   public byte GetNoise(Entity e) { return (byte)Math.Max(Math.Min(Noise*15-e.Stealth*8, 255), 0); }
 
@@ -128,8 +128,9 @@ public abstract class Item : UniqueObject, ICloneable
     return false;
   }
 
-  public virtual void OnPickup(Entity holder) { }
   public virtual void OnDrop  (Entity holder) { }
+  public virtual void OnPickup(Entity holder) { }
+  public virtual void OnMap() { } // put on the map
 
   public Item Split(int toRemove)
   { if(toRemove>=Count) throw new ArgumentOutOfRangeException("toRemove", toRemove, "is >= than Count");
@@ -138,8 +139,6 @@ public abstract class Item : UniqueObject, ICloneable
     Count -= toRemove;
     return newItem;
   }
-
-  public override string ToString() { return FullName; }
 
   public string Title, Prefix, PluralPrefix, PluralSuffix, ShortDesc, LongDesc;
   public int Age, Count, Weight; // age in map ticks, number in the stack, weight (5 = approx. 1 pound)
@@ -197,6 +196,7 @@ public abstract class Wearable : Modifying
     return ret;
   }
 
+  public override void OnMap() { worn = false; }
   public virtual void OnRemove(Entity equipper) { worn=false;  }
   public virtual void OnWear  (Entity equipper) { worn=true; }
 
@@ -217,6 +217,7 @@ public abstract class Wieldable : Modifying
 
   public virtual void OnEquip  (Entity equipper) { equipped=true;  }
   public virtual void OnUnequip(Entity equipper) { equipped=false; }
+  public override void OnMap() { equipped=false; }
 
   public Attr Exercises;
   public bool AllHandWield;
@@ -241,6 +242,8 @@ public class Gold : Item
   public Gold(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override bool CanStackWith(Item item) { return item.Class==ItemClass.Gold; }
+  
+  public static readonly int SpawnChance=200; // 2% chance
 }
 
 } // namespace Chrono

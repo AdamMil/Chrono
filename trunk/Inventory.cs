@@ -45,7 +45,7 @@ public sealed class ItemPile : IInventory
   public int Weight
   { get
     { int weight=0;
-      if(items!=null) foreach(Item i in items) weight += i.Weight*i.Count;
+      if(items!=null) foreach(Item i in items) weight += i.FullWeight;
       return weight;
     }
   }
@@ -107,7 +107,7 @@ public sealed class Inventory : IKeyedInventory
   public int Weight
   { get
     { int weight=0;
-      if(items!=null) foreach(Item i in items.Values) weight += i.Weight*i.Count;
+      if(items!=null) foreach(Item i in items.Values) weight += i.FullWeight;
       return weight;
     }
   }

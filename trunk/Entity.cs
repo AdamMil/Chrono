@@ -295,18 +295,16 @@ public abstract class Entity : UniqueObject
     }
     else if(item!=null) destroy = item.Hit(this, res.Point);
 
-    if(ranged) // put the item on the ground
+    if(ranged) // remove the item from our hand/quiver
     { if(ammo!=null) item=ammo;
       int staychance = destroy ? 0 : item.Durability==-1 ? item.Weight*5+15 : item.Durability;
       if(item.Count==1)
-      { TryUnequip(item);
+      { RemoveFromHand(item);
         Inv.Remove(item);
       }
-      if(Global.Rand(100)<staychance) // destroyed
-      { if(item.Count>1) item.Count--;
-      }
-      else Map.AddItem(c!=null || Map.IsPassable(Map[res.Point].Type) ? res.Point : res.Previous, // stays
-                       item.Count>1 ? item.Split(1) : item);
+      else item = item.Split(1);
+      if(Global.Rand(100)<staychance) // put the item on the ground
+        Map.AddItem(c!=null || Map.IsPassable(Map[res.Point].Type) ? res.Point : res.Previous, item);
     }
   }
 
@@ -647,6 +645,14 @@ public abstract class Entity : UniqueObject
     CheckFlags();
   }
 
+  public void RemoveFromHand(Item item)
+  { for(int i=0; i<Hands.Length; i++) if(Hands[i]==item) { RemoveFromHand(i); return; }
+  }
+  public void RemoveFromHand(int hand)
+  { Hands[hand] = null;
+    CheckFlags();
+  }
+
   public Ammo SelectAmmo(Weapon w)
   { FiringWeapon fw = w as FiringWeapon;
     if(fw==null) return null;
@@ -957,12 +963,7 @@ public abstract class Entity : UniqueObject
     hit = hit || c==this || TryHit(c, item);
 
     if(hit) destroyed = TryDamage(c, item, ammo);
-    else
-    { c.Exercise(Attr.EV);
-      c.OnMissBy(this, item);
-      OnMiss(c, item);
-      noise /= 2;
-    }
+    else noise /= 2;
     if((this==App.Player || c==App.Player) && noise>0)
       Map.MakeNoise(this==App.Player ? Position : c.Position, this, Noise.Combat, (byte)noise);
 
@@ -983,7 +984,7 @@ public abstract class Entity : UniqueObject
   // calculates our unarmed combat damage without skill bonuses
   protected virtual Damage CalculateDamage(Entity target)
   { // FIXME: make this higher for entities skilled in unarmed combat, and lower for those without
-    return new Damage(Math.Max(1, StrBonus));
+    return new Damage(Math.Max(1, StrBonus/2+1));
   }
 
   protected void CheckFlags() // check if our flags have changed and call OnFlagsChanged if so
@@ -1071,6 +1072,7 @@ public abstract class Entity : UniqueObject
   { Tile t=Map[pt];
     string msg=null;
     byte noise=0;
+    bool effect=false;
 
     if(t.Type==TileType.ClosedDoor)
     { int pdam = damage.Direct+damage.Physical, hdam = damage.Heat;
@@ -1078,9 +1080,10 @@ public abstract class Entity : UniqueObject
       { Map.SetType(pt, TileType.RoomFloor);
         if(hdam>pdam) { msg="The door burns!"; noise=80; }
         else { msg="Crash! You break down the door."; noise=200; }
+        effect = true;
       }
     }
-    else return false;
+    if(!effect) return false;
 
     if(this==App.Player)
     { if(msg!=null) App.IO.Print(msg);
@@ -1103,11 +1106,16 @@ public abstract class Entity : UniqueObject
     toHit   -= (toHit  *((int)  HungerLevel*10)+99)/100; // effects of hunger -10% per hunger level (rounded up)
     toEvade -= (toEvade*((int)c.HungerLevel*10)+99)/100;
 
-    c.Exercise(Skill.Dodge);
-
     int n = Global.Rand(toHit+toEvade);
     App.IO.Print(Color.DarkGrey, "HIT: (toHit: {0}, EV: {1}, roll: {2} = {3})", toHit, toEvade, n, n>=toEvade ? "hit" : "miss");
-    return n>=toEvade;
+    if(n<toEvade)
+    { c.Exercise(Skill.Dodge);
+      c.Exercise(Attr.EV);
+      c.OnMissBy(this, item);
+      OnMiss(c, item);
+      return false;
+    }
+    return true;
   }
   
   void VisibleLine(int x2, int y2)

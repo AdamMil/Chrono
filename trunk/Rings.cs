@@ -14,8 +14,8 @@ public abstract class Ring : Wearable
   protected Ring(SerializationInfo info, StreamingContext context) : base(info, context) { }
   static Ring() { Global.RandomizeNames(names); }
 
-  public override string GetFullName(Entity e)
-  { if(e==null || e.KnowsAbout(this)) return FullName;
+  public override string GetFullName(Entity e, bool forceSingular)
+  { if(e==null || e.KnowsAbout(this)) return base.GetFullName(e, forceSingular);
     string tn = GetType().ToString(), rn = (string)namemap[tn];
     if(rn==null) namemap[tn] = rn = names[namei++];
     rn += " ring";
@@ -50,12 +50,16 @@ public class InvisibilityRing : Ring
     if(holder==App.Player) holder.Hunger += 2;
     return false;
   }
+
+  public static readonly int SpawnChance=50; // 0.5% chance
 }
 
 [Serializable]
 public class SeeInvisibleRing : Ring
 { public SeeInvisibleRing() { name="see invisible"; Color=Color.LightCyan; FlagMods=Entity.Flag.SeeInvisible; }
   public SeeInvisibleRing(SerializationInfo info, StreamingContext context) : base(info, context) { }
+
+  public static readonly int SpawnChance=50; // 0.5% chance
 }
 
 } // namespace Chrono

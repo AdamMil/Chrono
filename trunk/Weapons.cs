@@ -9,24 +9,25 @@ public enum WeaponClass
 
 public abstract class Weapon : Wieldable
 { public Weapon() { Class=ItemClass.Weapon; }
+  protected Weapon(Item item) : base(item)
+  { Weapon ow = (Weapon)item;
+    wClass=ow.wClass; Delay=ow.Delay; Noise=ow.Noise; ToHitBonus=ow.ToHitBonus; Ranged=ow.Ranged;
+  }
 
-  public abstract int CalculateDamage(Entity user);
+  public abstract int CalculateDamage(Entity user, Entity target); // target can be null
 
   public WeaponClass wClass;
-  public int Delay; // delay (percentage of speed)
-  public int Noise; // noise this weapon makes (0-10)
-  public int ToHitBonus;
+  public int  Delay;  // delay (percentage of speed)
+  public int  Noise;  // noise this weapon makes (0-10)
+  public int  ToHitBonus;
+  public bool Ranged;
 }
 
-public class CueStick : Weapon
-{ public CueStick()
-  { name="cue stick"; Weight=5; Delay=10; Color=Color.Brown; Noise=4;
-    wClass=WeaponClass.Staff; Mods[(int)Attr.EV]=1; AllHandWield=true;
-    ShortDesc="A long, tapered staff with a white tip.";
-    LongDesc="You don't quite remember how you happened upon this cue stick. The last thing you remember, you were in a bar drinking with some buddies...";
-  }
+public class Dart : Weapon
+{ public Dart() { wClass=WeaponClass.Thrown; Ranged=true; name="dart"; Weight=1; }
+  public Dart(Item item) : base(item) { }
   
-  public override int CalculateDamage(Entity user) { return Global.NdN(1, 5) + user.StrBonus; }
+  public override int CalculateDamage(Entity user, Entity target) { return Global.NdN(1, 3) + user.StrBonus; }
 }
 
 public class ShortSword : Weapon
@@ -35,7 +36,7 @@ public class ShortSword : Weapon
     wClass=WeaponClass.ShortBlade; Exercises=Attr.Str; Noise=5;
   }
 
-  public override int CalculateDamage(Entity user) { return Global.NdN(1, 6) + user.StrBonus; }
+  public override int CalculateDamage(Entity user, Entity target) { return Global.NdN(1, 6) + user.StrBonus; }
 }
 
 public class TwigOfDeath : Weapon
@@ -63,7 +64,7 @@ public class TwigOfDeath : Weapon
     return false;
   }
 
-  public override int CalculateDamage(Entity user) { return Global.NdN(8, 8) - user.StrBonus; }
+  public override int CalculateDamage(Entity user, Entity target) { return Global.NdN(8, 8) - user.StrBonus; }
 }
 
 } // namespace Chrono

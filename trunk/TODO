@@ -28,3 +28,6 @@ add reasonable defaults for USEing items (scroll, potion, etc)
 make character hesitant to eat raw flesh
 make deodorant set smell to 0
 handle case when inventory is full in various places
+make Fire check for sufficient ammo
+alter AI so that ranged weapons can be used
+handle splitting thrown/fired items and putting them on the map

@@ -7,7 +7,7 @@ namespace Chrono
 public enum Action
 { None, Quit, Rest, Move, MoveToInteresting, MoveToDanger, MoveAFAP, OpenDoor, CloseDoor, Pickup, Drop, DropType,
   GoUp, GoDown, Eat, Wear, Remove, Wield, Inventory, ShowMap, Fire, Quaff, Read, ViewItem, Invoke, SwapAB, Reassign,
-  ManageSkills, UseItem, Carve
+  ManageSkills, UseItem, Carve, ExamineTile,
 }
 
 public struct Input
@@ -93,6 +93,9 @@ public abstract class InputOutput
   public abstract void DisplayTileItems(IInventory items);
   public abstract void DisplayMap(Entity viewer);
 
+  public abstract void ExamineItem(Entity viewer, Item item);
+  public abstract void ExamineTile(Entity viewer, SD.Point pos);
+
   public abstract Input GetNextInput();
 
   public abstract void ManageSkills(Entity player);
@@ -111,8 +114,6 @@ public abstract class InputOutput
   public abstract void Render(Entity viewer);
 
   public abstract void SetTitle(string title);
-
-  public abstract void ViewItem(Item item);
 
   public bool YesNo(string prompt, bool defaultYes) { return YesNo(Color.Normal, prompt, defaultYes); }
   public abstract bool YesNo(Color color, string prompt, bool defaultYes);

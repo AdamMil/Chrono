@@ -15,7 +15,7 @@ public abstract class Item : ICloneable
 { public Item()
   { Prefix="a "; PluralPrefix=string.Empty; PluralSuffix="s"; Count=1; Color=Color.White;
   }
-  public Item(Item item)
+  protected Item(Item item)
   { name=item.name; Title=item.Title; Class=item.Class;
     Prefix=item.Prefix; PluralPrefix=item.PluralPrefix; PluralSuffix=item.PluralSuffix;
     Age=item.Age; Count=item.Count; Weight=item.Weight; Color=item.Color; Char=item.Char;
@@ -79,7 +79,7 @@ public abstract class Item : ICloneable
   public override string ToString() { return FullName; }
 
   public string Title, Prefix, PluralPrefix, PluralSuffix, ShortDesc, LongDesc;
-  public int Age, Count, Weight;
+  public int Age, Count, Weight; // age in map ticks, number in the stack, weight (5 = approx. 1 pound)
   public ItemClass Class;
   public Color Color;
   public char Char;
@@ -92,7 +92,12 @@ public abstract class Item : ICloneable
 #endregion
 
 public abstract class Modifying : Item
-{ public override bool CanStackWith(Item item) { return false; }
+{ protected Modifying() { }
+  protected Modifying(Item item)
+  { Modifying mi = (Modifying)item; Mods=(int[])mi.Mods.Clone(); FlagMods=mi.FlagMods;
+  }
+
+  public override bool CanStackWith(Item item) { return false; }
 
   public int AC { get { return Mods[(int)Attr.AC]; } set { Mods[(int)Attr.AC]=value; } }
   public int Dex { get { return Mods[(int)Attr.Dex]; } set { Mods[(int)Attr.Dex]=value; } }
@@ -128,13 +133,16 @@ public abstract class Wearable : Modifying
   public virtual void OnRemove(Entity equipper) { worn=false;  }
   public virtual void OnWear  (Entity equipper) { worn=true; }
 
-  public string EquipText;
   public Slot Slot;
   bool worn;
 }
 
 public abstract class Wieldable : Modifying
-{ public override string InvName
+{ protected Wieldable() { }
+  protected Wieldable(Item item)
+  { Wieldable wi = (Wieldable)item; Exercises=wi.Exercises; AllHandWield=wi.AllHandWield;
+  }
+  public override string InvName
   { get
     { string ret = FullName;
       if(equipped) ret += " (equipped)";

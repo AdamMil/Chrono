@@ -172,11 +172,18 @@ public abstract class Modifying : Item
   public override bool CanStackWith(Item item) { return false; }
 
   public int AC { get { return Mods[(int)Attr.AC]; } set { Mods[(int)Attr.AC]=value; } }
+  public int ColdRes { get { return Mods[(int)Attr.ColdRes]; } set { Mods[(int)Attr.ColdRes]=value; } }
   public int Dex { get { return Mods[(int)Attr.Dex]; } set { Mods[(int)Attr.Dex]=value; } }
+  public int ElectricityRes
+  { get { return Mods[(int)Attr.ElectricityRes]; }
+    set { Mods[(int)Attr.ElectricityRes]=value; }
+  }
   public int EV { get { return Mods[(int)Attr.EV]; } set { Mods[(int)Attr.EV]=value; } }
+  public int HeatRes { get { return Mods[(int)Attr.HeatRes]; } set { Mods[(int)Attr.HeatRes]=value; } }
   public int Int { get { return Mods[(int)Attr.Int]; } set { Mods[(int)Attr.Int]=value; } }
   public int MaxHP { get { return Mods[(int)Attr.MaxHP]; } set { Mods[(int)Attr.MaxHP]=value; } }
   public int MaxMP { get { return Mods[(int)Attr.MaxMP]; } set { Mods[(int)Attr.MaxMP]=value; } }
+  public int PoisonRes { get { return Mods[(int)Attr.PoisonRes]; } set { Mods[(int)Attr.PoisonRes]=value; } }
   public int Speed { get { return Mods[(int)Attr.Speed]; } set { Mods[(int)Attr.Speed]=value; } }
   public int Stealth { get { return Mods[(int)Attr.Stealth]; } set { Mods[(int)Attr.Stealth]=value; } }
   public int Str { get { return Mods[(int)Attr.Str]; } set { Mods[(int)Attr.Str]=value; } }

@@ -12,12 +12,17 @@ public class Orc : AI
   
   public override void Generate(int level, EntityClass myClass)
   { base.Generate(level, myClass);
+
+    SetSkill(Skill.Fighting, 1);
+
     if(Global.Rand(100)<10)
-    { AddItem(new Bow());
+    { SetSkill(Skill.Bow, 1);
+      AddItem(new Bow());
       AddItem(Global.Coinflip() ? (Arrow)new BasicArrow() : (Arrow)new FlamingArrow()).Count = Global.Rand(5) + 5;
     }
-    else if(Global.Rand(100)<10) AddItem(new ShortSword());
-    else if(Global.Rand(100)<10) AddItem(new PoisonDart()).Count = 5;
+    else if(Global.Rand(100)<10) { AddItem(new ShortSword()); SetSkill(Skill.ShortBlade, 1); }
+    else if(Global.Rand(100)<10) { AddItem(new PoisonDart()).Count = 5; SetSkill(Skill.Throwing, 1); }
+    else SetSkill(Skill.UnarmedCombat, 1);
     if(Global.Rand(100)<10) AddItem(new PaperBag());
     if(Global.Rand(100)<10) AddItem(new TeleportScroll());
     if(Global.Rand(100)<10) AddItem(new HealPotion());

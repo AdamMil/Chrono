@@ -11,7 +11,7 @@ public enum SpellTarget { Self, Item, Tile };
 public enum SpellClass // remember to add these to the Skill enum as well
 { Summoning, Enchantment, Telekinesis, Translocation, Transformation, Divination, Channeling, Necromancy, Elemental,
   Poison,
-  
+
   NumClasses
 }
 
@@ -97,7 +97,7 @@ public abstract class Spell : UniqueObject
 
   public virtual ICollection TracePath(Entity user, Point pt) { return null; }
 
-  public string Name, Description;
+  public string Name;
   public SpellClass  Class;
   public SpellTarget Target;
   public int Difficulty; // 1-18, 1,2=level 1, 3,4=level 2, etc
@@ -105,9 +105,33 @@ public abstract class Spell : UniqueObject
   public int Power;  // MP usage
   public int Range;  // the approximate range of the wand, in tiles, if applicable
   public bool AutoIdentify;
-  
+
+  protected bool TryHit(Entity user, Entity target)
+  { int skill = user.GetSkill(Skill);
+    int toHit = (user.Int+skill+1)/2;
+    int toEvade = target.EV;
+    
+    if(skill==0) toHit = (toHit+1)/2;
+    else if(skill==1) toHit -= (toHit+2)/4;
+    else toHit = (int)Math.Round(toHit*Entity.SkillModifier(skill));
+    
+    toEvade += (toEvade*target.GetSkill(Skill.Dodge)*10+50)/100;
+
+    toHit   -= (toHit  *((int)user.HungerLevel*10)+99)/100; // effects of hunger -10% per hunger level (rounded up)
+    toEvade -= (toEvade*((int)target.HungerLevel*10)+99)/100;
+
+    int n = Global.Rand(toHit+toEvade);
+    App.IO.Print(Color.DarkGrey, "SpHIT: (toHit: {0}, EV: {1}, roll: {2} = {3})", toHit, toEvade, n, n>=toEvade ? "hit" : "miss");
+    if(n<toEvade)
+    { target.Exercise(Skill.Dodge);
+      target.Exercise(Attr.EV);
+      return false;
+    }
+    return true;
+  }
+
   protected static ArrayList path = new ArrayList();
-  
+
   static readonly int[] armorPenalty = new int[]
   { (int)Slot.Feet, 5, (int)Slot.Hands, 10, (int)Slot.Head, 5, (int)Slot.Legs, 10, (int)Slot.Torso, 25
   };
@@ -139,7 +163,19 @@ public abstract class BeamSpell : Spell
     return path;
   }
 
-  protected abstract object Hit(Entity user, Point pt);
+  protected virtual object Hit(Entity user, Point pt)
+  { Entity e = user.Map.GetEntity(pt);
+    if(e!=null)
+    { if(TryHit(user, e)) return e;
+      else
+      { e.OnMissBy(user, this);
+        user.OnMiss(e, this);
+        return null;
+      }
+    }
+    else return Map.IsPassable(user.Map[pt].Type) ? null : (object)pt;
+  }
+
   protected abstract void Affect(Entity user, object obj);
   protected abstract bool Affect(Entity user, Direction dir); // returns if execution should continue (in Cast)
 
@@ -152,6 +188,7 @@ public abstract class BeamSpell : Spell
       ret = TraceAction.Bounce;
       if(!Map.IsPassable(user.Map[oldPt.X, pt.Y].Type)) ret &= ~TraceAction.HBounce;
       if(!Map.IsPassable(user.Map[pt.X, oldPt.Y].Type)) ret &= ~TraceAction.VBounce;
+      if(ret==0) ret=TraceAction.Bounce;
     }
     else ret = TraceAction.Go;
     oldPt=pt;
@@ -166,6 +203,7 @@ public abstract class BeamSpell : Spell
       ret = TraceAction.Bounce;
       if(!Map.IsPassable(user.Map[oldPt.X, pt.Y].Type)) ret &= ~TraceAction.HBounce;
       if(!Map.IsPassable(user.Map[pt.X, oldPt.Y].Type)) ret &= ~TraceAction.VBounce;
+      if(ret==0) ret=TraceAction.Bounce;
       if(user==App.Player) App.IO.Print("The spell bounces!");
     }
     else ret=TraceAction.Go;
@@ -184,13 +222,8 @@ public abstract class BeamSpell : Spell
 #region ForceBolt
 [Serializable]
 public class ForceBolt : BeamSpell
-{ public ForceBolt()
-  { Name="force bolt"; Class=SpellClass.Telekinesis; Difficulty=1; Power=2;
-    Description = "The spell forces stuff. Yeah.";
-  }
+{ public ForceBolt() { Name="force bolt"; Class=SpellClass.Telekinesis; Difficulty=1; Power=2; }
   public ForceBolt(SerializationInfo info, StreamingContext context) : base(info, context) { }
-
-  protected override object Hit(Entity user, Point pt) { return user.Map.IsPassable(pt) ? null : (object)pt; }
 
   protected override bool Affect(Entity user, Direction dir)
   { if(dir==Direction.Above)
@@ -208,7 +241,8 @@ public class ForceBolt : BeamSpell
     user.TrySpellDamage(this, e!=null ? e.Position : (Point)obj, damage);
   }
 
-  public static ForceBolt Default = new ForceBolt();
+  public static readonly ForceBolt Default = new ForceBolt();
+  public static readonly string Description = "The spell forces stuff. Yeah.";
 }
 #endregion
 
@@ -217,16 +251,13 @@ public class ForceBolt : BeamSpell
 public class FireSpell : BeamSpell
 { public FireSpell()
   { Name="fire"; Class=SpellClass.Elemental; Difficulty=10; Power=12; AutoIdentify=true;
-    Description = "The fire spell hurls a great bolt of flames.";
   }
   public FireSpell(SerializationInfo info, StreamingContext context) : base(info, context) { }
-
-  public static FireSpell Default = new FireSpell();
 
   protected override object Hit(Entity user, Point pt)
   { Entity e = user.Map.GetEntity(pt);
     if(e==null) return pt;
-    else if(Global.Coinflip()) return e;
+    else if(TryHit(user, e)) return e;
     else
     { e.OnMissBy(user, this);
       user.OnMiss(e, this);
@@ -283,6 +314,9 @@ public class FireSpell : BeamSpell
     }
     return false;
   }
+
+  public readonly static FireSpell Default = new FireSpell();
+  public readonly static string Description = "The fire spell hurls a great bolt of flames.";
 }
 #endregion
 
@@ -291,17 +325,17 @@ public class FireSpell : BeamSpell
 public class TeleportSpell : Spell
 { public TeleportSpell()
   { Name="teleport"; Class=SpellClass.Translocation; Difficulty=6; Power=9; Target=SpellTarget.Self; AutoIdentify=true;
-    Description = "This spell will teleport the caster to a random location.";
   }
   public TeleportSpell(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
 
   public override void Cast(Entity user, ItemStatus buc, Point tile, Direction dir)
-  { user.Position = user.Map.FreeSpace();
-    if(user!=App.Player) App.IO.Print("{0} disappears.", user.TheName);
+  { if(user!=App.Player && App.Player.CanSee(user)) App.IO.Print("{0} disappears.", user.TheName);
+    user.Position = user.Map.FreeSpace();
   }
 
-  public static TeleportSpell Default = new TeleportSpell();
+  public readonly static TeleportSpell Default = new TeleportSpell();
+  public readonly static string Description = "This spell will teleport the caster to a random location.";
 }
 #endregion
 
@@ -310,7 +344,6 @@ public class TeleportSpell : Spell
 public class AmnesiaSpell : Spell
 { public AmnesiaSpell()
   { Name="amnesia"; Class=SpellClass.Divination; Difficulty=2; Power=2; Target=SpellTarget.Self;
-    Description = "This spell scrambles the caster's memory.";
   }
   public AmnesiaSpell(SerializationInfo info, StreamingContext context) : base(info, context) { }
   
@@ -329,7 +362,8 @@ public class AmnesiaSpell : Spell
     }
   }
   
-  public static AmnesiaSpell Default = new AmnesiaSpell();
+  public static readonly AmnesiaSpell Default = new AmnesiaSpell();
+  public static readonly string Description = "This spell scrambles the caster's memory.";
   
   Map Wipe(Map good, ItemStatus buc)
   { Map bad = new Map(good.Width, good.Height, TileType.Border, false);
@@ -356,11 +390,9 @@ public class AmnesiaSpell : Spell
 public class IdentifySpell : Spell
 { public IdentifySpell()
   { Name="identify"; Class=SpellClass.Divination; Difficulty=5; Power=3; Target=SpellTarget.Item; AutoIdentify=true;
-    Description = "This spell provides the caster full knowledge of an item.";
   }
   public IdentifySpell(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
-  
   public override void Cast(Entity user, ItemStatus buc, Item target)
   { if(user==App.Player)
     { user.AddKnowledge(target, true);
@@ -368,7 +400,8 @@ public class IdentifySpell : Spell
     }
   }
 
-  public static IdentifySpell Default = new IdentifySpell();
+  public static readonly IdentifySpell Default = new IdentifySpell();
+  public static readonly string Description = "This spell provides the caster full knowledge of an item.";
 }
 #endregion
 

@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Reflection;
 using GameLib.Collections;
 using Chrono;
 
@@ -178,8 +179,26 @@ public sealed class ConsoleIO : InputOutput
         console.SetCursorPosition(0, 0);
         WriteLine(Color.Normal, "{0} (lv{1}, {2})", selected.Name, selected.Level, selected.Class);
         console.WriteLine();
-        int height = WordWrap(selected.Description, mapW);
-        for(int i=0; i<height; i++) console.WriteLine(wrapped[i]);
+
+        FieldInfo f = selected.GetType().GetField("Description", BindingFlags.DeclaredOnly|BindingFlags.Public|BindingFlags.Static);
+        if(f!=null) WriteWrapped((string)f.GetValue(null), mapW);
+        else console.WriteLine("THIS SPELL IS MISSING A DESCRIPTION.");
+        console.WriteLine();
+
+        int memory = reader.SpellKnowledge(selected);
+        if(memory==0) console.WriteLine("You do not have this spell memorized.");
+        else if(memory<500) console.WriteLine("Your memory of this spell is very faint!");
+        else if(memory<1000) console.WriteLine("Your memory of this spell is faint.");
+        else console.WriteLine("You know this spell quite well.");
+
+        console.WriteLine("Casting this spell requires {0} MP.", selected.Power);
+        switch(selected.Target)
+        { case SpellTarget.Self: console.WriteLine("This spell only affects the caster."); break;
+          case SpellTarget.Item: console.WriteLine("This spell is cast upon an item."); break;
+          case SpellTarget.Tile: console.WriteLine("This spell is cast at a point in space."); break;
+        }
+        if(selected.Range>0) console.WriteLine("This spell has a range of approximately {0} tiles.", selected.Range);
+
         ReadChar();
         clear=true;
         continue;
@@ -394,6 +413,7 @@ public sealed class ConsoleIO : InputOutput
 
   public override Point DisplayMap(Entity viewer)
   { ClearScreen();
+    ClearLines();
     SetCursorToPlayer();
     Point[] vpts = viewer.VisibleTiles();
     Point pos = viewer.Position, ret = new Point(-1, -1);
@@ -402,7 +422,10 @@ public sealed class ConsoleIO : InputOutput
     char c;
     while(true)
     { RenderMap(viewer, pos, vpts);
-      DescribeTile(viewer, pos, vpts);
+      lines.Clear(); uncleared=0;
+      AddLine("<,> to find stairs. '@' to find player. 'g' to walk to cursor.");
+      AddLine("Select a creature and press '?' for a description.");
+      DescribeTile(viewer, pos, vpts, false);
       nextChar:
       ReadChar();
       if(rec.Key.VirtualKey==NTConsole.Key.Escape) break;
@@ -417,6 +440,11 @@ public sealed class ConsoleIO : InputOutput
         case 'u': pos.Offset(1, -1); break;
         case 'g': ret = pos; goto done;
         case '@': pos = viewer.Position; break;
+        case '?':
+        { Entity e = pos==viewer.Position ? viewer : viewer.Memory[pos].Entity;
+          if(e!=null) { DescribeEntity(e); break; }
+          else goto nextChar;
+        }
         case '<': case '>':
         { Map map = viewer.Memory;
           int ni  = oldi, size=map.Width*map.Height;
@@ -437,6 +465,7 @@ public sealed class ConsoleIO : InputOutput
       }
     }
     done:
+    RestoreLines();
     RestoreScreen();
     return ret;
   }
@@ -452,29 +481,44 @@ public sealed class ConsoleIO : InputOutput
       console.WriteLine();
     }
     if(item is Modifying)
-    { Modifying mod = (Modifying)item;
-      if(mod.AC!=0) console.WriteLine("Armor {0}: {1}", mod.AC<0 ? "penalty" : "bonus", mod.AC);
-      if(mod.Dex!=0) console.WriteLine("Dexterity modifier: {0}", mod.Dex);
-      if(mod.EV!=0) console.WriteLine("Evasion modifier: {0}", mod.EV);
-      if(mod.Int!=0) console.WriteLine("Intelligence modifier: {0}", mod.Int);
-      if(mod.Speed!=0) console.WriteLine("Speed modifier: {0}", mod.Speed);
-      if(mod.Str!=0) console.WriteLine("Strength modifier: {0}", mod.Str);
+    { if(item.Identified)
+      { Modifying mod = (Modifying)item;
+        if(mod.AC!=0) console.WriteLine("Armor {0}: {1}", mod.AC<0 ? "penalty" : "bonus", mod.AC);
+        if(mod.Dex!=0) console.WriteLine("Dexterity modifier: {0}", mod.Dex);
+        if(mod.EV!=0) console.WriteLine("Evasion modifier: {0}", mod.EV);
+        if(mod.Int!=0) console.WriteLine("Intelligence modifier: {0}", mod.Int);
+        if(mod.Speed!=0) console.WriteLine("Speed modifier: {0}", mod.Speed);
+        if(mod.Str!=0) console.WriteLine("Strength modifier: {0}", mod.Str);
+        if(mod.ColdRes!=0) console.WriteLine("Cold resistance: {0}{1}%", mod.ColdRes<0 ? '-' : '+', mod.ColdRes);
+        if(mod.ElectricityRes!=0)
+          console.WriteLine("Electricity resistance: {0}{1}%", mod.ElectricityRes<0 ? '-' : '+', mod.ElectricityRes);
+        if(mod.HeatRes!=0) console.WriteLine("Heat resistance: {0}{1}%", mod.HeatRes<0 ? '-' : '+', mod.HeatRes);
+      }
+      else console.WriteLine("This item's modifiers are not fully known.");
     }
     if(item is Chargeable)
-    { Chargeable ch = (Chargeable)item;
-      console.WriteLine("This item has {0} charges remaining.", ch.Charges);
-      if(ch.Recharged>0) console.WriteLine("This item has been recharged {0} times.", ch.Recharged);
+    { if(item.Identified)
+      { Chargeable ch = (Chargeable)item;
+        console.WriteLine("This item has {0} charges remaining.", ch.Charges);
+        if(ch.Recharged>0) console.WriteLine("This item has been recharged {0} times.", ch.Recharged);
+      }
+      else console.WriteLine("This item has an unknown number of charges.");
     }
     if(item.Class==ItemClass.Weapon)
     { Weapon w = (Weapon)item;
       if(w.Delay!=0) console.WriteLine("Attack delay: {0}%", w.Delay);
-      if(w.ToHitBonus!=0) console.WriteLine("To hit {0}: {1}", w.ToHitBonus<0 ? "penalty" : "bonus", w.ToHitBonus);
+      if(w.Identified)
+      { if(w.DamageBonus!=0) console.WriteLine("Damage {0}: {1}", w.DamageBonus<0 ? "penalty" : "bonus", w.DamageBonus);
+        if(w.ToHitBonus!=0) console.WriteLine("To hit {0}: {1}", w.ToHitBonus<0 ? "penalty" : "bonus", w.ToHitBonus);
+      }
+      else console.WriteLine("This weapon's damage and to-hit modifiers are unknown.");
       console.WriteLine("It falls into the '{0}' category.", w.wClass.ToString().ToLower());
       noiseStr = "This weapon";
     }
     else if(item.Class==ItemClass.Shield)
     { Shield s = (Shield)item;
-      console.WriteLine("Chance to block: {0}%", s.BlockChance);
+      if(item.Identified) console.WriteLine("Chance to block: {0}%", s.BlockChance);
+      else console.WriteLine("This shield's chance to block is unknown.");
     }
     else if(item.Class==ItemClass.Food || item.Class==ItemClass.Potion || item.Class==ItemClass.Scroll ||
             item.Class==ItemClass.Tool || item.Class==ItemClass.Wand)
@@ -653,8 +697,8 @@ public sealed class ConsoleIO : InputOutput
     return ret;
   }
 
-  public override void Print() { AddLine(Color.Normal, ""); }
-  public override void Print(Color color, string line) { AddLine(color, line); }
+  public override void Print() { AddLine(Color.Normal, "", true); }
+  public override void Print(Color color, string line) { AddLine(color, line, true); }
 
   public override Input GetNextInput()
   { while(true)
@@ -835,10 +879,28 @@ public sealed class ConsoleIO : InputOutput
     console.Fill(0, mheight, console.Width, height-mheight); // clear message area
   }
 
-  void DescribeTile(Entity viewer, Point pos, Point[] vpts)
+  void DescribeEntity(Entity entity)
+  { ClearScreen();
+    console.SetCursorPosition(0, 0);
+    console.WriteLine("{0}, Race: {1}", entity.AName, entity.Race);
+    console.WriteLine();
+
+    FieldInfo f = entity.GetType().GetField("Description", BindingFlags.DeclaredOnly|BindingFlags.Public|BindingFlags.Static);
+    if(f!=null)
+    { WriteWrapped((string)f.GetValue(null), MapWidth);
+      console.WriteLine();
+    }
+    WriteWrapped(Entity.RaceDescs[(int)entity.Race], MapWidth);
+
+    ReadChar();
+    RestoreScreen();
+  }
+
+  void DescribeTile(Entity viewer, Point pos, Point[] vpts) { DescribeTile(viewer, pos, vpts, true); }
+  void DescribeTile(Entity viewer, Point pos, Point[] vpts, bool clearLines)
   { bool visible=false;
     for(int i=0; i<vpts.Length; i++) if(vpts[i]==pos) { visible=true; break; }
-    lines.Clear(); uncleared=0;
+    if(clearLines) { lines.Clear(); uncleared=0; }
     if(!visible)
     { if(!viewer.Memory.GetFlag(pos, Tile.Flag.Seen)) { AddLine("You can't see that position.", true); return; }  
       AddLine("You can't see that position, but here's what you remember:");
@@ -852,6 +914,14 @@ public sealed class ConsoleIO : InputOutput
       AddLine(string.Format(prefix+" here.", e.AName));
       Weapon w = e.Weapon;
       if(w!=null) AddLine(string.Format(prefix+" wielding {1} {2}.", "It", Global.AorAn(w.Name), w.Name));
+
+      int healthpct = e.HP*100/e.MaxHP;
+      if(healthpct>=90) AddLine("It looks healthy.");
+      else if(healthpct>=75) AddLine("It looks slightly wounded.");
+      else if(healthpct>=50) AddLine("It looks wounded.");
+      else if(healthpct>=25) AddLine("It looks heavily wounded.");
+      else AddLine("It looks almost dead.");
+
       if(e!=viewer && e is AI) switch(((AI)e).State)
       { case AIState.Asleep: AddLine("It appears to be asleep."); break;
         case AIState.Attacking: AddLine("It looks angry!"); break;
@@ -859,6 +929,7 @@ public sealed class ConsoleIO : InputOutput
         case AIState.Idle: case AIState.Patrolling: case AIState.Wandering: AddLine("It looks bored."); break;
         default: AddLine("UNKNOWN AI STATE"); break;
       }
+
     }
     if(viewer.Map.HasItems(pos)) DisplayTileItems(viewer, map[pos].Items, visible);
     DrawLines();

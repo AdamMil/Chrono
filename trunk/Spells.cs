@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Drawing;
 
 namespace Chrono
@@ -13,11 +14,15 @@ public abstract class Spell
 { public virtual void Cast(Entity user, Item item) { }
   public virtual void Cast(Entity user, Point tile, Direction dir) { }
 
+  public virtual ICollection TracePath(Entity user, Point pt) { return null; }
+
   public string Name;
   public SpellClass  Class;
   public SpellTarget Target;
   public int Level;  // level at which spell can be cast with 0% chance of failure
   public int Memory; // memory of this spell, decreased every turn that the spell isn't cast, forgotten at zero
+  
+  protected static ArrayList path = new ArrayList();
 }
 
 public abstract class BeamSpell : Spell
@@ -28,24 +33,57 @@ public abstract class BeamSpell : Spell
     else if(user.Position==tile) Affect(user, user);
     else
     { bounces=0; oldPt=user.Position;
-      Global.TraceLine(oldPt, tile, 15, false, new LinePoint(ZapPoint), user);
+      Global.TraceLine(oldPt, tile, 10, false, new LinePoint(ZapPoint), user);
     }
+  }
+
+  public override ICollection TracePath(Entity user, Point tile)
+  { path.Clear();
+    if(user.Position==tile) path.Add(tile);
+    else
+    { bounces=0; oldPt=user.Position;
+      Global.TraceLine(oldPt, tile, 10, false, new LinePoint(TracePoint), user);
+    }
+    return path;
   }
 
   protected abstract object Hit(Entity user, Point pt);
   protected abstract void Affect(Entity user, object obj);
   protected abstract bool Affect(Entity user, Direction dir); // returns if execution should continue (in Cast)
 
+  TraceAction TracePoint(Point pt, object context)
+  { Entity user = (Entity)context;
+    if(!Map.IsPassable(user.Map[pt].Type))
+    { TraceAction ret = (TraceAction)0;
+      if(Map.IsPassable(user.Map[oldPt.X, pt.Y].Type)) ret |= TraceAction.HBounce;
+      if(Map.IsPassable(user.Map[pt.X, oldPt.Y].Type)) ret |= TraceAction.VBounce;
+      oldPt=pt;
+      if(ret>0)
+      { if(++bounces==3) return TraceAction.Stop;
+        return ret;
+      }
+      return TraceAction.Go;
+    }
+    oldPt=pt;
+    path.Add(pt);
+    return TraceAction.Go;
+  }
+
   TraceAction ZapPoint(Point pt, object context)
   { Entity user = (Entity)context;
     if(!Map.IsPassable(user.Map[pt].Type))
-    { if(++bounces==3) return TraceAction.Stop;
-      if(user==App.Player) App.IO.Print("The spell bounces!");
-      TraceAction ret = (TraceAction)0;
-      if(!Map.IsPassable(user.Map[oldPt.X, pt.Y].Type)) ret |= TraceAction.VBounce;
-      if(!Map.IsPassable(user.Map[pt.X, oldPt.Y].Type)) ret |= TraceAction.HBounce;
-      return ret;
+    { TraceAction ret = (TraceAction)0;
+      if(Map.IsPassable(user.Map[oldPt.X, pt.Y].Type)) ret |= TraceAction.HBounce;
+      if(Map.IsPassable(user.Map[pt.X, oldPt.Y].Type)) ret |= TraceAction.VBounce;
+      oldPt=pt;
+      if(ret>0)
+      { if(++bounces==3) return TraceAction.Stop;
+        if(user==App.Player) App.IO.Print("The spell bounces!");
+        return ret;
+      }
+      return TraceAction.Go;
     }
+    oldPt=pt;
     object affected = Hit(user, pt);
     if(affected!=null) Affect(user, affected);
     return TraceAction.Go;

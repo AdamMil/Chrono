@@ -86,7 +86,8 @@ public abstract class InputOutput
   public abstract MenuItem[] ChooseItem(string prompt, IKeyedInventory items, MenuFlag flags,
                                         params ItemClass[] classes);
 
-  public abstract RangeTarget ChooseTarget(Entity viewer, bool allowDir);
+  public RangeTarget ChooseTarget(Entity viewer, bool allowDir) { return ChooseTarget(viewer, null, allowDir); }
+  public abstract RangeTarget ChooseTarget(Entity viewer, Spell spell, bool allowDir);
 
   public void DisplayInventory(IKeyedInventory items) { DisplayInventory(items, ItemClass.Any); }
   public abstract void DisplayInventory(IKeyedInventory items, params ItemClass[] classes);

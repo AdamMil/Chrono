@@ -85,8 +85,12 @@ public abstract class InputOutput
   public abstract char CharChoice(Color color, string prompt, string chars, char defaultChar, bool caseInsensitive,
                                   string rebuke);
 
-  public Direction ChooseDirection() { return ChooseDirection(true, true); }
-  public abstract Direction ChooseDirection(bool allowSelf, bool allowVertical);
+  public Direction ChooseDirection() { return ChooseDirection(null, true, true); }
+  public Direction ChooseDirection(string prompt) { return ChooseDirection(prompt, true, true); }
+  public Direction ChooseDirection(bool allowSelf, bool allowVertical)
+  { return ChooseDirection(null, allowSelf, allowVertical);
+  }
+  public abstract Direction ChooseDirection(string prompt, bool allowSelf, bool allowVertical);
 
   public MenuItem[] ChooseItem(string prompt, Entity entity, MenuFlag flags, params ItemClass[] classes)
   { return ChooseItem(prompt, entity, entity.Inv, flags, classes);

@@ -12,6 +12,41 @@ public class Player : Entity
 { public Player() { Color=Color.White; Timer=50; SocialGroup=Global.NewSocialGroup(false, true); }
   public Player(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
+  public class Quest
+  { public Quest(XmlNode node)
+    { Name    = node.Attributes["id"].Value;
+      Title   = node.Attributes["title"].Value;
+      States  = new string[node.ChildNodes.Count];
+      Success = new bool[node.ChildNodes.Count];
+      Failure = new bool[node.ChildNodes.Count];
+
+      for(int i=0; i<node.ChildNodes.Count; i++)
+      { XmlNode child = node.ChildNodes[i];
+        States[i]  = child.LocalName;
+        Success[i] = Xml.IsTrue(child.Attributes["success"]);
+        Failure[i] = Xml.IsTrue(child.Attributes["failure"]);
+      }
+    }
+
+    public bool Succeeded { get { return Success[State]; } }
+    public bool Failed { get { return Failure[State]; } }
+    public bool Done { get { return Succeeded || Failed; } }
+
+    public string StateName
+    { get { return States[State]; }
+      set
+      { for(int i=0; i<States.Length; i++) if(value==States[i]) { State=i; return; }
+        throw new ArgumentException("quest "+Name+" has no state "+value);
+      }
+    }
+
+    public string Name, Title;
+    public string[] States;
+    public bool[]   Success, Failure;
+    public int  State;
+    public bool Received;
+  }
+
   public void DeclareQuest(XmlNode node)
   { Quest quest = new Quest(node);
     if(GetQuest(quest.Name, false)!=null) throw new ArgumentException("quest declared twice: "+quest.Name);
@@ -53,22 +88,18 @@ public class Player : Entity
     }
   }
 
+  public Quest GetQuest(string name) { return GetQuest(name, true); }
+  public Quest GetQuest(string name, bool throwOnError)
+  { foreach(Quest q in quests) if(q.Name==name) return q;
+    if(throwOnError) throw new ArgumentException("no such quest: "+name);
+    return null;
+  }
+
   public override void Generate(int level, EntityClass myClass)
   { base.Generate(level, myClass);
     LevelUp(); ExpLevel--; // players start with slightly higher stats
     ExpPool = (level+1)*25;
   }
-
-  public void GiveQuest(string name, string state)
-  { Quest q = GetQuest(name);
-    for(int i=0; i<q.States.Length; i++)
-      if(state==q.States[i]) { q.State=i; goto recv; }
-    throw new ArgumentException("quest "+name+" has no state "+state);
-    recv:
-    q.Received = true;
-  }
-
-  public bool HasQuest(string name) { return GetQuest(name).Received; }
 
   public override void OnAttrChange(Attr attribute, int amount, bool fromExercise)
   { string feel=null;
@@ -272,26 +303,6 @@ public class Player : Entity
 
   public void Quit() { HP=0; App.Quit=true; Die(Death.Quit); }
 
-  public bool QuestDone(string name)
-  { Quest q = GetQuest(name);
-    return q.Success[q.State] || q.Failure[q.State];
-  }
-
-  public bool QuestFailed(string name)
-  { Quest q = GetQuest(name);
-    return q.Failure[q.State];
-  }
-
-  public string QuestState(string name)
-  { Quest q = GetQuest(name);
-    return q.States[q.State];
-  }
-  
-  public bool QuestSucceeded(string name)
-  { Quest q = GetQuest(name);
-    return q.Success[q.State];
-  }
-
   public void Save() { App.Quit=true; }
 
   public override void TalkTo() { App.IO.Print("Talking to yourself again?"); }
@@ -315,28 +326,6 @@ public class Player : Entity
   }
   
   protected const int OverworldMoveTime=100;
-
-  protected class Quest
-  { public Quest(XmlNode node)
-    { Name    = node.Attributes["id"].Value;
-      States  = new string[node.ChildNodes.Count];
-      Success = new bool[node.ChildNodes.Count];
-      Failure = new bool[node.ChildNodes.Count];
-
-      for(int i=0; i<node.ChildNodes.Count; i++)
-      { XmlNode child = node.ChildNodes[i];
-        States[i]  = child.LocalName;
-        Success[i] = Xml.IsTrue(child.Attributes["success"]);
-        Failure[i] = Xml.IsTrue(child.Attributes["failure"]);
-      }
-    }
-
-    public string Name;
-    public string[] States;
-    public bool[]   Success, Failure;
-    public int  State;
-    public bool Received;
-  }
 
   #region DefaultHandler
   protected bool DefaultHandler(ref Point[] vis)
@@ -767,7 +756,7 @@ public class Player : Entity
       }
 
       case Action.TalkTo:
-      { Direction d = App.IO.ChooseDirection(true, false);
+      { Direction d = App.IO.ChooseDirection("Speak to whom", true, false);
         if(d==Direction.Invalid) goto nevermind;
         if(d==Direction.Self) TalkTo();
         else
@@ -1170,13 +1159,6 @@ public class Player : Entity
       }
     if(pt.X!=-1) return (Direction)dir;
     return App.IO.ChooseDirection(false, false);
-  }
-
-  protected Quest GetQuest(string name) { return GetQuest(name, true); }
-  protected Quest GetQuest(string name, bool throwOnError)
-  { foreach(Quest q in quests) if(q.Name==name) return q;
-    if(throwOnError) throw new ArgumentException("no such quest: "+name);
-    return null;
   }
 
   protected bool GroundPackUse(Type type, string verb, out Item item, out IInventory inv, params ItemClass[] classes)

@@ -444,7 +444,7 @@ public abstract class AI : Entity
 
   void AddSkills(int points, Skill[] skills)
   { int[] skillTable = RaceSkills[(int)Race];
-    int add=points/40, min=int.MaxValue, max=0, range;
+    int min=int.MaxValue, max=0, range;
 
     for(int i=0; i<skills.Length; i++)
     { int val = skillTable[(int)skills[i]];
@@ -454,15 +454,15 @@ public abstract class AI : Entity
 
     do
       for(int i=0; i<skills.Length; i++)
-      { int si=(int)skills[i], need = skillTable[si];
+      { int si=(int)skills[i], need = skillTable[si], ti=Math.Min(points, 100);
         if(Global.Rand(range)>need)
-        { points -= add;
-          if((SkillExp[si]+=add) >= need)
+        { points -= ti;
+          if((SkillExp[si]+=ti) >= need)
           { SkillExp[si] -= need;
             Skills[si]++;
           }
+          if(points==0) break;
         }
-        if(points<=0) break;
       }
     while(points>0);
   }

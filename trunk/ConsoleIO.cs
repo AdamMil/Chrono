@@ -13,7 +13,6 @@ public sealed class ConsoleIO : InputOutput
     console.OutputMode = NTConsole.OutputModes.Processed|NTConsole.OutputModes.WrapAtEOL;
     console.Fill();
     console.SetCursorVisibility(true, 20);
-    for(int i=0; i<stats.Length; i++) stats[i] = int.MinValue;
   }
 
   public override int ScrollBack
@@ -77,7 +76,7 @@ public sealed class ConsoleIO : InputOutput
     return d;
   }
 
-  public override MenuItem[] ChooseItem(string prompt, IKeyedInventory items, MenuFlag flags,
+  public override MenuItem[] ChooseItem(string prompt, Entity entity, IKeyedInventory items, MenuFlag flags,
                                         params ItemClass[] classes)
   { string chars = items.CharString(classes);
     if((flags&MenuFlag.AllowNothing)!=0) chars = "-"+chars;
@@ -105,8 +104,8 @@ public sealed class ConsoleIO : InputOutput
       if(char.IsLetter(c) && num>items[c].Count) { AddLine("You don't have that many!", true); continue; }
       TextInput = false;
       if(c=='-') return new MenuItem[1] { new MenuItem(null, 0) };
-      if(c=='?') return Menu(items, flags, classes);
-      if(c=='*') return Menu(items, flags, ItemClass.Any);
+      if(c=='?') return Menu(entity, items, flags, classes);
+      if(c=='*') return Menu(entity, items, flags, ItemClass.Any);
       return new MenuItem[1] { new MenuItem(items[c], num==-1 ? items[c].Count : num) };
     }
   }
@@ -306,8 +305,8 @@ public sealed class ConsoleIO : InputOutput
     finally { RestoreLines(); }
   }
 
-  public override void DisplayInventory(IKeyedInventory items, params ItemClass[] classes)
-  { SetupMenu(items, MenuFlag.None, classes);
+  public override void DisplayInventory(Entity entity, params ItemClass[] classes)
+  { SetupMenu(entity.Inv, MenuFlag.None, classes);
 
     int cs=0, width=Math.Min(MapWidth, console.Width), height=console.Height, iheight=height-2;
     ClearScreen();
@@ -322,7 +321,7 @@ public sealed class ConsoleIO : InputOutput
           PutString(NTConsole.Attribute.White, 0, yi, head.ToString());
         }
         else
-        { PutString(0, yi, "{0} - {1}", menu[mc].Char, menu[mc].Item.InvName);
+        { PutString(0, yi, "{0} - {1}", menu[mc].Char, menu[mc].Item.GetInvName(entity));
           mc++;
         }
       }
@@ -378,9 +377,7 @@ public sealed class ConsoleIO : InputOutput
   }
 
   public override Point DisplayMap(Entity viewer)
-  { ClearLines();
-    int oldW=mapW; mapW=console.Width-1; 
-    console.Fill(0, 0, mapW, mapH);
+  { ClearScreen();
     SetCursorToPlayer();
     Point[] vpts = viewer.VisibleTiles();
     Point pos = viewer.Position, ret = new Point(-1, -1);
@@ -424,19 +421,14 @@ public sealed class ConsoleIO : InputOutput
       }
     }
     done:
-    console.Fill(0, 0, mapW, mapH);
-    mapW=oldW;
-    RestoreLines();
-    RenderMap(viewer, pos, vpts); 
-    DrawLines(); // RestoreScreen can't be called here because buf[] doesn't contain data correct for mapW
-    renderStats=true;
+    RestoreScreen();
     return ret;
   }
 
   public override void ExamineItem(Entity viewer, Item item)
   { ClearScreen();
     console.SetCursorPosition(0, 0);
-    console.WriteLine("{0} - {1}", item.Char, item.InvName);
+    console.WriteLine("{0} - {1}", item.Char, item.GetInvName(viewer));
     console.WriteLine();
     if(item.ShortDesc!=null)
     { WriteWrapped(item.ShortDesc, MapWidth);
@@ -521,7 +513,8 @@ public sealed class ConsoleIO : InputOutput
     RestoreScreen();
   }
 
-  public override MenuItem[] Menu(System.Collections.ICollection items, MenuFlag flags, params ItemClass[] classes)
+  public override MenuItem[] Menu(Entity entity, System.Collections.ICollection items, MenuFlag flags,
+                                  params ItemClass[] classes)
   { SetupMenu(items, flags, classes);
 
     MenuItem[] ret;
@@ -542,7 +535,7 @@ public sealed class ConsoleIO : InputOutput
         }
         else
         { if(reletter) menu[mc].Char=c;
-          DrawMenuItem(yi, menu[mc++], flags);
+          DrawMenuItem(entity, yi, menu[mc++], flags);
           if(++c>'z') c='A';
         }
       }
@@ -570,9 +563,9 @@ public sealed class ConsoleIO : InputOutput
               { for(int j=0; j<menu.Length; j++) if(j!=i) menu[j].Count=0;
                 goto redraw;
               }
-              else if(i>=cs && i<cs+mc)            // if it's onscreen
-              { DrawMenuItem(y, menu[i], flags);   // draw it
-                console.SetCursorPosition(16, yi); // and restore the cursor, 16 == length of "Enter selection:"
+              else if(i>=cs && i<cs+mc)                  // if it's onscreen
+              { DrawMenuItem(entity, y, menu[i], flags); // draw it
+                console.SetCursorPosition(16, yi);       // and restore the cursor, 16 == length of "Enter selection:"
               }
               break;
             }
@@ -717,9 +710,9 @@ public sealed class ConsoleIO : InputOutput
     public static readonly ItemComparer Default = new ItemComparer();
   }
 
-  int LineSpace { get { return console.Height-MapHeight-1; } }
-  int MapWidth  { get { return Math.Max(console.Width-30, 50); } }
-  int MapHeight { get { return Math.Max(console.Height-16, 40); } }
+  int LineSpace { get { return console.Height-MapHeight-4; } }
+  int MapWidth  { get { return console.Width; } }
+  int MapHeight { get { return Math.Max(console.Height-19, 36); } }
 
   bool TextInput
   { get { return inputMode; }
@@ -828,9 +821,6 @@ public sealed class ConsoleIO : InputOutput
     uncleared = 0;
   }
 
-  bool Diff(Entity player, Attr attr) { return renderStats || player.GetAttr(attr)!=stats[(int)attr]; }
-  bool Diff(int a, int b) { return renderStats || a!=b; }
-
   void DisplayHelp()
   { ClearScreen();
     string helptext =
@@ -917,11 +907,11 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
       }
     }
 
-    blY=MapHeight-1;
-    console.Fill(0, MapHeight, console.Width, console.Height-MapHeight);
-    console.SetCursorPosition(0, blY+1); // MapHeight
+    blY=console.Height-LineSpace-1;
+    console.Fill(0, blY, console.Width, maxlines);
+    console.SetCursorPosition(0, blY);
 
-    for(li++; li<arr.Length; li++)
+    for(blY--,li++; li<arr.Length; li++)
     { console.Attributes = ColorToAttr(arr[li].Color);
       console.WriteLine(arr[li].Text);
       blX = arr[li].Text.Length; blY++;
@@ -929,12 +919,12 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
     SetCursorToPlayer();
   }
 
-  void DrawMenuItem(int y, MenuItem item, MenuFlag flags)
+  void DrawMenuItem(Entity e, int y, MenuItem item, MenuFlag flags)
   { PutString(0, y, "[{0}] {1} - {2}",
               (flags&MenuFlag.AllowNum)==0 ?
                 item.Count==0 ? "-" : "+" :
                 item.Count==0 ? " - " : item.Count==item.Item.Count ? " + " : item.Count.ToString("d3"),
-              item.Char, item.Item.InvName);
+              item.Char, item.Item.GetInvName(e));
   }
 
   int LineHeight(string line) { return WordWrap(line); }
@@ -1044,73 +1034,49 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
   }
 
   void RenderStats(Entity player)
-  { int x=MapWidth+2, y=0, xlines, width=console.Width-x;
-    if(Diff(player.ExpLevel, expLevel)) PutStringP(width, x, y, "{0} the {1}", player.Name, player.Title);
-    PutStringP(width, x, y+1, "Human");
-    if(Diff(player, Attr.MaxHP) || Diff(player.HP, hp))
-    { int healthpct = player.HP*100/player.MaxHP;
-      PutStringP(healthpct<25 ? Color.Dire : healthpct<50 ? Color.Warning : Color.Normal,
-                width, x, y+2, "HP:   {0}/{1}", player.HP, player.MaxHP);
-    }
-    if(Diff(player, Attr.MaxMP) || Diff(player.MP, mp))
-    { int magicpct = player.MP*100/player.MaxMP;
-      PutStringP(magicpct<25 ? Color.Dire : magicpct<50 ? Color.Warning : Color.Normal,
-                 width, x, y+3, "MP:   {0}/{1}", player.MP, player.MaxMP);
-    }
-    if(Diff(player, Attr.AC)) PutStringP(width, x, y+4, "AC:   {0}", player.AC);
-    if(Diff(player, Attr.EV)) PutStringP(width, x, y+5, "EV:   {0}", player.EV);
-    if(Diff(player, Attr.Str)) PutStringP(width, x, y+6, "Str:  {0}", player.Str);
-    if(Diff(player, Attr.Int)) PutStringP(width, x, y+7, "Int:  {0}", player.Int);
-    if(Diff(player, Attr.Dex)) PutStringP(width, x, y+8, "Dex:  {0}", player.Dex);
-    if(Diff(player.Gold, gold)) PutStringP(width, x, y+9, "Gold: {0}", player.Gold);
-    if(Diff(player.Exp, exp))
-      PutStringP(width, x, y+10, "Exp:  {0}/{1} [{2}] (lv {3})", player.Exp, player.NextExp, player.ExpPool, player.ExpLevel);
-    if(Diff(player.Age, age))
-    { PutStringP(width, x, y+11, "Turn: {0}", player.Age);
-      PutStringP(width, x, y+12, "Dungeon level {0}", App.CurrentLevel+1);
+  { int x=0, y=MapHeight, width=console.Width-x;
+    console.SetCursorPosition(x, y);
+    x += Write(Color.Normal, "{0} the {1}  St:{2} Dx:{3} In:{4} AC:{5} EV:{6} ",
+               player.Name, player.Title, player.Str, player.Dex, player.Int, player.AC, player.EV);
+    if(player.HungerLevel==HungerLevel.Hungry) x += Write(Color.Warning, "Hungr ");
+    else if(player.HungerLevel==HungerLevel.Starving) x += Write(Color.Dire, "Starv ");
+
+    if(player.Sickness>0) x += Write(player.Sickness>1 ? Color.Dire : Color.Warning, "Sick ");
+
+    switch(player.CarryStress)
+    { case CarryStress.Burdened: x += Write(Color.Warning, "Burden ");break;
+      case CarryStress.Stressed: x += Write(Color.Dire, "Stress "); break;
+      case CarryStress.Overtaxed: x += Write(Color.Dire, "Overtax "); break;
     }
 
-    y = 13;
-    bool drewHands=false;
-    { string ws="";
-      for(int i=0; i<player.Hands.Length; i++) if(player.Hands[i]!=null) ws += player.Hands[i].FullName;
-      if(renderStats || equipStr!=ws)
-      { handLines=0; drewHands=true;
-        for(int i=0; i<player.Hands.Length; i++)
-          if(player.Hands[i]!=null)
-          { Item item = player.Hands[i];
-            PutStringP(item.Class==ItemClass.Weapon ? Color.LightCyan : Color.LightGreen, width, x, y++, "{0}) {1}",
-                       item.Char, item.FullName);
-            handLines++;
-          }
+    if(player.Is(Entity.Flag.Confused)) x += Write(Color.Warning, "Conf ");
+    if(player.Is(Entity.Flag.Hallucinating)) x += Write(Color.Warning, "Halluc ");
+
+    while(x++<width) console.WriteChar(' ');
+    x = 0; y++;
+    console.SetCursorPosition(x, y);
+
+    x += Write(Color.Normal, "Dlvl:{0} $:{1} ", player.Map.Index, player.Gold);
+    int healthpct = player.HP*100/player.MaxHP;
+    x += Write(healthpct<25 ? Color.Dire : healthpct<50 ? Color.Warning : Color.Normal, "HP:{0}/{1} ",
+               player.HP, player.MaxHP);
+    int magicpct = player.MP*100/player.MaxMP;
+    x += Write(magicpct<25 ? Color.Dire : healthpct<50 ? Color.Warning : Color.Normal, "MP:{0}/{1} ",
+               player.MP, player.MaxMP);
+    x += Write(Color.Normal, "Exp:{0} ({1}/{2},{3}) T:{4}", player.ExpLevel, player.Exp, player.NextExp,
+               player.ExpPool, player.Age);
+    
+    while(x++<width) console.WriteChar(' ');
+    x = 0; y++;
+    console.SetCursorPosition(x, y);
+
+    for(int i=0; i<player.Hands.Length; i++)
+      if(player.Hands[i]!=null)
+      { Item item = player.Hands[i];
+        x += Write(item.Class==ItemClass.Weapon ? Color.LightCyan : Color.LightGreen, "{0}:{1} ",
+                   item.Char, item.FullName);
       }
-    }
-    y = 13 + handLines;
-    if(drewHands || sick!=player.Sickness || hunger!=player.HungerLevel || playerFlags!=player.Flags ||
-       carry!=player.CarryStress)
-    { xlines=handLines;
-
-      if(player.HungerLevel==HungerLevel.Hungry) { PutStringP(Color.Warning, width, x, y++, "Hungry"); xlines++; }
-      else if(player.HungerLevel==HungerLevel.Starving) { PutStringP(Color.Dire, width, x, y++, "Starving"); xlines++; }
-
-      if(player.Sickness>0)
-      { PutStringP(player.Sickness>1 ? Color.Dire : Color.Warning, width, x, y++, "Sick"); xlines++;
-      }
-      
-      switch(player.CarryStress)
-      { case CarryStress.Burdened: PutStringP(Color.Warning, width, x, y++, "Burdened"); xlines++; break;
-        case CarryStress.Stressed: PutStringP(Color.Dire, width, x, y++, "Stressed"); xlines++; break;
-        case CarryStress.Overtaxed: PutStringP(Color.Dire, width, x, y++, "Overtaxed"); xlines++; break;
-      }
-      
-      if(player.Is(Entity.Flag.Confused)) { PutStringP(Color.Warning, width, x, y++, "Confused"); xlines++; }
-      if(player.Is(Entity.Flag.Hallucinating)) { PutStringP(Color.Warning, width, x, y++, "Hallucinating"); xlines++; }
-
-      if(xlines<statLines) console.Fill(x, y, width, statLines-xlines);
-      statLines=xlines;
-    }
-    UpdateStats(player);
-    renderStats=false;
+    while(x++<width) console.WriteChar(' ');
   }
 
   void RestoreLines() { lines=oldLines; oldLines=null; }
@@ -1146,14 +1112,6 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
     }
   }
 
-  void UpdateStats(Entity player)
-  { for(int i=0; i<(int)Attr.NumAttributes; i++) stats[i] = player.GetAttr((Attr)i);
-    age=player.Age; exp=player.Exp; expLevel=player.ExpLevel; gold=player.Gold; hp=player.HP; mp=player.MP;
-    sick=player.Sickness; hunger=player.HungerLevel; carry=player.CarryStress; playerFlags=player.Flags;
-    equipStr = "";
-    for(int i=0; i<player.Hands.Length; i++) if(player.Hands[i]!=null) equipStr += player.Hands[i].FullName;
-  }
-
   int WordWrap(string line) { return WordWrap(line, console.Width-1); }
   int WordWrap(string line, int width)
   { int s=0, e=line.Length, height=0;
@@ -1174,9 +1132,11 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
     return height;
   }
 
-  void Write(Color color, string format, params object[] parms)
-  { console.Attributes = ColorToAttr(color);
-    console.Write(string.Format(format, parms));
+  int Write(Color color, string format, params object[] parms)
+  { string str = string.Format(format, parms);
+    console.Attributes = ColorToAttr(color);
+    console.Write(str);
+    return str.Length;
   }
 
   void WriteLine(Color color, string str)
@@ -1199,19 +1159,10 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
   string[] wrapped = new string[4];
   Entity lastTarget;
 
-  // these are used for stat rendering
-  int[] stats = new int[(int)Attr.NumAttributes];
-  Entity.Flag playerFlags;
-  HungerLevel hunger;
-  CarryStress carry;
-  string equipStr="";
-  int age=-1, exp=-1, expLevel=-1, gold=-1, hp=-1, mp=-1, sick=-1, handLines;
-  bool renderStats;
-
   NTConsole console = new NTConsole();
   LinkedList lines = new LinkedList(), oldLines; // a circular array would be more efficient...
   NTConsole.InputRecord rec;
-  int  uncleared, maxLines=200, blX, blY, mapW, mapH, statLines;
+  int  uncleared, maxLines=200, blX, blY, mapW, mapH;
   bool inputMode, seeInvisible;
 
   static NTConsole.Attribute ColorToAttr(Color color)

@@ -9,7 +9,9 @@ public enum ItemClass
   Gold, Amulet, Weapon, Shield, Armor, Ammo, Food, Corpse, Scroll, Ring, Potion, Wand, Tool, Spellbook, Container,
   Treasure, NumClasses
 }
-[Flags] public enum ItemUse { NoUse=0, Self=1, UseTarget=2, UseDirection=4, UseBoth=UseTarget|UseDirection };
+[Flags] public enum ItemUse : byte { NoUse=0, Self=1, UseTarget=2, UseDirection=4, UseBoth=UseTarget|UseDirection };
+
+[Flags] public enum ItemStatus : byte { Identified=1, Burnt=2, Rotted=4, Rusted=8, Cursed=16, Blessed=32 };
 
 #region Item
 public abstract class Item : ICloneable
@@ -20,7 +22,7 @@ public abstract class Item : ICloneable
   { name=item.name; Title=item.Title; Class=item.Class;
     Prefix=item.Prefix; PluralPrefix=item.PluralPrefix; PluralSuffix=item.PluralSuffix;
     Age=item.Age; Count=item.Count; Weight=item.Weight; Color=item.Color; Char=item.Char;
-    Usability=item.Usability; Durability=item.Durability;
+    Usability=item.Usability; Durability=item.Durability; Status=item.Status;
   }
 
   public virtual bool Think(Entity holder) { Age++; return false; }
@@ -34,7 +36,6 @@ public abstract class Item : ICloneable
       return ret;
     }
   }
-  public virtual string InvName { get { return FullName; } }
   public virtual string Name { get { return name; } }
 
   public string ItOne { get { return Count>1 ? "one" : "it"; } }
@@ -51,6 +52,9 @@ public abstract class Item : ICloneable
       return true;
     return false;
   }
+
+  public virtual string GetFullName(Entity e) { return FullName; }
+  public virtual string GetInvName(Entity e) { return GetFullName(e); }
 
   // item is thrown at or bashed on an entity. returns true if item should be destroyed
   public virtual bool Hit(Entity user, Point pos) { return false; }
@@ -91,6 +95,7 @@ public abstract class Item : ICloneable
   public Color Color;
   public char Char;
   public ItemUse Usability;
+  public ItemStatus Status;
 
   protected string name;
 
@@ -129,12 +134,10 @@ public abstract class Modifying : Item
 public abstract class Wearable : Modifying
 { public Wearable() { Slot=Slot.Invalid; }
 
-  public override string InvName
-  { get
-    { string ret = FullName;
-      if(worn) ret += " (worn)";
-      return ret;
-    }
+  public override string GetInvName(Entity e)
+  { string ret = GetFullName(e);
+    if(worn) ret += " (worn)";
+    return ret;
   }
 
   public virtual void OnRemove(Entity equipper) { worn=false;  }
@@ -149,12 +152,11 @@ public abstract class Wieldable : Modifying
   protected Wieldable(Item item) : base(item)
   { Wieldable wi = (Wieldable)item; Exercises=wi.Exercises; AllHandWield=wi.AllHandWield;
   }
-  public override string InvName
-  { get
-    { string ret = FullName;
-      if(equipped) ret += " (equipped)";
-      return ret;
-    }
+
+  public override string GetInvName(Entity e)
+  { string ret = GetFullName(e);
+    if(equipped) ret += " (equipped)";
+    return ret;
   }
 
   public virtual void OnEquip  (Entity equipper) { equipped=true;  }
@@ -179,7 +181,6 @@ public class Gold : Item
   public Gold(Item item) : base(item) { }
   
   public override bool CanStackWith(Item item) { return item.Class==ItemClass.Gold; }
-
 }
 
 } // namespace Chrono

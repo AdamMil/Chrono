@@ -42,8 +42,9 @@ improve spell target prompting (add custom messages, etc)
 have corpses rot, too (not just go from plain -> skeleton)
 rework skill system so top level is 10
 add critical hits
-require a sharp weapon for carving
+require a sharp weapon for carving (and equip it during carving?)
 add help string to Skill management page
-find out why shift-move is so slow
 make higher skill levels harder to obtain
-fix stats display (with high experience + levels,it doesn't fit in 80 columns) -- make like nethack's ?
+make use of extra space to show better help
+add identification for individual items (so you don't always know wand charges, for instance)
+add knowledge display

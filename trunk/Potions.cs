@@ -9,12 +9,29 @@ public abstract class Potion : Item
   { Class=ItemClass.Potion; Prefix="a potion of "; PluralPrefix="potions of "; PluralSuffix=""; Weight=5;
   }
   protected Potion(Item item) : base(item) { }
+  static Potion() { Global.RandomizeNames(names); }
 
   public override bool CanStackWith(Item item)
   { return base.CanStackWith(item) && ((Potion)item).Name==Name;
   }
 
   public abstract void Drink(Entity user);
+
+  public override string GetFullName(Entity e)
+  { if(e==null || e.KnowsAbout(this)) return FullName;
+    string tn = GetType().ToString(), rn = (string)namemap[tn];
+    if(rn==null)
+    { namemap[tn] = rn = Global.AorAn(names[namei]) + ' ' + names[namei];
+      namei++;
+    }
+    rn += " potion";
+    if(Title!=null) rn += " (called "+Title+')';
+    return rn;
+  }
+  
+  static System.Collections.Hashtable namemap = new System.Collections.Hashtable();
+  static string[] names = new string[] { "green", "purple", "bubbly", "fizzy" };
+  static int namei;
 }
 
 public class HealPotion : Potion

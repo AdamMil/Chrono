@@ -31,13 +31,16 @@ public sealed class Global
     if(fc=='a' || fc=='e' || fc=='i' || fc=='o' || fc=='u') return "an";
     else return "a";
   }
+
   public static string Cap1(string s)
   { if(s.Length==0) return s;
     string ret = char.ToUpper(s[0]).ToString();
     if(s.Length>1) ret += s.Substring(1);
     return ret;
   }
+
   public static bool Coinflip() { return Random.Next(100)<50; }
+
   public static Point Move(Point pt, Direction d) { return Move(pt, (int)d); }
   public static Point Move(Point pt, int d)
   { if(d<0) { d=d%8; if(d!=0) d+=8; }
@@ -45,18 +48,29 @@ public sealed class Global
     pt.Offset(DirMap[d].X, DirMap[d].Y);
     return pt;
   }
+
   public static int NdN(int ndice, int nsides) // dice range from 1 to nsides, not 0 to nsides-1
   { int val=0;
     while(ndice-->0) { val += Random.Next(nsides)+1; }
     return val;
   }
+
   public static Direction PointToDir(Point off)
   { for(int i=0; i<8; i++) if(DirMap[i]==off) return (Direction)i;
     return Direction.Invalid;
   }
+
   public static bool OneIn(int n) { return Random.Next(n)==0; }
+
   public static int Rand(int min, int max) { return Random.Next(min, max+1); }
   public static int Rand(int max) { return Random.Next(max); }
+  
+  public static void RandomizeNames(string[] names)
+  { for(int i=0; i<names.Length; i++)
+    { int j = Global.Rand(names.Length);
+      string t = names[i]; names[i] = names[j]; names[j] = t;
+    }
+  }
 
   // bouncing is incompatible with stopAtDest
   public static TraceResult TraceLine(Point start, Point dest, int maxDist, bool stopAtDest,
@@ -101,7 +115,7 @@ public sealed class Global
     new Point(0, 1),  new Point(-1, 1), new Point(-1, 0), new Point(-1, -1)
   };
 
-  static readonly Random Random = new Random();
+  static Random Random = new Random();
 }
 
 } // namespace Chrono

@@ -8,6 +8,23 @@ public abstract class Ring : Wearable
   { Class=ItemClass.Ring; Slot=Slot.Ring; Prefix="a ring of "; PluralSuffix=""; PluralPrefix="rings of "; Weight=1;
     Durability=95;
   }
+  static Ring() { Global.RandomizeNames(names); }
+
+  public override string GetFullName(Entity e)
+  { if(e==null || e.KnowsAbout(this)) return FullName;
+    string tn = GetType().ToString(), rn = (string)namemap[tn];
+    if(rn==null)
+    { namemap[tn] = rn = Global.AorAn(names[namei]) + ' ' + names[namei];
+      namei++;
+    }
+    rn += " ring";
+    if(Title!=null) rn += " (called "+Title+')';
+    return rn;
+  }
+  
+  static System.Collections.Hashtable namemap = new System.Collections.Hashtable();
+  static string[] names = new string[] { "gold", "silver", "brass", "iron" };
+  static int namei;
 }
 
 public class InvisibilityRing : Ring

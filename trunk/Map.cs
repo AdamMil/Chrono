@@ -410,8 +410,8 @@ public sealed class Map
               if(items!=null) for(int i=0; i<items.Count; i++) if(items[i].Think(null)) items.RemoveAt(i--);
             }
           age++;
-          if(numCreatures<50 && (Index==App.CurrentLevel && age%75==0 || Index!=App.CurrentLevel && age%150==0))
-            SpawnMonster();
+          int level = App.Player.Map.Index;
+          if(numCreatures<50 && (Index==level && age%75==0 || Index!=level && age%150==0)) SpawnMonster();
         }
         if(entities.Count==0) return;
       }
@@ -435,6 +435,8 @@ public sealed class Map
     { entities[idx].Position = FreeSpace();
       if(App.Player==null || !App.Player.CanSee(entities[idx])) break;
     }
+    entities[idx].SetBaseAttr(Attr.AC, 3);
+    entities[idx].SetBaseAttr(Attr.EV, 4);
   }
 
   public void SpreadScent()

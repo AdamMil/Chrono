@@ -14,7 +14,6 @@ public class Player : Entity
   { base.Generate(level, myClass);
     LevelUp(); ExpLevel--; // players start with slightly higher stats
     ExpPool = (level+1)*25;
-    
   }
 
   public override void Think()
@@ -36,7 +35,32 @@ public class Player : Entity
     inp.Count=0; // inp.Count drops to zero unless set to 'count' by an action
 
     switch(inp.Action)
-    { case Action.CloseDoor:
+    { case Action.Carve:
+      { Item item;
+        IInventory inv;
+        if(!GroundPackUse(typeof(Corpse), "Butcher", out item, out inv, ItemClass.Corpse)) goto next;
+        Corpse corpse = (Corpse)item;
+        if(corpse.Skeleton) { App.IO.Print("You can't find any usable meat on this skeleton."); goto next; }
+
+        int turn=1, turns=(corpse.Weight+99)/100;
+        corpse.CarveTurns++;
+        if(turns>1) App.IO.Print("You begin carving the {0}.", corpse.Name);
+        while(turn<turns)
+        { corpse.CarveTurns=++turn;
+          if(ThinkUpdate(ref vis)) break;
+        }
+        if(turn<turns) App.IO.Print("You stop carving the {0}.", corpse.Name);
+        else
+        { inv.Remove(corpse);
+          Flesh food = new Flesh(corpse);
+          food.Count = Global.Rand(turns/2)+1;
+          inv.Add(food);
+          if(turns>1) App.IO.Print("You finish carving the {0}.", corpse.Name);
+        }
+        break;
+      }
+      
+      case Action.CloseDoor:
       { Direction dir = App.IO.ChooseDirection(false, false);
         if(dir!=Direction.Invalid)
         { Point newpos = Global.Move(Position, dir);
@@ -205,6 +229,7 @@ public class Player : Entity
 
       case Action.Pickup:
       { if(!Map.HasItems(Position)) { App.IO.Print("There are no items here."); goto next; }
+        if(Inv.IsFull) { App.IO.Print("Your pack is full."); goto next; }
         ItemPile inv = Map[Position].Items;
         if(inv.Count==1)
         { Item item = inv[0], newItem = Pickup(inv, 0);
@@ -214,8 +239,10 @@ public class Player : Entity
         }
         else
           foreach(MenuItem item in App.IO.Menu(inv, MenuFlag.AllowNum|MenuFlag.Multi|MenuFlag.Reletter))
-          { if(item.Count==item.Item.Count) Pickup(inv, item.Item);
-            else Pickup(item.Item.Split(item.Count));
+          { Item newItem = item.Count==item.Item.Count ? Pickup(inv, item.Item) : Pickup(item.Item.Split(item.Count));
+            string s = string.Format("{0} - {1}", newItem.Char, item.Item.FullName);
+            if(item.Count!=newItem.Count) s += string.Format(" (now {0})", newItem.Count);
+            App.IO.Print(s);
           }
         break;
       }
@@ -313,7 +340,27 @@ public class Player : Entity
       }
 
       case Action.UseItem:
-      {
+      { Inventory inv = new Inventory();
+        foreach(Item ii in Inv) if(ii.UseDirection || ii.UseTarget) inv.Add(ii);
+        MenuItem[] items = App.IO.ChooseItem("Use which item?", inv, MenuFlag.None, ItemClass.Any);
+        if(items.Length==0) goto nevermind;
+        Item i = items[0].Item;
+        bool consume;
+        if(i.UseTarget)
+        { RangeTarget r = App.IO.ChooseTarget(this, i.UseDirection);
+          if(r.Dir==Direction.Invalid && r.Point.X==-1) goto nevermind;
+          consume = r.Dir==Direction.Invalid ? i.Use(this, r.Point) : i.Use(this, r.Dir);
+        }
+        else
+        { Direction d = App.IO.ChooseDirection();
+          if(d==Direction.Invalid) goto nevermind;
+          consume = i.Use(this, d);
+        }
+        if(consume)
+        { if(i.Count>1) i.Count--;
+          else Inv.Remove(i.Char);
+        }
+        break;
       }
 
       case Action.ViewItem:
@@ -442,6 +489,7 @@ public class Player : Entity
   }
   public override void OnReadScroll(Scroll item) { App.IO.Print("You read {0}.", item); }
   public override void OnRemove(Wearable item) { App.IO.Print("You remove {0}.", item); }
+  public override void OnSick(string howSick) { App.IO.Print(Color.Dire, "You feel {0}.", howSick); }
   public override void OnSkillUp(Skill skill)
   { App.IO.Print(Color.Green, "Your {0} skill went up!", skill.ToString().ToLower());
   }

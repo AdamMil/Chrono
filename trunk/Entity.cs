@@ -11,7 +11,7 @@ public enum Attr
   NumAttributes=NumModifiable
 }
 
-public enum Death { Starvation, Trap } // causes of death (besides combat)
+public enum Death { Starvation, Sickness, Trap } // causes of death (besides combat)
 
 public enum EntityClass
 { Other=-2, // not a monster (boulder or some other entity)
@@ -147,15 +147,10 @@ public abstract class Entity
       return Global.AorAn(name)+' ';
     }
   }
-  public virtual string aName
-  { get { return Name==null ? Prefix+Race.ToString().ToLower() : Name; }
-  }
-  public virtual string TheName
-  { get { return Name==null ? "The "+Race.ToString().ToLower() : Name; }
-  }
-  public virtual string theName
-  { get { return Name==null ? "the "+Race.ToString().ToLower() : Name; }
-  }
+  public virtual string AName { get { return Global.Cap1(aName); } }
+  public virtual string aName { get { return Name==null ? Prefix+Race.ToString().ToLower() : Name; } }
+  public virtual string TheName { get { return Name==null ? "The "+Race.ToString().ToLower() : Name; } }
+  public virtual string theName { get { return Name==null ? "the "+Race.ToString().ToLower() : Name; } }
 
   public void Attack(Direction dir) // attack in a direction, can be used for attacking locked doors, etc
   { Point np = Global.Move(Position, dir);
@@ -354,7 +349,9 @@ public abstract class Entity
   }
 
   // call Think() for all items in our inventory
-  public void ItemThink() { for(int i=0; i<Inv.Count; i++) Inv[i].Think(this); }
+  public void ItemThink()
+  { for(int i=0; i<Inv.Count; i++) if(Inv[i].Think(this)) Inv.RemoveAt(i--);
+  }
 
   public virtual void LevelDown() { ExpLevel--; } // TODO: make this subtract from stats
   public virtual void LevelUp()
@@ -411,17 +408,20 @@ public abstract class Entity
   public virtual void OnMiss(Entity hit, Weapon w) { }
   public virtual void OnMissBy(Entity hit, Weapon w) { }
   public virtual void OnNoise(Entity source, Noise type, int volume) { }
+  public virtual void OnPickup(Item item) { }
   public virtual void OnReadScroll(Scroll scroll) { }
   public virtual void OnRemove(Wearable item) { }
   public virtual void OnRemoveFail(Wearable item) { }
+  public virtual void OnSick(string howSick) { }
   public virtual void OnSkillUp(Skill skill) { }
   public virtual void OnUnequip(Wieldable item) { }
   public virtual void OnUnequipFail(Wieldable item) { }
   public virtual void OnWear(Wearable item) { }
 
   // place item in inventory, assumes it's within reach, already removed from other inventory, etc
-  public virtual Item Pickup(Item item)
+  public Item Pickup(Item item)
   { Item ret = Inv.Add(item);
+    OnPickup(ret);
     ret.OnPickup(this);
     return ret;
   }
@@ -454,6 +454,24 @@ public abstract class Entity
     { if(HP<MaxHP) HP++;
       if(MP<MaxMP) MP++;
     }
+    if(Global.Rand(5) < Sickness)
+    { string msg;
+      if(Sickness>10 && Global.Rand(Sickness)>=8)
+      { HP -= 10;
+        msg = "extremely sick.";
+      }
+      else if(Sickness>5 && Global.Coinflip())
+      { HP -= Global.Coinflip() ? 3 : 2;
+        msg = "very sick.";
+      }
+      else
+      { HP--;
+        msg = "sick";
+      }
+      OnSick(msg);
+      if(HP<=0) Die(Death.Sickness);
+      else if(Global.OneIn(HP==1 ? 3 : 8)) Sickness--;
+    }
   }
 
   public void Train(Skill skill, bool train) // gets/sets whether a skill is being trained
@@ -478,15 +496,15 @@ public abstract class Entity
     { for(int i=0; i<Hands.Length; i++) if(!CanUnequip(i)) return false;
       for(int i=0; i<Hands.Length; i++) if(Hands[i]!=null) Unequip(i);
     }
-    /*else if(HandsFull) // unequip one item to make room
-    { bool success=false;
-      for(int i=0; i<Hands.Length; i++) // first try items of the same class
-        if(Hands[i]!=null && Hands[i].Class==item.Class && TryUnequip(i)) { success=true; break; }
-      if(!success) for(int i=0; i<Hands.Length; i++) if(TryUnequip(i)) { success=true; break; } // then try any class
-      if(!success) return false;
-    }*/
-    else for(int i=0; i<Hands.Length; i++) // unequip all items of the same class
-      if(Hands[i]!=null && Hands[i].Class==item.Class && !TryUnequip(i)) return false;
+    else
+    { for(int i=0; i<Hands.Length; i++) // unequip all items of the same class
+        if(Hands[i]!=null && Hands[i].Class==item.Class && !TryUnequip(i)) return false;
+      if(HandsFull) // unequip one item to make room
+      { int i;
+        for(i=0; i<Hands.Length; i++) if(TryUnequip(i)) break; // try any class
+        if(i==Hands.Length) return false;
+      }
+    }
     Equip(item); // finally, equip the new item
     return true;
   }
@@ -702,11 +720,11 @@ public abstract class Entity
     int wepskill = 
       (GetSkill(Skill.Fighting) + (w==null ? GetSkill(Skill.UnarmedCombat) : GetSkill((Skill)w.wClass)) + 1) / 2;
 
-    toHit   += toHit*wepskill*10/100;                  // toHit   +10% per (avg of fighting + weapon) skill level 
-    toEvade += toEvade*c.GetSkill(Skill.Dodge)*10/100; // toEvade +10% per dodge level
+    toHit   += toHit*wepskill*10/100;                    // toHit   +10% per (avg of fighting + weapon) skill level 
+    toEvade += toEvade*c.GetSkill(Skill.Dodge)*10/100;   // toEvade +10% per dodge level
 
-    toHit   -= toHit  *((int)  HungerLevel*10+99)/100; // effects of hunger -10% per hunger level (rounded up)
-    toEvade -= toEvade*((int)c.HungerLevel*10+99)/100;
+    toHit   -= (toHit  *((int)  HungerLevel*10)+99)/100; // effects of hunger -10% per hunger level (rounded up)
+    toEvade -= (toEvade*((int)c.HungerLevel*10)+99)/100;
 
     c.Exercise(Skill.Dodge);
 

@@ -7,7 +7,7 @@ namespace Chrono
 public enum Action
 { None, Quit, Rest, Move, MoveToInteresting, MoveToDanger, MoveAFAP, OpenDoor, CloseDoor, Pickup, Drop, DropType,
   GoUp, GoDown, Eat, Wear, Remove, Wield, Inventory, ShowMap, Fire, Quaff, Read, ViewItem, Invoke, SwapAB, Reassign,
-  ManageSkills, UseItem
+  ManageSkills, UseItem, Carve
 }
 
 public struct Input
@@ -35,6 +35,14 @@ public struct MenuItem
   public Item Item;
   public int  Count;
   public char Char;
+}
+
+public struct RangeTarget
+{ public RangeTarget(Direction dir) { Point=new SD.Point(-1, -1); Dir=dir; }
+  public RangeTarget(SD.Point pt) { Point=pt; Dir=Direction.Invalid; }
+  public RangeTarget(SD.Point pt, Direction dir) { Point=pt; Dir=dir; }
+  public SD.Point Point; // X,Y == -1,-1 for an invalid point (no selection)
+  public Direction Dir;
 }
 
 public abstract class InputOutput
@@ -77,6 +85,8 @@ public abstract class InputOutput
 
   public abstract MenuItem[] ChooseItem(string prompt, IKeyedInventory items, MenuFlag flags,
                                         params ItemClass[] classes);
+
+  public abstract RangeTarget ChooseTarget(Entity viewer, bool allowDir);
 
   public void DisplayInventory(IKeyedInventory items) { DisplayInventory(items, ItemClass.Any); }
   public abstract void DisplayInventory(IKeyedInventory items, params ItemClass[] classes);

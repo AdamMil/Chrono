@@ -1,2 +1,16 @@
-make fighter not notice light scents when not alert
-add tracking by sound
+ranged weapons & item throwing
+wands
+carry weight
+gods, religion
+praying
+spells
+spellbooks
+searching & hidden tiles
+examine level map
+examine tile, examine surroundings
+autopickup, config file
+knowledge/identification
+saving/loading
+
+penalty for fighting unarmed with something in your hands?
+make monsters fill in around the player (if i'm next to player and around me is a monster that's not, move next to player)

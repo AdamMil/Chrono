@@ -165,7 +165,7 @@ public sealed class ConsoleIO : InputOutput
   { if(items.Count==0) return;
     if(items.Count==1) AddLine("You see here: "+items[0]);
     else
-    { int nitems=items.Count+1, space=LineSpace-uncleared;
+    { int nitems=items.Count+1, space=LineSpace-uncleared-2;
       bool other=false;
       if(nitems>space)
       { nitems = space;
@@ -174,8 +174,8 @@ public sealed class ConsoleIO : InputOutput
       }
       if(nitems<=space || nitems>2)
       { AddLine("You see here:"); nitems--;
+        if(nitems<items.Count) { other=true; nitems--; }
         for(int i=0; i<nitems; i++) AddLine(items[i].ToString());
-        if(nitems<items.Count) other=true;
       }
       if(other) AddLine("There are other items here as well.");
     }
@@ -212,6 +212,36 @@ public sealed class ConsoleIO : InputOutput
     mapW=old.Width; mapH=old.Height;
     RestoreScreen();
     renderStats=true;
+  }
+
+  public override void ManageSkills(Entity player)
+  { ClearScreen();
+    console.SetCursorPosition(0, 0);
+    console.WriteLine("You have {0} points of unallocated experience.", player.ExpPool);
+
+    int[] skillTable = Entity.RaceSkills[(int)player.Race];
+    Skill[] skills = new Skill[(int)Skill.NumSkills];
+    int numSkills=0;
+
+    for(int i=0; i<(int)Skill.NumSkills; i++) if(player.SkillExp[i]>0) skills[numSkills++]=(Skill)i;
+
+    while(true)
+    { char c='a';
+      console.SetCursorPosition(0, 2);
+      for(int i=0; i<numSkills; i++)
+      { bool enabled = player.Training(skills[i]);
+        Write(enabled ? Color.Normal : Color.DarkGrey, "{0} {1} {2} Skill {3} ",
+              c++, enabled ? '+' : '-', skills[i].ToString().PadRight(18), player.GetSkill(skills[i])+1);
+        WriteLine(Color.LightBlue, "({0})", player.SkillExp[(int)skills[i]]*9/skillTable[(int)skills[i]]+1);
+      }
+
+      nextChar:
+      c = ReadChar();
+      if(c==' ' || c=='\r' || c=='\n' || rec.Key.VirtualKey==NTConsole.Key.Escape) break;
+      if(c>='a' && c-'a'<numSkills) player.Train(skills[c-'a'], !player.Training(skills[c-'a']));
+      else goto nextChar;
+    }
+    RestoreScreen();
   }
 
   public override MenuItem[] Menu(System.Collections.ICollection items, MenuFlag flags, params ItemClass[] classes)
@@ -354,6 +384,7 @@ public sealed class ConsoleIO : InputOutput
         case 'q': inp.Action = Action.Quaff; break;
         case 'r': inp.Action = Action.Read; break;
         case 'R': inp.Action = Action.Remove; break;
+        case 'S': inp.Action = Action.ManageSkills; break;
         case 'v': inp.Action = Action.ViewItem; break;
         case 'w': inp.Action = Action.Wield; break;
         case 'W': inp.Action = Action.Wear; break;
@@ -407,8 +438,16 @@ public sealed class ConsoleIO : InputOutput
     if(item is Weapon)
     { Weapon w = (Weapon)item;
       if(w.Delay!=0) console.WriteLine("Attack delay: {0}%", w.Delay);
+      if(w.Noise==0) console.WriteLine("This weapon is silent (noise=0).");
+      else if(w.Noise<4) console.WriteLine("This weapon is rather quiet (noise={0}).", w.Noise);
+      else if(w.Noise<8) console.WriteLine("This weapon is quite noisy (noise={0}).", w.Noise);
+      else console.WriteLine("This weapon is extremely noisy (noise={0}).", w.Noise);
       if(w.ToHitBonus!=0) console.WriteLine("To hit {0}: {1}", w.ToHitBonus<0 ? "penalty" : "bonus", w.ToHitBonus);
       console.WriteLine("It falls into the '{0}' category.", w.wClass.ToString().ToLower());
+    }
+    else if(item is Shield)
+    { Shield s = (Shield)item;
+      console.WriteLine("Chance to block: {0}%", s.BlockChance);
     }
     if(item is Wieldable)
     { Wieldable w = (Wieldable)item;
@@ -428,7 +467,7 @@ public sealed class ConsoleIO : InputOutput
   }
 
   public override bool YesNo(Color color, string prompt, bool defaultYes)
-  { char c = CharChoice(color, prompt, defaultYes ? "Yn" : "yN", defaultYes ? 'y' : 'n', true, null);
+  { char c = CharChoice(color, prompt, defaultYes ? "Yn" : "yN", defaultYes ? 'y' : 'n', true, "Please enter Y or N.");
     return c==0 ? defaultYes : Char.ToLower(c)=='y';
   }
 
@@ -568,37 +607,34 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
   }
 
   void DisplayMessages()
-  { int maxlines = console.Height-1, width=MapWidth, li, height;
-    Line[] arr = new Line[maxlines];
-    LinkedList.Node baseNode = lines.Tail, node;
+  { int width=MapWidth, height=console.Height, ls, lss;
+    System.Collections.ArrayList list = new System.Collections.ArrayList();
+    for(LinkedList.Node node=lines.Head; node!=null; node=node.NextNode)
+    { Line line = (Line)node.Data;
+      int lh = WordWrap(line.Text, width);
+      for(int i=0; i<lh; i++) list.Add(new Line(line.Color, wrapped[i]));
+    }
+    ls = lss = Math.Max(0, list.Count-height);
 
     ClearScreen();
     while(true)
-    { li=maxlines-1;
-      node = baseNode;
-
-      while(li>=0 && node!=null)
-      { Line line = (Line)node.Data;
-        height = WordWrap(line.Text, width);
-        while(height-->0 && li>=0) arr[li--] = new Line(line.Color, wrapped[height]);
-        node=node.PrevNode;
+    { for(int y=0,i=ls; i<list.Count && y<height; y++,i++)
+      { Line line = (Line)list[i];
+        PutStringP(line.Color, width, 0, y, line.Text);
       }
-      for(int y=0,i=li+1; i<arr.Length; y++,i++) PutStringP(arr[i].Color, width, 0, y, arr[i].Text);
-      
+
       nextChar: ReadChar();
       if(rec.Key.VirtualKey==NTConsole.Key.Escape) goto done;
-      if(rec.Key.VirtualKey==NTConsole.Key.Prior)
-        for(int i=0; i<maxlines/2 && li<0 && baseNode!=lines.Head; i++) baseNode=baseNode.PrevNode;
-      else if(rec.Key.VirtualKey==NTConsole.Key.Next)
-        for(int i=0; i<maxlines/2 && baseNode!=lines.Tail; i++) baseNode=baseNode.NextNode;
+      if(rec.Key.VirtualKey==NTConsole.Key.Prior) ls = Math.Max(0, ls-height*2/3);
+      else if(rec.Key.VirtualKey==NTConsole.Key.Next) ls = Math.Min(lss, ls+height*2/3);
       else switch(char.ToLower(NormalizeDirChar()))
-      { case 'j': if(baseNode==lines.Tail) goto nextChar; baseNode=baseNode.NextNode; break;
-        case 'k': if(li>=0 || baseNode==lines.Head) goto nextChar; baseNode=baseNode.PrevNode; break;
+      { case 'j': if(ls<lss) ls++; break;
+        case 'k': if(ls>0)   ls--; break;
         case ' ': case '\r': case '\n': goto done;
         default: goto nextChar;
       }
     }
-    
+
     done: RestoreScreen();
   }
 
@@ -676,7 +712,8 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
   { PutStringP(Color.Normal, width, x, y, string.Format(format, parms));
   }
   void PutStringP(Color color, int width, int x, int y, string str)
-  { PutString(color, x, y, str);
+  { if(str.Length>width) str = str.Substring(0, width);
+    PutString(color, x, y, str);
     for(int i=str.Length; i<width; i++) console.WriteChar(' ');
   }
   void PutStringP(Color color, int width, int x, int y, string format, params object[] parms)
@@ -705,7 +742,7 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
     if(map==viewer.Map)
     { for(int i=0,y=rect.Top; y<rect.Bottom; y++)
         for(int x=rect.Left; x<rect.Right; i++,x++) buf[i] = TileToChar(map[x,y], vis[i]);
-      RenderMonsters(map.Creatures, vpts, rect);
+      RenderMonsters(map.Entities, vpts, rect);
     }
     else
     { Array.Clear(vis, 0, size);
@@ -720,7 +757,7 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
       map = viewer.Map;
       for(int i=0,y=rect.Top; y<rect.Bottom; y++)
         for(int x=rect.Left; x<rect.Right; i++,x++) if(vis[i]) buf[i] = TileToChar(map[x,y], vis[i]);
-      RenderMonsters(map.Creatures, vpts, rect);
+      RenderMonsters(map.Entities, vpts, rect);
     }
     console.PutBlock(new Rectangle(0, 0, rect.Width, rect.Height), buf);
   }
@@ -735,7 +772,7 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
   }
 
   void RenderStats(Entity player)
-  { int x=MapWidth+2, y=0, xlines=0, width=console.Width-x;
+  { int x=MapWidth+2, y=0, xlines, width=console.Width-x;
     if(Diff(player, Attr.ExpLevel)) PutStringP(width, x, y, "{0} the {1}", player.Name, player.Title);
     PutStringP(width, x, y+1, "Human");
     if(Diff(player, Attr.HP, Attr.MaxHP))
@@ -755,20 +792,31 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
     if(Diff(player, Attr.Dex)) PutStringP(width, x, y+8, "Dex:  {0}", player.Dex);
     if(Diff(player, Attr.Gold)) PutStringP(width, x, y+9, "Gold: {0}", player.Gold);
     if(Diff(player, Attr.Exp))
-      PutStringP(width, x, y+10, "Exp:  {0}/{1} (lv {2})", player.Exp, player.NextExp, player.ExpLevel+1);
+      PutStringP(width, x, y+10, "Exp:  {0}/{1} [{2}] (lv {3})", player.Exp, player.NextExp, player.ExpPool, player.ExpLevel);
     if(Diff(player, Attr.Age))
     { PutStringP(width, x, y+11, "Turn: {0}", player.Age);
       PutStringP(width, x, y+12, "Dungeon level {0}", App.CurrentLevel+1);
     }
-    { Weapon w = player.Weapon;
-      if(w==null)
-      { if(weaponStr!="") PutStringP(width, x, y+13, "");
+
+    y = 13;
+    bool drewHands=false;
+    { string ws="";
+      for(int i=0; i<player.Hands.Length; i++) if(player.Hands[i]!=null) ws += player.Hands[i].FullName;
+      if(equipStr!=ws)
+      { handLines=0; drewHands=true;
+        for(int i=0; i<player.Hands.Length; i++)
+          if(player.Hands[i]!=null)
+          { Item item = player.Hands[i];
+            PutStringP(item.Class==ItemClass.Weapon ? Color.LightCyan : Color.LightGreen, width, x, y++, "{0}) {1}",
+                       item.Char, item.FullName);
+            handLines++;
+          }
       }
-      else if(weaponStr!=w.FullName) PutStringP(Color.LightCyan, width, x, y+13, "{0}) {1}", w.Char, w.FullName);
     }
-    y += 14;
-    if(hunger!=player.HungerLevel || playerFlags!=player.Flags)
-    { if(player.HungerLevel==Hunger.Hungry) { PutStringP(Color.Warning, width, x, y++, "Hungry"); xlines++; }
+    y = 13 + handLines;
+    if(drewHands || hunger!=player.HungerLevel || playerFlags!=player.Flags)
+    { xlines=handLines;
+      if(player.HungerLevel==Hunger.Hungry) { PutStringP(Color.Warning, width, x, y++, "Hungry"); xlines++; }
       else if(player.HungerLevel==Hunger.Starving) { PutStringP(Color.Dire, width, x, y++, "Starving"); xlines++; }
       if(xlines<statLines) console.Fill(x, y, width, statLines-xlines);
       statLines=xlines;
@@ -801,8 +849,9 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
     }
     else
     { System.Collections.ArrayList list = new System.Collections.ArrayList();
-      for(int i=0; i<itemarr.Length; i++)
-        if(Array.IndexOf(classes, itemarr[i].Class)!=-1) list.Add(new MenuItem(itemarr[i]));
+      for(int ci=0; ci<classes.Length; ci++)
+        for(int i=0; i<itemarr.Length; i++)
+          if(itemarr[i].Class==classes[ci]) list.Add(new MenuItem(itemarr[i]));
       menu = (MenuItem[])list.ToArray(typeof(MenuItem));
     }
   }
@@ -811,8 +860,8 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
   { for(int i=0; i<(int)Attr.NumAttributes; i++) stats[i] = player.GetAttr((Attr)i);
     playerFlags = player.Flags;
     hunger = player.HungerLevel;
-    Weapon w = player.Weapon;
-    weaponStr = w==null ? "" : w.FullName;
+    equipStr = "";
+    for(int i=0; i<player.Hands.Length; i++) if(player.Hands[i]!=null) equipStr += player.Hands[i].FullName;
   }
 
   int WordWrap(string line) { return WordWrap(line, console.Width-1); }
@@ -835,6 +884,16 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
     return height;
   }
 
+  void Write(Color color, string format, params object[] parms)
+  { console.Attributes = ColorToAttr(color);
+    console.Write(string.Format(format, parms));
+  }
+
+  void WriteLine(Color color, string format, params object[] parms)
+  { console.Attributes = ColorToAttr(color);
+    console.WriteLine(string.Format(format, parms));
+  }
+
   void WriteWrapped(string text, int width)
   { int height = WordWrap(text, width);
     for(int i=0; i<height; i++) console.WriteLine(wrapped[i]);
@@ -848,7 +907,8 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
   int[] stats = new int[(int)Attr.NumAttributes];
   Entity.Flag playerFlags;
   Hunger hunger;
-  string weaponStr="";
+  string equipStr="";
+  int handLines;
 
   NTConsole console = new NTConsole();
   LinkedList lines = new LinkedList(); // a circular array would be more efficient...
@@ -891,13 +951,12 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
       default: ci = new NTConsole.CharInfo(' ', NTConsole.Attribute.Black); break;
     }
     if(!visible && tile.Type!=TileType.ClosedDoor) ci.Attributes = NTConsole.Attribute.DarkGrey;
-    ci.Attributes |= NTConsole.ForeToBack((NTConsole.Attribute)(tile.Scent*15/1200));
     return ci;
   }
 
-  // Amulet, Weapon, Armor, Ammo, Food, Corpse, Scroll, Ring, Potion, Wand, Tool, Spellbook, Container, Treasure,
+  // Amulet, Weapon, Shield, Armor, Ammo, Food, Corpse, Scroll, Ring, Potion, Wand, Tool, Spellbook, Container, Treasure,
   static readonly char[] itemMap = new char[(int)ItemClass.NumClasses]
-  { '"', ')', '[', '(', '%', '&', '?', '=', '!', '/', ']', '+', ']', '*',
+  { '"', ')', '[', '[', '(', '%', '&', '?', '=', '!', '/', ']', '+', ']', '*',
   };
   static readonly char[] raceMap = new char[(int)Race.NumRaces]
   { '@', 'o'

@@ -19,21 +19,24 @@ public sealed class App
     IO.Print();
 
     Map map = Dungeon[0];
-    Player = Player.Generate(CreatureClass.Fighter, Race.Human);
+    Player = Player.Generate(EntityClass.Fighter, Race.Human);
     Player.Name = IO.Ask("Enter your name:", false, "I need to know what to call you!");
     
     for(int y=0; y<map.Height; y++) // place Player on the up staircase of the first level
       for(int x=0; x<map.Width; x++)
         if(map[x, y].Type==TileType.UpStairs) { Player.X = x; Player.Y = y; break; }
     Player.SetRawAttr(Attr.AC, 7);
+    Player.SetRawAttr(Attr.Stealth, 0);
     Player.SetRawAttr(Attr.EV, 6);
     Player.Pickup(new CueStick());
+    Player.Pickup(new Buckler());
     Player.Pickup(new TwigOfDeath());
+    Player.Pickup(new ShortSword());
     Player.Pickup(new PaperBag());
     Player.Pickup(new Hamburger()).Count=2;
     Player.Pickup(new HealPotion()).Count=2;
     Player.Pickup(new TeleportScroll());
-    map.Creatures.Add(Player);
+    map.Entities.Add(Player);
 
     IO.Render(Player);
 

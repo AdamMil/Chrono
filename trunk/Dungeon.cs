@@ -21,9 +21,9 @@ public class Dungeon
     maps[mi] = map = new RoomyMapGenerator().Generate();
     map.Index = mi;
 
-    for(int i=0; i<10; i++)
-    { int idx = map.Creatures.Add(Entity.Generate(typeof(Orc), mi, CreatureClass.Fighter));
-      map.Creatures[idx].Position = map.FreeSpace();
+    for(int i=0; i<100; i++)
+    { int idx = map.Entities.Add(Entity.Generate(typeof(Orc), mi+1, EntityClass.Fighter));
+      map.Entities[idx].Position = map.FreeSpace();
     }
     for(int i=0; i<2; i++) map.AddItem(map.FreeSpace(true, true), new Hamburger());
     for(int i=0; i<3; i++) map.AddItem(map.FreeSpace(true, true), new FortuneCookie());

@@ -82,11 +82,10 @@ public abstract class Item : UniqueObject, ICloneable
   }
 
   public virtual object Clone()
-  { System.Runtime.Serialization.Formatters.Binary.BinaryFormatter f = new System.Runtime.Serialization.Formatters.Binary.BinaryFormatter();
+  { buffer.Position = 0;
+    formatter.Serialize(buffer, this);
     buffer.Position = 0;
-    f.Serialize(buffer, this);
-    buffer.Position = 0;
-    return f.Deserialize(buffer);
+    return formatter.Deserialize(buffer);
   }
 
   public virtual bool CanStackWith(Item item)
@@ -152,8 +151,8 @@ public abstract class Item : UniqueObject, ICloneable
 
   protected string name;
 
-  static readonly Type[] copyCons = new Type[] { typeof(Item) };
   static System.IO.MemoryStream buffer = new System.IO.MemoryStream(512);
+  static System.Runtime.Serialization.Formatters.Binary.BinaryFormatter formatter = new System.Runtime.Serialization.Formatters.Binary.BinaryFormatter();
 }
 #endregion
 

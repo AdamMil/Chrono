@@ -12,8 +12,12 @@ public class Food : Item
     public const uint None=0, Partial=1, NextFlag=2;
   };
 
+  public override bool CanStackWith(Item item)
+  { return base.CanStackWith(item) && (Flags&Flag.Partial)==0 && (((Food)item).Flags&Flag.Partial)==0;
+  }
+
   public override bool Use(Creature user)
-  { int eaten = Math.Min(user.Hunger, Math.Min(Weight*10, 100));
+  { int eaten = Math.Min(user.Hunger, Math.Min(Weight*75, 100));
     user.Hunger -= eaten;
     Weight -= (eaten+9)/10;
     Flags |= Flag.Partial;
@@ -24,7 +28,8 @@ public class Food : Item
 }
 
 public class FortuneCookie : Food
-{ public FortuneCookie() { Name="fortune cookie"; Color=Color.Brown; }
+{ public FortuneCookie() { Name="fortune cookie"; Color=Color.Brown; Weight=1; }
+  public FortuneCookie(Item item) : base(item) { }
   
   public override bool Use(Creature user)
   { if((Flags&Read)==0)

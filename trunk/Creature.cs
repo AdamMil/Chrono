@@ -18,6 +18,8 @@ public enum CreatureClass
 { RandomClass=-1, Fighter, NumClasses
 }
 
+public enum Hunger { Normal, Hungry, Starving };
+
 public abstract class Creature
 { [Flags] public enum Flag { None=0, Confused=1, Stunned=2, Hallucinating=4, Asleep=8 }
 
@@ -39,9 +41,13 @@ public abstract class Creature
       Title = GetTitle();
     }
   }
+
   public int Gold { get { return attr[(int)Attr.Gold]; } set { SetAttr(Attr.Gold, value); } }
   public int HP { get { return attr[(int)Attr.HP]; } set { SetAttr(Attr.HP, value); } }
   public int Hunger { get { return attr[(int)Attr.Hunger]; } set { SetAttr(Attr.Hunger, value); } }
+  public Hunger HungerLevel
+  { get { return Hunger<500 ? Chrono.Hunger.Normal : Hunger<800 ? Chrono.Hunger.Hungry : Chrono.Hunger.Starving; }
+  }
   public int Int { get { return attr[(int)Attr.Int]; } set { SetAttr(Attr.Int, value); } }
   public int MaxHP { get { return attr[(int)Attr.MaxHP]; } set { SetAttr(Attr.MaxHP, value); } }
   public int MaxMP { get { return attr[(int)Attr.MaxMP]; } set { SetAttr(Attr.MaxMP, value); } }
@@ -60,8 +66,18 @@ public abstract class Creature
   }
   public Point Position { get { return new Point(X, Y); } set { X=value.X; Y=value.Y; } }
 
-  public void Drop(char c)
-  { 
+  public Item Drop(char c)
+  { Item i = Inv[c];
+    Inv.Remove(c);
+    Map.AddItem(Position, i);
+    return i;
+  }
+  public Item Drop(char c, int count)
+  { Item i = Inv[c];
+    if(count==i.Count) Inv.Remove(c);
+    else i = i.Split(count);
+    Map.AddItem(Position, i);
+    return i;
   }
 
   public int GetAttr(Attr attribute) { return attr[(int)attribute]; }
@@ -190,6 +206,8 @@ public abstract class Creature
     creature.Generate(level, myClass, race);
     return creature;
   }
+
+  protected const int HungryAt=500, StarvingAt=800, StarveAt=1000;
 
   protected struct AttrMods
   { public AttrMods(params int[] mods) { Mods = mods; }

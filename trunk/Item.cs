@@ -4,7 +4,7 @@ namespace Chrono
 {
 
 public enum ItemClass
-{ Invalid, Amulet, Weapon, Armor, Food, Corpse, Ring, Potion, Wand, Tool, Container, Treasure, NumClasses
+{ Invalid, Any=Invalid, Amulet, Weapon, Armor, Food, Corpse, Ring, Potion, Wand, Tool, Container, Treasure, NumClasses
 }
 
 public abstract class Item : ICloneable
@@ -24,7 +24,7 @@ public abstract class Item : ICloneable
   public string FullName
   { get
     { string ret = Count>1 ? Count+" "+PluralPrefix+Name+PluralSuffix : Prefix+Name;
-      if(Title!=null && Title!="") ret += " named "+Title;
+      if(Title!=null) ret += " named "+Title;
       return ret;
     }
   }
@@ -37,7 +37,7 @@ public abstract class Item : ICloneable
   #endregion
 
   public virtual bool CanStackWith(Item item)
-  { if(item.GetType() != GetType()) return false;
+  { if(item.Title!=null || Title!=null || item.GetType() != GetType()) return false;
     if(Class==ItemClass.Food || Class==ItemClass.Potion || Class==ItemClass.Treasure) return true;
     return false;
   }
@@ -49,6 +49,8 @@ public abstract class Item : ICloneable
     Count -= toRemove;
     return newItem;
   }
+
+  public override string ToString() { return FullName; }
 
   public string Name, Title, Prefix, PluralPrefix, PluralSuffix;
   public int Age, Count, Weight;

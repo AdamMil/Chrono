@@ -16,9 +16,9 @@ public abstract class Scroll : Readable
   { return base.CanStackWith(item) && ((Scroll)item).Name==Name;
   }
 
-  public override void Read(Entity user)
+  public virtual void Read(Entity user)
   { user.OnReadScroll(this);
-    Spell.Cast(user, user.Position, Direction.Self);
+    Spell.Cast(user);
   }
 
   public Spell Spell;

@@ -14,7 +14,7 @@ public struct Input
 { public Input(Action action) { Action=action; Direction=Direction.Invalid; Count=1; }
   public Action Action;
   public Direction Direction;
-  public int    Count;
+  public int Count;
 }
 
 [Flags]
@@ -85,14 +85,15 @@ public abstract class InputOutput
 
   public abstract MenuItem[] ChooseItem(string prompt, IKeyedInventory items, MenuFlag flags,
                                         params ItemClass[] classes);
-
+  public abstract Spell ChooseSpell(Entity viewer);
+  public abstract Spell ChooseSpell(Entity reader, Spellbook book);
   public RangeTarget ChooseTarget(Entity viewer, bool allowDir) { return ChooseTarget(viewer, null, allowDir); }
   public abstract RangeTarget ChooseTarget(Entity viewer, Spell spell, bool allowDir);
 
   public void DisplayInventory(IKeyedInventory items) { DisplayInventory(items, ItemClass.Any); }
   public abstract void DisplayInventory(IKeyedInventory items, params ItemClass[] classes);
   public abstract void DisplayTileItems(IInventory items);
-  public abstract void DisplayMap(Entity viewer);
+  public abstract SD.Point DisplayMap(Entity viewer);
 
   public abstract void ExamineItem(Entity viewer, Item item);
   public abstract void ExamineTile(Entity viewer, SD.Point pos);

@@ -168,7 +168,6 @@ public abstract class Wieldable : Modifying
 public abstract class Readable : Item
 { protected Readable() { }
   protected Readable(Item item) : base(item) { }
-  public abstract void Read(Entity user);
 }
 
 public abstract class Chargeable : Item

@@ -11,7 +11,8 @@ public enum SpellClass
 }
 
 public abstract class Spell
-{ public virtual void Cast(Entity user, Item item) { }
+{ public void Cast(Entity user) { Cast(user, user.Position, Direction.Self); }
+  public virtual void Cast(Entity user, Item item) { }
   public virtual void Cast(Entity user, Point tile, Direction dir) { }
 
   public int Level { get { return Difficulty/100+1; } }
@@ -32,11 +33,10 @@ public abstract class Spell
     chance += chance*20/100;                                // + 20%
     return chance<0 ? 0 : chance>100 ? 100 : chance;
   }
-  public bool LearnTest(Entity user) { return Global.Rand(100)<LearnChance(user); }
 
   public virtual ICollection TracePath(Entity user, Point pt) { return null; }
 
-  public string Name;
+  public string Name, Description;
   public SpellClass  Class;
   public SpellTarget Target;
   public int Difficulty; // 0-99=level 1, 100-199=level 2, 200-299=level 3, etc
@@ -118,7 +118,10 @@ public abstract class BeamSpell : Spell
 }
 
 public class FireSpell : BeamSpell
-{ public FireSpell() { Name="fire"; }
+{ public FireSpell()
+  { Name="fire"; Class=SpellClass.Elemental; Difficulty=550; Power=12;
+    Description = "The fire spell hurls a great bolt of flames.";
+  }
 
   public static FireSpell Default = new FireSpell();
 
@@ -171,10 +174,10 @@ public class FireSpell : BeamSpell
   }
 
   bool AffectItem(IInventory inv, Item i, bool print)
-  { if(i.Class==ItemClass.Scroll || i.Class==ItemClass.Potion)
+  { if(i.Class==ItemClass.Scroll || i.Class==ItemClass.Potion || i.Class==ItemClass.Spellbook)
     { if(print)
       { string plural = i.Count>1 ? "s" : "";
-        App.IO.Print(i.Class==ItemClass.Scroll ? "{0} burn{1} up!" : "{0} heat{1} up and burst{1}!",
+        App.IO.Print(i.Class==ItemClass.Potion ? "{0} heat{1} up and burst{1}!" : "{0} burn{1} up!",
                      Global.Cap1(i.ToString()), plural);
       }
       inv.Remove(i);
@@ -185,7 +188,10 @@ public class FireSpell : BeamSpell
 }
 
 public class TeleportSpell : Spell
-{ public TeleportSpell() { Name="teleport"; }
+{ public TeleportSpell()
+  { Name="teleport"; Class=SpellClass.Translocation; Difficulty=450; Power=9;
+    Description = "This spell will teleport the caster to a random location.";
+  }
 
   public override void Cast(Entity user, Point tile, Direction dir)
   { user.Position = user.Map.FreeSpace();
@@ -193,6 +199,35 @@ public class TeleportSpell : Spell
   }
 
   public static TeleportSpell Default = new TeleportSpell();
+}
+
+public class AmnesiaSpell : Spell
+{ public AmnesiaSpell()
+  { Name="amnesia"; Class=SpellClass.Divination; Difficulty=10; Power=2;
+    Description = "This spell scrambles the caster's memory.";
+  }
+  
+  public override void Cast(Entity user, Point tile, Direction dir)
+  { if(user.Memory!=null)
+    { Map old = user.Memory;
+      user.Memory = new Map(user.Map.Width, user.Map.Height, TileType.Border, false); // wipe the memory
+      int count = user.Map.Width*user.Map.Height/20;
+      for(int i=0; i<count; i++) // put some of the old tiles in there
+      { int x = Global.Rand(user.Map.Width), y = Global.Rand(user.Map.Height);
+        if(old[x, y].Type!=TileType.Border)
+        { user.Memory.SetType(x, y, user.Map[x, y].Type);
+          user.Memory.SetFlag(x, y, Tile.Flag.Seen, true);
+        }
+      }
+      for(int i=0; i<count; i++) // put some random tiles in there
+      { int x = Global.Rand(user.Map.Width), y = Global.Rand(user.Map.Height);
+        user.Memory.SetType(x, y, (TileType)Global.Rand((int)TileType.NumTypes));
+      }
+      if(user==App.Player) App.IO.Print("You feel your mind being twisted!");
+    }
+  }
+  
+  public static AmnesiaSpell Default = new AmnesiaSpell();
 }
 
 } // namespace Chrono

@@ -20,7 +20,7 @@ public enum Death { Combat, Falling, Poison, Starvation, Sickness, Trap } // cau
 
 public enum EntityClass
 { Other=-2, // not a monster (boulder or some other entity)
-  RandomClass=-1, Fighter, NumClasses
+  RandomClass=-1, Fighter, Wizard, NumClasses
 }
 
 public enum HungerLevel { Normal, Hungry, Starving, Starved };
@@ -96,15 +96,7 @@ public abstract class Entity
   { get { return expLevel; }
     set { expLevel=value; Title=GetTitle(); }
   }
-  public Flag Flags
-  { get
-    { Flag flags = RawFlags;
-      for(int i=0; i<Slots.Length; i++) if(Slots[i]!=null) flags |= Slots[i].FlagMods;
-      for(int i=0; i<Hands.Length; i++) if(Hands[i]!=null) flags |= Hands[i].FlagMods;
-      for(int i=0; i<numEffects; i++) if(effects[i].Attr==Attr.Flags) flags |= (Flag)effects[i].Value;
-      return flags;
-    }
-  }
+  public Flag Flags { get { return flags; } }
   public int Gold
   { get
     { int gold = 0;
@@ -208,17 +200,25 @@ public abstract class Entity
   public virtual string theName { get { return Name==null ? "the "+Race.ToString().ToLower() : Name; } }
 
   public void AddEffect(Effect effect)
-  { if(effects==null || numEffects==effects.Length)
+  { int i;
+    if(effects==null || numEffects==effects.Length)
     { Effect[] narr = new Effect[numEffects==0 ? 4 : numEffects*2];
       if(numEffects>0) Array.Copy(effects, narr, numEffects);
       effects = narr;
     }
     if(effect.Attr==Attr.Sickness || effect.Attr==Attr.Poison) // sickness/poison combines with existing effect
-    { int i;
-      for(i=0; i<numEffects; i++) if(effects[i].Attr==effect.Attr) break;
+    { for(i=0; i<numEffects; i++) if(effects[i].Attr==effect.Attr) break;
       if(i==numEffects) effects[numEffects++] = effect;
       else
       { effect.Value += effects[i].Value;
+        effects[i] = effect;
+      }
+    }
+    else if(effect.Attr==Attr.Flags) // flags effects combine to increase duration
+    { for(i=0; i<numEffects; i++) if(effects[i].Attr==effect.Attr && effects[i].Value==effects[i].Value) break;
+      if(i==numEffects) { effects[numEffects++] = effect; CheckFlags(); }
+      else
+      { effect.Timeout += effects[i].Timeout;
         effects[i] = effect;
       }
     }
@@ -433,9 +433,6 @@ public abstract class Entity
     while(--level>0) LevelUp();
   }
 
-  // returns true if we have the given flag (checks modifiers from weapons, etc)
-  public bool GetFlag(Flag f) { return (Flags&f)!=0; }
-
   public int GetRawAttr(Attr attribute) { return attr[(int)attribute]; } // gets a raw attribute value (no modifiers)
   public void SetRawAttr(Attr attribute, int val) // sets a base attribute value
   { attr[(int)attribute]=val;
@@ -458,11 +455,13 @@ public abstract class Entity
     if(item.Invoke(this)) Exercise(Skill.Invoking);
   }
 
+  public bool Is(Flag flag) { return (Flags&flag)!=0; } // returns true if we have the given flag
+
   // returns true if a monster is within the visible area
   public bool IsCreatureVisible() { return IsCreatureVisible(VisibleTiles()); }
   public bool IsCreatureVisible(Point[] vis)
   { foreach(Entity e in Map.Entities)
-      if(e.Class!=EntityClass.Other && e!=this && (!e.GetFlag(Flag.Invisible) || GetFlag(Flag.SeeInvisible)))
+      if(e.Class!=EntityClass.Other && e!=this && (!e.Is(Flag.Invisible) || Is(Flag.SeeInvisible)))
       { Point cp = e.Position;
         for(int j=0; j<vis.Length; j++) if(vis[j]==cp) return true;
       }
@@ -485,7 +484,7 @@ public abstract class Entity
   }
 
   public Direction LookAt(Entity creature) // return the direction to a visible creature or Invalid if not visible
-  { if(creature.GetFlag(Flag.Invisible) && !GetFlag(Flag.SeeInvisible)) return Direction.Invalid;
+  { if(creature.Is(Flag.Invisible) && !Is(Flag.SeeInvisible)) return Direction.Invalid;
     return LookAt(creature.Position);
   }
   public Direction LookAt(Point pt)
@@ -517,6 +516,13 @@ public abstract class Entity
       } while(dy>=0);
     }
     return Global.PointToDir(off);
+  }
+
+  public void MemorizeSpell(Spell spell, int memory)
+  { if(spells==null) spells = new ArrayList();
+    Type type = spell.GetType();
+    foreach(Spell s in spells) if(s.GetType()==type) { s.Memory = memory; return; }
+    spells.Add(type.GetConstructor(Type.EmptyTypes).Invoke(null));
   }
 
   // event handlers (for output, etc)
@@ -589,6 +595,13 @@ public abstract class Entity
     return ammo;
   }
 
+  public int SpellKnowledge(Spell spell)
+  { if(spells==null) return 0;
+    Type type = spell.GetType();
+    foreach(Spell s in spells) if(s.GetType()==type) return s.Memory;
+    return 0;
+  }
+
   public virtual void Think() // base Think()
   { Age++;
     Timer-=Speed;
@@ -597,6 +610,7 @@ public abstract class Entity
       if(MP<MaxMP) MP++;
     }
 
+    bool healthup=false;
     for(int i=0; i<numEffects; i++)
     { Effect e = effects[i];
       if(e.Attr==Attr.Poison || e.Attr==Attr.Sickness)
@@ -622,11 +636,14 @@ public abstract class Entity
           }
           else if(Global.OneIn(HP==1 ? 3 : 8))
           { if(--effects[i].Value<=0) CancelEffect(i--);
+            healthup = true;
           }
         }
       }
       else if(--effects[i].Timeout<=0) CancelEffect(i--);
     }
+    
+    if(healthup) App.IO.Print(Color.LightGreen, "You feel your health improve.");
   }
   
   public void ThrowItem(Item item, Direction dir)
@@ -721,7 +738,7 @@ public abstract class Entity
   public Entity[] VisibleCreatures() { return VisibleCreatures(VisibleTiles()); }
   public Entity[] VisibleCreatures(Point[] vis)
   { foreach(Entity e in Map.Entities)
-      if(e.Class!=EntityClass.Other && e!=this && (!e.GetFlag(Flag.Invisible) || GetFlag(Flag.SeeInvisible)))
+      if(e.Class!=EntityClass.Other && e!=this && (!e.Is(Flag.Invisible) || Is(Flag.SeeInvisible)))
       { Point cp = e.Position;
         for(int j=0; j<vis.Length; j++) if(vis[j]==cp) { list.Add(e); break; }
       }
@@ -865,8 +882,11 @@ public abstract class Entity
   }
 
   protected void CheckFlags() // check if our flags have changed and call OnFlagsChanged if so
-  { Flag nf = Flags;
-    if(nf!=oldFlags) { OnFlagsChanged(oldFlags, nf); oldFlags=nf; Interrupt(); }
+  { Flag nf = RawFlags;
+    for(int i=0; i<Slots.Length; i++) if(Slots[i]!=null) nf |= Slots[i].FlagMods;
+    for(int i=0; i<Hands.Length; i++) if(Hands[i]!=null) nf |= Hands[i].FlagMods;
+    for(int i=0; i<numEffects; i++) if(effects[i].Attr==Attr.Flags) nf |= (Flag)effects[i].Value;
+    if(nf!=flags) { OnFlagsChanged(flags, nf); flags=nf; Interrupt(); }
   }
 
   protected void GiveKillExp(Entity killed)
@@ -898,7 +918,6 @@ public abstract class Entity
 
   protected string prefix;   // my name prefix (usually null)
   protected int baseKillExp; // the base experience gotten for killing me
-  protected Flag oldFlags;   // the flags at the beginning of this turn
   protected bool interrupt;  // true if we've been interrupted
 
   struct AttrMods
@@ -1029,7 +1048,9 @@ public abstract class Entity
   int[] attr = new int[(int)Attr.NumAttributes], attrExp = new int[(int)Attr.NumAttributes];
   bool[] skillEnable; // are we training these skills?
   Effect[] effects;
+  ArrayList spells;   // spells we've learned
   int exp, expLevel, hp, mp, smell, numEffects;
+  Flag flags;      // cached set of flags
 
   static ArrayList list = new ArrayList(); // an arraylist used in some places (ie VisibleCreatures)
   static int[] vis = new int[128]; // vis point buffer
@@ -1040,14 +1061,18 @@ public abstract class Entity
     new AttrMods(9, 4, 3)  // Orc   - 16
   };
   static readonly AttrMods[] classAttrs = new AttrMods[(int)EntityClass.NumClasses] // stat modifiers per class
-  { new AttrMods(7, 3, -1, 15, 2, 40, 0, 1) // Fighter - 10, 15/2, 40, 0/1
+  { new AttrMods(7, 3, -1, 15, 2, 40, 0, 1), // Fighter - 9, 15/2=17, 40, 0/1
+    new AttrMods(-1, 3, 7, 9, 8, 50),        // Wizard  - 9, 9/8=17,  50, 0/0
   };
   // titles per exp level per class
   static readonly ClassLevel[][] classTitles = new ClassLevel[(int)EntityClass.NumClasses][]
   { new ClassLevel[]
     { new ClassLevel(1, "Whacker"), new ClassLevel(4, "Beater"), new ClassLevel(8, "Grunter"),
       new ClassLevel(13, "Fighter"), new ClassLevel(19, "Veteran")
-    }
+    },
+    new ClassLevel[]
+    { new ClassLevel(1, "Neophyte"),
+    },
   };
 }
 

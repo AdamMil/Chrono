@@ -12,7 +12,9 @@ public enum TileType : byte
   SolidRock, Wall, ClosedDoor, OpenDoor, RoomFloor, Corridor, UpStairs, DownStairs,
   ShallowWater, DeepWater, Ice, Lava, Pit, Hole,
 
-  Trap, Altar
+  Trap, Altar,
+  
+  NumTypes
 }
 
 public enum Trap : byte { Dart, PoisonDart, Magic, MpDrain, Teleport, Pit }
@@ -22,17 +24,14 @@ public enum Noise { Walking, Bang, Combat, Alert, NeedHelp }
 
 public struct Tile
 { [Flags()]
-  public enum Flag : byte { None=0, PermaLit=1, Lit=2, Hidden=4, Locked=8 };
+  public enum Flag : byte { None=0, Hidden=1, Locked=2, Seen=4 };
 
-  public bool Lit
-  { get { return GetFlag(Flag.Lit|Flag.PermaLit); }
-    set { SetFlag(Flag.Lit, value); }
-  }
   public bool GetFlag(Flag f) { return (Flags&(byte)f)!=0; }
   public void SetFlag(Flag flag, bool on) { if(on) Flags|=(byte)flag; else Flags&=(byte)~flag; }
 
   public ItemPile  Items;
-  public Entity  Entity; // for memory only
+  public Entity    Entity;   // for memory (creature on tile), or owner of trap
+  public PathNode  Node;     // for pathfinding
   public Point     Dest;     // destination on prev/next level
   public ushort    Scent;    // strength of player smell
   public TileType  Type;
@@ -48,6 +47,139 @@ public struct Link
   public Point From, To;
   public int  ToLevel;
   public bool Down;
+}
+
+public class PathNode : IComparable
+{ public PathNode(int x, int y) { Point=new Point(x, y); }
+  public enum State { New, Open, Closed };
+
+  public Point    Point;
+  public PathNode Parent;
+  public int      MinCost, PathCost;
+  public State    Type;
+
+  public int CompareTo(object obj)
+  { PathNode on = (PathNode)obj;
+    int n = MinCost-on.MinCost;
+    if(n==0)
+    { n = Point.X-on.Point.X;
+      if(n==0) n = Point.Y-on.Point.Y;
+    }
+    return n;
+  }
+}
+
+public sealed class PathFinder
+{ public Point Goal { get { return goal; } }
+
+  public bool Blocked(PathNode node)
+  { if(node.Type==PathNode.State.Closed) Insert(node, node.PathCost);
+
+    int kmin;
+    do kmin=ProcessState(); while(kmin!=-1 && node.MinCost<node.PathCost);
+    return kmin!=-1 && node.Parent!=null;
+  }
+
+  public PathNode GetPathFrom(Point pt) { return map[pt].Node; }
+
+  public bool Start(Map map, Point start, Point goal)
+  { queue.Clear();
+
+    if(this.map!=map) Clear(this.map);
+
+    for(int y=0; y<map.Height; y++)
+      for(int x=0; x<map.Width; x++)
+        if(map[x, y].Node==null) map.SetNode(x, y, new PathNode(x, y));
+    this.map  = map;
+    this.goal = goal;
+    if(map[start].Node==null || map[goal].Node==null) return false;
+    Insert(map[goal].Node, 0);
+
+    PathNode startnode = map[start].Node;
+    int kmin;
+    do kmin=ProcessState(); while(kmin!=-1 && startnode.Type!=PathNode.State.Closed);
+    return kmin!=-1 && startnode.Parent!=null;
+  }
+
+  void Clear(Map map)
+  { if(map==null) return;
+    for(int y=0; y<map.Height; y++) for(int x=0; x<map.Height; x++) map.SetNode(x, y, null);
+  }
+
+  void Insert(PathNode node, int cost)
+  { switch(node.Type)
+    { case PathNode.State.New: node.MinCost=cost; break;
+      case PathNode.State.Open:
+        queue.Remove(node);
+        if(cost<node.MinCost) node.MinCost=cost;
+        break;
+      case PathNode.State.Closed:
+        queue.Remove(node);
+        if(cost<node.MinCost) node.MinCost=cost;
+        break;
+    }
+    node.PathCost = cost;
+    node.Type=PathNode.State.Open;
+    queue.Add(node);
+  }
+
+  int TileCost(Point pt) 
+  { TileType type = map[pt].Type;
+    return Map.IsDangerous(type) ? 1000 : Map.IsPassable(type) ? 1 : Map.IsDoor(type) ? 3 :
+            map.GetFlag(pt, Tile.Flag.Seen) ? 10000 : 4;
+  }
+
+  int MoveCost(PathNode from, PathNode to)
+  { return TileCost(from.Point)+TileCost(to.Point);
+    /*+ Math.Sign(Math.Max(Math.Abs(to.Point.X-goal.X), Math.Abs(to.Point.Y-goal.Y)) -
+                            Math.Max(Math.Abs(from.Point.X-goal.X), Math.Abs(from.Point.Y-goal.Y)));*/;
+  }
+
+  int ProcessState()
+  { if(queue.Count==0) return -1;
+    PathNode x = (PathNode)queue.RemoveMinimum();
+    int kold = x.MinCost, knew, mc;
+    x.Type = PathNode.State.Closed;
+    if(kold<x.PathCost)
+      for(int yi=-1; yi<=1; yi++)
+        for(int xi=-1; xi<=1; xi++)
+        { PathNode y = map[x.Point.X+xi, x.Point.Y+yi].Node;
+          if(y==null) continue;
+          if(y.PathCost<=kold)
+          { knew=y.PathCost+MoveCost(y, x);
+            if(x.PathCost>knew) { x.Parent=y; x.PathCost=knew; }
+          }
+        }
+
+    if(kold==x.PathCost) 
+      for(int yi=-1; yi<=1; yi++)
+        for(int xi=-1; xi<=1; xi++)
+        { PathNode y = map[x.Point.X+xi, x.Point.Y+yi].Node;
+          if(y==null) continue;
+          knew = x.PathCost+MoveCost(x, y);
+          if(y.Type==PathNode.State.New || y.Parent==x && y.PathCost!=knew || y.Parent!=x && y.PathCost>knew)
+          { y.Parent = x;
+            Insert(y, knew);
+          }
+        }
+    else
+      for(int yi=-1; yi<=1; yi++)
+        for(int xi=-1; xi<=1; xi++)
+        { PathNode y = map[x.Point.X+xi, x.Point.Y+yi].Node;
+          if(y==null) continue;
+          mc=MoveCost(x, y); knew=x.PathCost+mc;
+          if(y.Type==PathNode.State.New || y.Parent!=x && y.PathCost!=knew) { y.Parent=x; Insert(y, knew); }
+          else if(y.Parent!=x)
+          { if(y.PathCost>knew) Insert(x, x.PathCost);
+            else if(y.Type==PathNode.State.Closed && y.PathCost>kold && x.PathCost>y.PathCost+mc) Insert(y,y.PathCost);
+          }
+        }
+    return queue.Count==0 ? -1 : ((PathNode)queue.GetMinimum()).MinCost;
+  }
+
+  BinaryTree queue = new BinaryTree();
+  Map map;
+  Point goal;
 }
 
 public sealed class Map
@@ -101,11 +233,15 @@ public sealed class Map
   }
   #endregion
 
-  public Map(int width, int height)
+  public Map(int width, int height) : this(width, height, TileType.SolidRock, true) { }
+  public Map(int width, int height, TileType fill, bool seen)
   { this.width  = width;
     this.height = height;
     map = new Tile[height, width];
     entities = new EntityCollection(this);
+    if(fill!=TileType.Border)
+      for(int y=0; y<height; y++) for(int x=0; x<width; x++) map[y,x].Type=fill;
+    if(seen) for(int y=0; y<height; y++) for(int x=0; x<width; x++) map[y,x].Flags=(byte)Tile.Flag.Seen;
   }
 
   public Link[] Links { get { return links; } }
@@ -171,6 +307,9 @@ public sealed class Map
 
   public bool HasItems(Point pt) { return HasItems(pt.X, pt.Y); }
   public bool HasItems(int x, int y) { return map[y,x].Items!=null && map[y,x].Items.Count>0; }
+
+  public void SetNode(Point pt, PathNode node) { map[pt.Y,pt.X].Node = node; }
+  public void SetNode(int x, int y, PathNode node) { map[y,x].Node = node; }
 
   public void SetType(Point pt, TileType type) { map[pt.Y,pt.X].Type = type; }
   public void SetType(int x, int y, TileType type) { map[y,x].Type = type; }
@@ -383,7 +522,7 @@ public sealed class Map
 
   [Flags]
   enum TileFlag : byte { None=0, Passable=1, Wall=2, Door=4, Dangerous=8 }
-  static readonly TileFlag[] tileFlag = new TileFlag[]
+  static readonly TileFlag[] tileFlag = new TileFlag[(int)TileType.NumTypes]
   { TileFlag.None,   // Border
     TileFlag.None,   // SolidRock
     TileFlag.Wall,   // Wall

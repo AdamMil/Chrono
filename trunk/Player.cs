@@ -82,7 +82,7 @@ public class Player : Entity
         { corpse.CarveTurns=++turn;
           if(ThinkUpdate(ref vis)) break;
         }
-        if(turn<turns) App.IO.Print("You stop carving the {0}.", corpse.Name);
+        if(turn<turns) { App.IO.Print("You stop carving the {0}.", corpse.Name); goto next; }
         else
         { inv.Remove(corpse);
           Flesh food = new Flesh(corpse);
@@ -452,22 +452,28 @@ public class Player : Entity
 
       case Action.ShowMap:
       { Point pt = App.IO.DisplayMap(this);
-        if(pt.X==-1 || !path.Start(Memory, Position, pt)) goto next;
+        if(pt.X==-1 || Position==pt || !path.Plan(Memory, Position, pt)) goto next;
         PathNode node = path.GetPathFrom(Position);
         do
         { Point od = node.Parent.Point;
           TileType type = Map[od].Type;
-          if(Map.IsPassable(type)) Position = od;
+          if(Map.IsPassable(type)) { Position = od; node = node.Parent; }
           else
-          { if(type==TileType.ClosedDoor && !Map.GetFlag(node.Point, Tile.Flag.Locked))
-            { Map.SetType(od, TileType.OpenDoor);
+          { if(type==TileType.ClosedDoor)
+            { if(Map.GetFlag(od, Tile.Flag.Locked))
+              { App.IO.Print("This door is locked.");
+                break;
+              }
+              Map.SetType(od, TileType.OpenDoor);
               continue;
             }
-            else if(!path.Blocked(node, Map) || node.Parent.Point==od) break;
+            else
+            { if(!path.Plan(Memory, Position, pt)) break;
+              node = path.GetPathFrom(Position);
+              if(node.Parent.Point==od) break;
+            }
           }
-          node = node.Parent;
-App.IO.Render(this);
-        } while(!ThinkUpdate(ref vis) && Position!=path.Goal);
+        } while(!ThinkUpdate(ref vis) && Position!=pt);
         goto next;
       }
       

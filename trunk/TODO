@@ -29,10 +29,8 @@ alert AI when any damage is taken
 make some spells hit doors, etc (generalize the code to damage tiles)
 handing choosing an above/below directional target
 make ESC skip all --more-- prompts
-make < and > in the map view jump to stairs
-free path nodes when we're done with them
 don't walk through invisible monsters while moving
-try to open doors when pathfinding
 make path tracing part of the Map class (?)
-fill levels with SolidRock instead of Border, and add a Seen flag? (so unexplored space is cheaper than explored space)
 when path finding, if stopped on items, display them
+make spells give monster death messages
+confirm on lifting heavy load

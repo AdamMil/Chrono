@@ -139,7 +139,7 @@ public sealed class ConsoleIO : InputOutput
           else if(chance>=25) color = Color.Cyan;
           else color = Color.DarkGrey;
         }
-        WriteLine(color, "{0} {1} {2} (lv. {3}, {4})", c++, s==selected ? '+' : '-', s.Name, s.Level, s.Class);
+        WriteLine(color, "{0} {1} {2} (lv{3}, {4})", c++, s==selected ? '+' : '-', s.Name, s.Level, s.Class);
       }
       WriteLine(Color.Normal, "Choose spell by character. ? to view description.");
       
@@ -149,7 +149,7 @@ public sealed class ConsoleIO : InputOutput
       if(c=='?' && selected!=null)
       { ClearScreen();
         console.SetCursorPosition(0, 0);
-        WriteLine(Color.Normal, "{0} (lv. {1}, {2})", selected.Name, selected.Level, selected.Class);
+        WriteLine(Color.Normal, "{0} (lv{1}, {2})", selected.Name, selected.Level, selected.Class);
         console.WriteLine();
         int height = WordWrap(selected.Description, mapW);
         for(int i=0; i<height; i++) console.WriteLine(wrapped[i]);
@@ -352,19 +352,21 @@ public sealed class ConsoleIO : InputOutput
 
   public override Point DisplayMap(Entity viewer)
   { ClearLines();
-    int oldW = mapW;
-    mapW = console.Width-1; 
+    int oldW = mapW; mapW = console.Width-1; 
     console.Fill(0, 0, mapW, mapH);
     SetCursorToPlayer();
     Point[] vpts = viewer.VisibleTiles();
     Point pos = viewer.Position, ret = new Point(-1, -1);
+
+    int oldi=0;
+    char c;
     while(true)
     { RenderMap(viewer, pos, vpts);
       DescribeTile(viewer, pos, vpts);
       nextChar:
       ReadChar();
       if(rec.Key.VirtualKey==NTConsole.Key.Escape) break;
-      switch(char.ToLower(NormalizeDirChar()))
+      switch(c=char.ToLower(NormalizeDirChar()))
       { case 'b': pos.Offset(-1, 1); break;
         case 'j': pos.Y++; break;
         case 'n': pos.Offset(1, 1); break;
@@ -375,6 +377,21 @@ public sealed class ConsoleIO : InputOutput
         case 'u': pos.Offset(1, -1); break;
         case 'g': ret = pos; goto done;
         case '@': pos = viewer.Position; break;
+        case '<': case '>':
+        { Map map = viewer.Memory;
+          int ni  = oldi, size=map.Width*map.Height;
+          TileType sf = c=='<' ? TileType.UpStairs : TileType.DownStairs;
+          int x = ni%map.Width, y;
+          for(y=ni/map.Width; ; y++)
+          { for(; x<map.Width; x++)
+            { if(++ni==size) { x=y=ni=0; }
+              if(ni==oldi) goto nextChar;
+              if(map[x, y].Type==sf) goto found;
+            }
+            x = 0;
+          }
+          found: pos=new Point(x, y); oldi=ni; break;
+        }
         case ' ': case '\r': case '\n': goto done;
         default: goto nextChar;
       }
@@ -963,18 +980,10 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
 
     seeInvisible = viewer.Is(Entity.Flag.SeeInvisible);
 
-    Map map = viewer.Map;//viewer.Memory==null ? viewer.Map : viewer.Memory;
+    Map map = viewer.Memory==null ? viewer.Map : viewer.Memory;
     if(map==viewer.Map)
     { for(int i=0,y=rect.Top; y<rect.Bottom; y++)
-        for(int x=rect.Left; x<rect.Right; i++,x++)
-        { buf[i] = TileToChar(map[x,y], vis[i]);
-          Tile tile = viewer.Memory[x,y];
-          if(tile.Node!=null)
-            buf[i].Attributes |= NTConsole.ForeToBack(ColorToAttr(
-              tile.Node.PathCost>50 ? tile.Node.Type==PathNode.State.Open ? Color.Green : tile.Node.Type==PathNode.State.Closed ? Color.Red : Color.DarkGrey :
-                                      tile.Node.Type==PathNode.State.Open ? Color.LightGreen : tile.Node.Type==PathNode.State.Closed ? Color.LightRed : Color.Grey));
-          else buf[i].Attributes |= NTConsole.ForeToBack(ColorToAttr(Color.Purple));
-        }
+        for(int x=rect.Left; x<rect.Right; i++,x++) buf[i] = TileToChar(map[x,y], vis[i]);
       RenderMonsters(map.Entities, vpts, rect);
     }
     else
@@ -987,10 +996,10 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
           buf[i] = tile.Type==TileType.UpStairs || tile.Type==TileType.DownStairs || tile.Entity==null ?
                     TileToChar(tile, vis[i]) : CreatureToChar(tile.Entity, vis[i]);
         }
-      /*map = viewer.Map;
+      map = viewer.Map;
       for(int i=0,y=rect.Top; y<rect.Bottom; y++)
         for(int x=rect.Left; x<rect.Right; i++,x++) if(vis[i]) buf[i] = TileToChar(map[x,y], vis[i]);
-      RenderMonsters(map.Entities, vpts, rect);*/
+      RenderMonsters(map.Entities, vpts, rect);
     }
     console.PutBlock(new Rectangle(0, 0, rect.Width, rect.Height), buf);
   }

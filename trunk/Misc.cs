@@ -20,13 +20,25 @@ public sealed class Global
 
   public static bool Coinflip() { return Random.Next(1)==0; }
   public static Point Move(Point pt, Direction d) { pt.Offset(DirMap[(int)d].X, DirMap[(int)d].Y); return pt; }
+  public static Point Move(Point pt, int d) { pt.Offset(DirMap[d].X, DirMap[d].Y); return pt; }
+  public static int NdN(int ndice, int nsides) // dice range from 1 to nsides, not 0 to nsides-1
+  { int val=0;
+    nsides++;
+    while(ndice-->0) { val += Random.Next(nsides); }
+    return val;
+  }
+  public static Direction PointToDir(Point off)
+  { for(int i=0; i<8; i++) if(DirMap[i]==off) return (Direction)i;
+    return Direction.Invalid;
+  }
+  public static int Rand(int min, int max) { return Random.Next(min, max); }
   public static int Rand(int max) { return Random.Next(max); }
 
   public static readonly Point[] DirMap = new Point[8]
   { new Point(0, -1), new Point(1, -1), new Point(1, 0),  new Point(1, 1),
     new Point(0, 1),  new Point(-1, 1), new Point(-1, 0), new Point(-1, -1)
   };
-  
+
   static readonly Random Random = new Random();
 }
 

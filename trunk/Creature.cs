@@ -31,6 +31,12 @@ public abstract class Creature
   public int AC { get { return GetAttr(Attr.AC); } }
   public int Age { get { return attr[(int)Attr.Age]; } set { SetRawAttr(Attr.Age, value); } }
   public int Dex { get { return GetAttr(Attr.Dex); } }
+  public int DexBonus
+  { get
+    { int dex = Dex;
+      return dex<8 ? (dex-9)/2 : dex-8;
+    }
+  }
   public int EV { get { return GetAttr(Attr.EV); } }
   public int Exp
   { get { return attr[(int)Attr.Exp]; }
@@ -46,7 +52,7 @@ public abstract class Creature
       Title = GetTitle();
     }
   }
-
+  public Flag Flags { get { return flags; } set { flags=value; } }
   public int Gold { get { return attr[(int)Attr.Gold]; } set { SetRawAttr(Attr.Gold, value); } }
   public bool HandsFull
   { get
@@ -63,15 +69,10 @@ public abstract class Creature
   { get { return Hunger<HungryAt ? Chrono.Hunger.Normal : Hunger<StarvingAt ? Chrono.Hunger.Hungry : Chrono.Hunger.Starving; }
   }
   public int Int { get { return GetAttr(Attr.Int); } }
+  public int KillExp { get { return baseKillExp*(ExpLevel+1); } }
   public int MaxHP { get { return GetAttr(Attr.MaxHP); } }
   public int MaxMP { get { return GetAttr(Attr.MaxMP); } }
   public int MP { get { return attr[(int)Attr.MP]; } set { SetRawAttr(Attr.MP, value); } }
-  public int Sickness { get { return attr[(int)Attr.Sickness]; } set { SetRawAttr(Attr.Sickness, value); } }
-  public int Speed { get { return GetAttr(Attr.Speed); } }
-  public int Str { get { return GetAttr(Attr.Str); } }
-
-  public Flag Flags { get { return flags; } set { flags=value; /* FIXME: redraw stats */ } }
-
   public int NextExp
   { get
     { return (int)(ExpLevel<8 ? 100*Math.Pow(1.75, ExpLevel)
@@ -79,29 +80,85 @@ public abstract class Creature
                                             : 100*Math.Pow(1.18, ExpLevel+25)+50000) - 75;
     }
   }
-  public Point Position { get { return new Point(X, Y); } set { X=value.X; Y=value.Y; } }
+  public int Sickness { get { return attr[(int)Attr.Sickness]; } set { SetRawAttr(Attr.Sickness, value); } }
+  public int Speed { get { return GetAttr(Attr.Speed); } }
+  public int Str { get { return GetAttr(Attr.Str); } }
+  public int StrBonus
+  { get
+    { int str = Str;
+      return str<10 ? (str-11)/2 : str-10;
+    }
+  }
+  public int X { get { return Position.X; } set { Position.X=value; } }
+  public int Y { get { return Position.Y; } set { Position.Y=value; } }
+
+  public string Prefix
+  { get
+    { if(prefix!=null) return prefix;
+      if(Name!=null) return "";
+      string name = Race.ToString();
+      switch(char.ToLower(name[0]))
+      { case 'a': case 'e': case 'i': case 'o': case 'u': return "an ";
+        default: return "a ";
+      }
+    }
+  }
+  public virtual string aName
+  { get { return Name==null ? Prefix+Race.ToString().ToLower() : Name; }
+  }
+  public virtual string TheName
+  { get { return Name==null ? "The "+Race.ToString().ToLower() : Name; }
+  }
+  public virtual string theName
+  { get { return Name==null ? "the "+Race.ToString().ToLower() : Name; }
+  }
+
+  public void Attack(Direction dir)
+  { Creature c = Map.GetCreature(Global.Move(Position, dir));
+    if(c==null) App.IO.Print("You swing at thin air.");
+    else Attack(c);
+  }
+  public void Attack(Creature c)
+  { bool unarmed=true;
+    int delay=0;
+    for(int i=0; i<Hands.Length; i++)
+    { Weapon w = Hands[i] as Weapon;
+      if(w==null) continue;
+      unarmed=false;
+      TryHit(c, w);
+      if(w.Delay>delay) delay=w.Delay;
+    }
+    if(unarmed) TryHit(c, null);
+    Timer -= delay;
+  }
 
   public bool CanRemove(Slot slot) { return true; }
   public bool CanRemove(Wearable item) { return true; }
   public bool CanUnequip(int hand) { return true; }
   public bool CanUnequip(Wieldable item) { return true; }
 
+  public void Die(Creature c) { Die(c.aName); }
+  public abstract void Die(string cause);
+
   public Item Drop(char c)
   { Item i = Inv[c];
-    Inv.Remove(c);
-    Map.AddItem(Position, i);
-    i.OnDrop(this);
-    OnDrop(i);
+    Drop(i);
     return i;
   }
-  public Item Drop(char c, int count)
-  { Item i = Inv[c];
-    if(count==i.Count) Inv.Remove(c);
-    else i = i.Split(count);
-    Map.AddItem(Position, i);
-    i.OnDrop(this);
-    OnDrop(i);
-    return i;
+  public Item Drop(char c, int count) { return Drop(Inv[c], count); }
+  public void Drop(Item item)
+  { Inv.Remove(item);
+    Map.AddItem(Position, item);
+    item.OnDrop(this);
+    OnDrop(item);
+  }
+  public Item Drop(Item item, int count)
+  { if(count==item.Count) Inv.Remove(item);
+    else item = item.Split(count);
+    Map.AddItem(Position, item);
+    item.OnDrop(this);
+    OnDrop(item);
+    return item;
   }
 
   public void Equip(Wieldable item)
@@ -135,18 +192,25 @@ public abstract class Creature
 
   public bool GetFlag(Flag f) { return (Flags&f)!=0; }
   public bool SetFlag(Flag flag, bool on) { if(on) Flags |= flag; else Flags &= ~flag; return on; }
-  
-  public virtual void LevelDown() { ExpLevel--; }
-  public virtual void LevelUp()   { ExpLevel++; }
 
-  public virtual void Generate(int level, CreatureClass myClass, Race race)
+  public virtual void LevelDown() { ExpLevel--; }
+  public virtual void LevelUp()
+  { int hpGain = attr[(int)Attr.Str]/3+1;
+    int mpGain = attr[(int)Attr.Int]/3+1;
+    attr[(int)Attr.MaxHP] += hpGain;
+    attr[(int)Attr.MaxMP] += mpGain;
+    attr[(int)Attr.HP] += hpGain;
+    attr[(int)Attr.MP] += mpGain;
+    ExpLevel++;
+  }
+
+  public virtual void Generate(int level, CreatureClass myClass)
   { if(myClass==CreatureClass.RandomClass)
       myClass = (CreatureClass)Global.Rand((int)CreatureClass.NumClasses);
-    if(race==Race.RandomRace) Race = (Race)Global.Rand((int)Race.NumRaces);
 
-    Class = myClass; Race = race; Title = GetTitle(); Light = 8;
+    Class = myClass; Title = GetTitle(); Light = 8;
 
-    int[] mods = raceAttrs[(int)race].Mods; // attributes for race
+    int[] mods = raceAttrs[(int)Race].Mods; // attributes for race
     for(int i=0; i<mods.Length; i++) attr[i] += mods[i];
 
     mods = classAttrs[(int)myClass].Mods;   // attribute modifiers from class
@@ -175,11 +239,16 @@ public abstract class Creature
       }
     return false;
   }
-  
+
   public void ItemThink() { for(int i=0; i<Inv.Count; i++) Inv[i].Think(this); }
 
   public virtual void OnDrop(Item item) { }
   public virtual void OnEquip(Wieldable item) { }
+  public virtual void OnHit(Creature hit, Weapon w, int damage) { }
+  public virtual void OnHitBy(Creature hit, Weapon w, int damage) { }
+  public virtual void OnKill(Creature killed) { }
+  public virtual void OnMiss(Creature hit, Weapon w) { }
+  public virtual void OnMissBy(Creature hit, Weapon w) { }
   public virtual void OnRemove(Wearable item) { }
   public virtual void OnRemoveFail(Wearable item) { }
   public virtual void OnUnequip(Wieldable item) { }
@@ -212,8 +281,15 @@ public abstract class Creature
     OnRemove(item);
   }
 
-  public virtual void Think() { Age++; Timer-=Speed; }
-  
+  public virtual void Think()
+  { Age++;
+    Timer-=Speed;
+    if(Age%16==0)
+    { if(HP<MaxHP) HP++;
+      if(MP<MaxMP) MP++;
+    }
+  }
+
   public bool TryEquip(Wieldable item)
   { if(item==null)
     { bool success=true;
@@ -222,7 +298,7 @@ public abstract class Creature
     }
     if(item.AllHandWield)
     { for(int i=0; i<Hands.Length; i++) if(!CanUnequip(i)) return false;
-      for(int i=0; i<Hands.Length; i++) Unequip(i);
+      for(int i=0; i<Hands.Length; i++) if(Hands[i]!=null) Unequip(i);
     }
     else if(HandsFull)
     { bool success=false;
@@ -230,10 +306,12 @@ public abstract class Creature
       if(!success) for(int i=0; i<Hands.Length; i++) if(TryUnequip(i)) { success=true; break; }
       if(!success) return false;
     }
+    else for(int i=0; i<Hands.Length; i++)
+      if(Hands[i]!=null && Hands[i].Class==item.Class && !TryUnequip(i)) return false;
     Equip(item);
     return true;
   }
-  
+
   public bool TryUnequip(Item item)
   { if(Equipped(item)) Unequip(item);
     return true;
@@ -323,7 +401,7 @@ public abstract class Creature
   public Wearable[] Slots = new Wearable[(int)Slot.NumSlots];
   public Wieldable[] Hands = new Wieldable[2];
   public string Name, Title;
-  public int    X, Y;
+  public Point Position;
   public int    Light, Timer;
   public Map    Map, Memory;
   public Race   Race;
@@ -338,11 +416,8 @@ public abstract class Creature
 
   static public Creature Generate(Type type, int level) { return Generate(type, level, CreatureClass.RandomClass); }
   static public Creature Generate(Type type, int level, CreatureClass myClass)
-  { return Generate(type, level, myClass);
-  }
-  static public Creature Generate(Type type, int level, CreatureClass myClass, Race race)
   { Creature creature = MakeCreature(type);
-    creature.Generate(level, myClass, race);
+    creature.Generate(level, myClass);
     return creature;
   }
 
@@ -352,7 +427,9 @@ public abstract class Creature
   { public AttrMods(params int[] mods) { Mods = mods; }
     public int[] Mods;
   }
-  
+
+  protected virtual int CalculateDamage() { return Global.NdN(1, (Str*2+2)/3); }
+
   protected internal virtual void OnMapChanged() { }
 
   protected void UpdateMemory()
@@ -374,6 +451,8 @@ public abstract class Creature
     }
   }
 
+  protected string prefix;
+  protected int baseKillExp;
   protected bool interrupt;
 
   struct ClassLevel
@@ -390,6 +469,34 @@ public abstract class Creature
       title = classes[i].Title;
     }
     return title;
+  }
+
+  void TryHit(Creature c, Weapon w)
+  { int toHit   = (Dex+EV+1)/2 + (w!=null ? w.ToHitBonus : 0); // average of dex and ev, rounded up
+    int toEvade = c.EV;
+    toHit   -= toHit*(int)HungerLevel*10/100+1; // effects of hunger
+    toEvade -= toEvade*(int)c.HungerLevel*10/100+1;
+    int n = Global.Rand(toHit+toEvade);
+string msg = string.Format("HIT: (toHit: {0}, EV: {1}, roll: {2} = {3})", toHit, toEvade, n, n>=toEvade ? "hit" : "miss");
+    if(n>=toEvade) // hit
+    { int damage = w==null ? CalculateDamage() : w.CalculateDamage(this);
+      n = Global.Rand(c.AC);
+      damage -= n; // armor absorbs damage
+      if(damage<0) damage = 0; // normalize
+      App.IO.Print("{4}, DAMAGE: {0} -> {1}, HP: {2} -> {3}", damage+n, damage, c.HP, c.HP-damage, msg);
+      c.HP -= damage;
+      c.OnHitBy(this, w, damage);
+      OnHit(c, w, damage);
+      if(c.HP<=0)
+      { c.Die(this); Exp += c.KillExp;
+        if(c.HP<=0) OnKill(c); // amulet of saving, etc...
+      }
+    }
+    else // miss
+    { App.IO.Print(msg);
+      c.OnMissBy(this, w);
+      OnMiss(c, w);
+    }
   }
 
   void VisibleLine(int x2, int y2)
@@ -439,11 +546,11 @@ public abstract class Creature
   static int visPts;
 
   static readonly AttrMods[] raceAttrs = new AttrMods[(int)Race.NumRaces]
-  { new AttrMods(6, 6, 6), // Human
-    new AttrMods(9, 3, 4)  // Orc
+  { new AttrMods(6, 6, 6), // Human - 18
+    new AttrMods(9, 4, 3)  // Orc   - 16
   };
   static readonly AttrMods[] classAttrs = new AttrMods[(int)CreatureClass.NumClasses]
-  { new AttrMods(7, 0, 3, 15, 2, 75) // Fighter
+  { new AttrMods(7, 3, -1, 15, 2, 40, 0, 1) // Fighter - 10, 15/2, 40, 0/1
   };
   static readonly ClassLevel[][] classTitles = new ClassLevel[(int)CreatureClass.NumClasses][]
   { new ClassLevel[]

@@ -4,18 +4,18 @@ namespace Chrono
 {
 
 public enum ItemClass
-{ Invalid, Any=Invalid,
-  Amulet, Weapon, Armor, Ammo, Food, Corpse, Ring, Potion, Wand, Tool, Container, Treasure,
+{ Invalid=-1, Any=-1,
+  Amulet, Weapon, Armor, Ammo, Food, Corpse, Scroll, Ring, Potion, Wand, Tool, Spellbook, Container, Treasure,
   NumClasses
 }
 
 #region Item
 public abstract class Item : ICloneable
 { public Item()
-  { Prefix="a "; PluralPrefix=string.Empty; PluralSuffix="s"; Count=1;
+  { Prefix="a "; PluralPrefix=string.Empty; PluralSuffix="s"; Count=1; Color=Color.White;
   }
-  protected Item(Item item)
-  { Name=item.Name; Title=item.Title;
+  public Item(Item item)
+  { name=item.name; Title=item.Title; Class=item.Class;
     Prefix=item.Prefix; PluralPrefix=item.PluralPrefix; PluralSuffix=item.PluralSuffix;
     Age=item.Age; Count=item.Count; Weight=item.Weight; Color=item.Color; Char=item.Char;
   }
@@ -34,6 +34,8 @@ public abstract class Item : ICloneable
       return ret;
     }
   }
+  public virtual string InvName { get { return FullName; } }
+  public virtual string Name { get { return name; } }
 
   public string ItOne { get { return Count>1 ? "one" : "it"; } }
   public string ItThem { get { return Count>1 ? "them" : "it"; } }
@@ -61,11 +63,13 @@ public abstract class Item : ICloneable
 
   public override string ToString() { return FullName; }
 
-  public string Name, Title, Prefix, PluralPrefix, PluralSuffix;
+  public string Title, Prefix, PluralPrefix, PluralSuffix;
   public int Age, Count, Weight;
   public ItemClass Class;
   public Color Color;
   public char Char;
+
+  protected string name;
 
   static readonly Type[] copyCons = new Type[] { typeof(Item) };
 }
@@ -92,9 +96,9 @@ public abstract class Modifying : Item
 public abstract class Wearable : Modifying
 { public Wearable() { Slot=Slot.Invalid; }
 
-  public override string FullName
+  public override string InvName
   { get
-    { string ret = base.FullName;
+    { string ret = FullName;
       if(worn) ret += " (worn)";
       return ret;
     }
@@ -109,10 +113,9 @@ public abstract class Wearable : Modifying
 }
 
 public abstract class Wieldable : Modifying
-{ 
-  public override string FullName
+{ public override string InvName
   { get
-    { string ret = base.FullName;
+    { string ret = FullName;
       if(equipped) ret += " (equipped)";
       return ret;
     }

@@ -11,7 +11,7 @@ public enum TileType : byte
 
   SolidRock, Wall, ClosedDoor, OpenDoor, RoomFloor, Corridor, UpStairs, DownStairs,
   ShallowWater, DeepWater, Ice, Lava, Pit, Hole,
-  
+
   Trap, Altar
 }
 
@@ -33,9 +33,10 @@ public struct Tile
   public Creature  Creature; // for memory only
   public TileType  Type;
   public Point     Dest;     // destination on prev/next level
+  public byte      Scent;    // strength of player smell
   public byte      Subtype;  // subtype of tile (ie, type of trap/altar/etc)
   public byte      Flags;
-  
+
   public static Tile Border { get { return new Tile(); } }
 }
 
@@ -44,13 +45,14 @@ public sealed class Map
   #region CreatureCollection
   public class CreatureCollection : ArrayList
   { public CreatureCollection(Map map) { this.map = map; }
-  
+
     public new Creature this[int index] { get { return (Creature)base[index]; } }
 
-    public new void Add(object o) { Add((Creature)o); }
-    public void Add(Creature c)
-    { base.Add(c);
+    public new int Add(object o) { return Add((Creature)o); }
+    public int Add(Creature c)
+    { int i = base.Add(c);
       map.Added(c);
+      return i;
     }
     public new void AddRange(ICollection creatures)
     { base.AddRange(creatures);
@@ -90,6 +92,7 @@ public sealed class Map
   { this.width  = width;
     this.height = height;
     map = new Tile[height, width];
+    scentbuf = new byte[height*width];
     creatures = new CreatureCollection(this);
   }
 
@@ -111,13 +114,21 @@ public sealed class Map
     inv.Add(item);
   }
 
+  public void AddScent(int x, int y) { map[y,x].Scent = 255; }
+
   public bool Contains(int x, int y) { return y>=0 && y<height && x>=0 && x<width; }
 
   public bool GetFlag(Point pt, Tile.Flag flag) { return this[pt.X,pt.Y].GetFlag(flag); }
   public bool GetFlag(int x, int y, Tile.Flag flag) { return this[x,y].GetFlag(flag); }
   public void SetFlag(Point pt, Tile.Flag flag, bool on) { map[pt.Y,pt.X].SetFlag(flag, on); }
   public void SetFlag(int x, int y, Tile.Flag flag, bool on) { map[y,x].SetFlag(flag, on); }
-  
+
+  public Creature GetCreature(Point pt)
+  { for(int i=0; i<creatures.Count; i++) if(creatures[i].Position==pt) return creatures[i];
+    return null;
+  }
+  public Creature GetCreature(int x, int y) { return GetCreature(new Point(x, y)); }
+
   public bool HasItems(Point pt) { return HasItems(pt.X, pt.Y); }
   public bool HasItems(int x, int y) { return map[y,x].Items!=null && map[y,x].Items.Count>0; }
 
@@ -153,7 +164,7 @@ public sealed class Map
         if(IsFreeSpace(x, y, allowItems, allowCreatures)) return new Point(x, y);
     throw new ArgumentException("No free space found on this map!");
   }
-  
+
   public bool IsFreeSpace(Point pt, bool allowItems, bool allowCreatures)
   { return IsFreeSpace(pt.X, pt.Y, allowItems, allowCreatures);
   }
@@ -219,6 +230,22 @@ public sealed class Map
     }
     if(--thinking==0) removedCreatures.Clear();
   }
+  
+  public void SpreadScent()
+  { for(int y=0,i=0; y<height; y++)
+      for(int x=0; x<width; i++,x++)
+      { if(!IsPassable(map[y,x].Type)) continue;
+        int val=0, n=0;
+        for(int yi=-1; yi<=1; yi++)
+          for(int xi=-1; xi<=1; xi++)
+            if(xi!=0 || yi!=0)
+            { Tile t = this[x+xi, y+yi];
+              if(IsPassable(t.Type)) { val += t.Scent; n++; }
+            }
+        if(n>0 && val>0) scentbuf[i] = (byte)Math.Max(val/n-1, 0);
+      }
+    for(int y=0,i=0; y<height; y++) for(int x=0; x<width; x++) map[y,x].Scent=scentbuf[i++];
+  }
 
   class CreatureComparer : IComparer
   { public int Compare(object x, object y) { return ((Creature)x).Timer - ((Creature)y).Timer; }
@@ -235,9 +262,10 @@ public sealed class Map
   }
 
   Tile[,] map;
+  byte[] scentbuf;
   CreatureCollection creatures;
   PriorityQueue thinkQueue = new PriorityQueue(new CreatureComparer());
-  GameLib.Collections.Map removedCreatures = new GameLib.Collections.Map();
+  Hashtable removedCreatures = new Hashtable();
   int width, height, thinking, timer;
 
   [Flags]

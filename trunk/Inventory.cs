@@ -7,13 +7,13 @@ namespace Chrono
 public interface IInventory : ICollection
 { Item this[int index] { get; }
   bool IsFull { get; }
-  
+
   Item Add(Item item);
-  
+
   Item[] GetItems(ItemClass itemClass);
-  
+
   bool Has(ItemClass itemClass);
-  
+
   void Remove(Item item);
   void RemoveAt(int index);
 }
@@ -23,7 +23,7 @@ public interface IKeyedInventory : IInventory
   string CharString();
   string CharString(ItemClass itemClass);
   string CharString(ItemClass[] classes);
-  
+
   void Remove(char c);
 }
 
@@ -60,7 +60,7 @@ public sealed class ItemPile : IInventory
       }
     return ret;
   }
-  
+
   public bool Has(ItemClass itemClass)
   { for(int i=0; i<items.Count; i++) if(this[i].Class==itemClass) return true;
     return false;

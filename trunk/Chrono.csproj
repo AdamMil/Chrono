@@ -84,6 +84,11 @@
         <Files>
             <Include>
                 <File
+                    RelPath = "AI.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
                     RelPath = "Armor.cs"
                     SubType = "Code"
                     BuildAction = "Compile"

@@ -278,7 +278,6 @@
                     DependentUpon = "textData.xsd"
                     BuildAction = "None"
                 />
-                <Folder RelPath = "data\entities\" />
                 <File
                     RelPath = "data\maps\MapFormat.txt"
                     BuildAction = "Content"

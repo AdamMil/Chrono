@@ -965,7 +965,8 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
       }
     }
     y = 13 + handLines;
-    if(drewHands || hunger!=player.HungerLevel || playerFlags!=player.Flags || sick!=player.Sickness)
+    if(drewHands || sick!=player.Sickness || hunger!=player.HungerLevel || playerFlags!=player.Flags ||
+       carry!=player.CarryStress)
     { xlines=handLines;
 
       if(player.HungerLevel==HungerLevel.Hungry) { PutStringP(Color.Warning, width, x, y++, "Hungry"); xlines++; }
@@ -973,6 +974,12 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
 
       if(player.Sickness>0)
       { PutStringP(player.Sickness>1 ? Color.Dire : Color.Warning, width, x, y++, "Sick"); xlines++;
+      }
+      
+      switch(player.CarryStress)
+      { case CarryStress.Burdened: PutStringP(Color.Warning, width, x, y++, "Burdened"); xlines++; break;
+        case CarryStress.Stressed: PutStringP(Color.Dire, width, x, y++, "Stressed"); xlines++; break;
+        case CarryStress.Overtaxed: PutStringP(Color.Dire, width, x, y++, "Overtaxed"); xlines++; break;
       }
 
       if(xlines<statLines) console.Fill(x, y, width, statLines-xlines);
@@ -1018,7 +1025,7 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
   void UpdateStats(Entity player)
   { for(int i=0; i<(int)Attr.NumAttributes; i++) stats[i] = player.GetAttr((Attr)i);
     age=player.Age; exp=player.Exp; expLevel=player.ExpLevel; gold=player.Gold; hp=player.HP; mp=player.MP;
-    sick=player.Sickness; hunger=player.HungerLevel; playerFlags=player.Flags;
+    sick=player.Sickness; hunger=player.HungerLevel; carry=player.CarryStress; playerFlags=player.Flags;
     equipStr = "";
     for(int i=0; i<player.Hands.Length; i++) if(player.Hands[i]!=null) equipStr += player.Hands[i].FullName;
   }
@@ -1068,6 +1075,7 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
   int[] stats = new int[(int)Attr.NumAttributes];
   Entity.Flag playerFlags;
   HungerLevel hunger;
+  CarryStress carry;
   string equipStr="";
   int age=-1, exp=-1, expLevel=-1, gold=-1, hp=-1, mp=-1, sick=-1, handLines;
   bool renderStats;

@@ -14,9 +14,9 @@ public abstract class Wand : Chargeable
 
   public override string Name { get { return "wand of "+Spell.Name; } }
 
-  public override string GetFullName(Entity e)
+  public override string GetFullName(Entity e, bool forceSingular)
   { string suffix = Identified ? string.Format(" ({0}:{1})", Charges, Recharged) : "";
-    if(e==null || e.KnowsAbout(this)) return FullName + suffix;
+    if(e==null || e.KnowsAbout(this)) return base.GetFullName(e, forceSingular) + suffix;
     string tn = GetType().ToString(), rn = (string)namemap[tn], status = StatusString;
     if(status!="") status += ' ';
     if(rn==null) namemap[tn] = rn = names[namei++];
@@ -43,10 +43,14 @@ public abstract class Wand : Chargeable
   }
 
   public Spell Spell;
+  public string Effect; // the message shown on the first use
 
   protected virtual void Cast(Entity user, Point target, Direction dir)
   { if(Spell.AutoIdentify && !App.Player.KnowsAbout(this))
-    { if(user==App.Player || App.Player.CanSee(user.Position)) user.AddKnowledge(this);
+    { if(user==App.Player || App.Player.CanSee(user.Position))
+      { App.Player.AddKnowledge(this);
+        if(Effect!=null) App.IO.Print(Effect);
+      }
       if(user==App.Player) App.IO.Print("This is {0}.", GetAName(user));
     }
     Spell.Cast(user, Status, target, dir);
@@ -71,8 +75,12 @@ public abstract class Wand : Chargeable
 
 [Serializable]
 public class WandOfFire : Wand
-{ public WandOfFire() { Spell=FireSpell.Default; Charges=Global.Rand(3, 7); }
+{ public WandOfFire()
+  { Spell=FireSpell.Default; Charges=Global.Rand(3, 7); Effect="Flames fly from the wand.";
+  }
   public WandOfFire(SerializationInfo info, StreamingContext context) : base(info, context) { }
+
+  public static readonly int SpawnChance=10; // 0.1% chance
 }
 
 } // namespace Chrono

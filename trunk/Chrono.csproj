@@ -129,11 +129,6 @@
                     BuildAction = "Compile"
                 />
                 <File
-                    RelPath = "Fighter.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
                     RelPath = "Food.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
@@ -170,6 +165,11 @@
                 />
                 <File
                     RelPath = "Misc.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
+                    RelPath = "Monsters.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
                 />

@@ -42,6 +42,8 @@ public class Corpse : Item
   static readonly int[] raceWeight = new int[(int)Race.NumRaces]
   { 750, 1000
   };
+
+  public static readonly int SpawnChance=0; // 0% chance
 }
 
 } // namespace Chrono

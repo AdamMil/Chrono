@@ -20,11 +20,11 @@ public abstract class Potion : Item
 
   public abstract void Drink(Entity user);
 
-  public override string GetFullName(Entity e)
-  { if(e==null || e.KnowsAbout(this)) return FullName;
+  public override string GetFullName(Entity e, bool forceSingular)
+  { if(e==null || e.KnowsAbout(this)) return base.GetFullName(e, forceSingular);
     string tn = GetType().ToString(), rn = (string)namemap[tn];
     if(rn==null) namemap[tn] = rn = names[namei++];
-    rn = Count>1 ? Count.ToString() + ' ' + rn + " potions" : rn + " potion";
+    rn = !forceSingular && Count>1 ? Count.ToString() + ' ' + rn + " potions" : rn + " potion";
     if(Title!=null) rn += " named "+Title;
     return rn;
   }
@@ -63,6 +63,8 @@ public class HealPotion : Potion
 
   public override bool Hit(Entity user, Point pos) { return true; }
   public override bool Hit(Entity user, Entity hit) { return true; }
+
+  public static readonly int SpawnChance=200; // 2% chance
 }
 
 } // namespace Chrono

@@ -98,7 +98,7 @@ public abstract class InputOutput
   public void DisplayInventory(Entity entity) { DisplayInventory(entity, ItemClass.Any); }
   public abstract void DisplayInventory(Entity entity, params ItemClass[] classes);
   public abstract void DisplayKnowledge(Entity entity);
-  public abstract void DisplayTileItems(IInventory items);
+  public abstract void DisplayTileItems(Entity entity, IInventory items);
   public abstract SD.Point DisplayMap(Entity viewer);
 
   public abstract void ExamineItem(Entity viewer, Item item);

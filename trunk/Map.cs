@@ -225,6 +225,7 @@ public sealed class Map : UniqueObject
   { ItemPile inv = map[y,x].Items;
     if(inv==null) map[y,x].Items = inv = new ItemPile();
     inv.Add(item);
+    item.OnMap();
   }
   
   public void AddLink(Link link)
@@ -430,14 +431,24 @@ public sealed class Map : UniqueObject
     if(--thinking==0) removedEntities.Clear();
   }
   
+  public Item SpawnItem()
+  { SpawnInfo s = Global.NextSpawn();
+    Item item = (Item)s.ItemType.GetConstructor(Type.EmptyTypes).Invoke(null);
+    item.Count = Global.Rand(s.SpawnMax-s.SpawnMin)+s.SpawnMin;
+
+    if(Global.Rand(100)<15) item.Curse(); // TODO: make these improve weapon/armor
+    else if(Global.Rand(100)<10) item.Bless();
+
+    AddItem(FreeSpace(true, true), item);
+    return item;
+  }
+
   public void SpawnMonster()
   { int idx = entities.Add(Entity.Generate(typeof(Orc), Index+1, EntityClass.Fighter));
     for(int i=0; i<10; i++)
     { entities[idx].Position = FreeSpace();
       if(App.Player==null || !App.Player.CanSee(entities[idx])) break;
     }
-    entities[idx].SetBaseAttr(Attr.AC, 3);
-    entities[idx].SetBaseAttr(Attr.EV, 4);
   }
 
   public void SpreadScent()

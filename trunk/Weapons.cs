@@ -15,20 +15,6 @@ public abstract class Weapon : Wieldable
 { public Weapon() { Class=ItemClass.Weapon; }
   protected Weapon(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
-  public override string FullName
-  { get
-    { if(!Identified) return base.FullName;
-      string status = StatusString;
-      if(status!="") status += ' ';
-      string ret = (Count>1 ? Count.ToString()+' ' : "") + status +
-                   (DamageMod<0 ? "" : "+") + DamageMod + ',' +
-                   (ToHitMod <0 ? "" : "+") + ToHitMod  + ' ' + Name;
-      if(Count>1) ret += PluralSuffix;
-      if(Title!=null) ret += " named "+Title;
-      return ret;
-    }
-  }
-
   public int DamageBonus { get { return BaseDamage+DamageMod; } }
   public int ToHitBonus  { get { return BaseToHit+ToHitMod; } }
 
@@ -40,6 +26,18 @@ public abstract class Weapon : Wieldable
   }
 
   public virtual Compatibility CompatibleWith(Entity user) { return Compatibility.Okay; }
+
+  public override string GetFullName(Entity e, bool forceSingular)
+  { if(!Identified) return base.GetFullName(e, forceSingular);
+    string status = StatusString;
+    if(status!="") status += ' ';
+    string ret = (!forceSingular && Count>1 ? Count.ToString()+' ' : "") + status +
+                  (DamageMod<0 ? "" : "+") + DamageMod + ',' +
+                  (ToHitMod <0 ? "" : "+") + ToHitMod  + ' ' + Name;
+    if(Count>1) ret += PluralSuffix;
+    if(Title!=null) ret += " named "+Title;
+    return ret;
+  }
 
   public WeaponClass wClass;
   public int  Delay;  // delay (percentage of speed)
@@ -74,6 +72,8 @@ public abstract class Arrow : Ammo
 public class BasicArrow : Arrow
 { public BasicArrow() { name="arrow"; }
   public BasicArrow(SerializationInfo info, StreamingContext context) : base(info, context) { }
+  
+  public static readonly int SpawnChance=300, SpawnMin=4, SpawnMax=12; // 3% chance, 4-12 arrows
 }
 
 [Serializable]
@@ -85,19 +85,24 @@ public class FlamingArrow : Arrow
   { damage.Heat += (ushort)Global.NdN(1, 4);
     return damage;
   }
+
+  public static readonly int SpawnChance=300, SpawnMin=3, SpawnMax=8; // 1% chance, 3-8 arrows
 }
 #endregion
 
 [Serializable]
-public class Dart : Weapon
-{ public Dart() { wClass=WeaponClass.Thrown; Ranged=true; name="poisoned dart"; Weight=2; }
-  public Dart(SerializationInfo info, StreamingContext context) : base(info, context) { }
+public class PoisonDart : Weapon
+{ public PoisonDart() { wClass=WeaponClass.Thrown; Ranged=true; name="poisoned dart"; Weight=2; }
+  public PoisonDart(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override Damage CalculateDamage(Entity user, Ammo ammo, Entity target)
   { Damage d = new Damage(Global.NdN(1, 3+(int)CompatibleWith(user)) + user.StrBonus/2 + DamageBonus);
-    if(Global.Rand(100)<100/(target.Poison+1)) d.Poison = 1;
+    if(target==null || Global.Rand(100)<100/(target.Poison+1)) d.Poison = 1;
     return d;
   }
+
+  public static readonly int SpawnChance=300; // 3% chance
+  public static readonly int SpawnMin=3, SpawnMax=10;
 }
 
 [Serializable]
@@ -117,6 +122,8 @@ public class Bow : FiringWeapon
                             + user.DexBonus + DamageBonus);
     return ammo.ModDamage(dam);
   }
+
+  public static readonly int SpawnChance=200; // 2% chance
 }
 
 [Serializable]
@@ -130,6 +137,8 @@ public class ShortSword : Weapon
   public override Damage CalculateDamage(Entity user, Ammo ammo, Entity target)
   { return new Damage(Global.NdN(1, 6+(int)CompatibleWith(user)) + user.StrBonus + DamageBonus);
   }
+
+  public static readonly int SpawnChance=400; // 4% chance
 }
 
 } // namespace Chrono

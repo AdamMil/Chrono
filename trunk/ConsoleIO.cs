@@ -112,7 +112,34 @@ public sealed class ConsoleIO : InputOutput
   }
 
   public override Spell ChooseSpell(Entity viewer)
-  { return null;
+  { string chars="";
+    char c='a';
+    for(int i=0; i<viewer.Spells.Count; i++) chars += c++;
+    chars += '?';
+
+    c = CharChoice("Cast which spell?", chars);
+    if(c==0) return null;
+    if(c!='?') return (Spell)viewer.Spells[c-'a'];
+
+    ClearScreen();
+    console.SetCursorPosition(0, 0);
+    WriteLine(Color.Normal, "{0} Chance", "Spell".PadRight(38));
+    console.WriteLine();
+
+    c='a';
+    foreach(Spell s in viewer.Spells)
+      WriteLine(Color.Normal, "{0} - {1} ({2}%)", c++, s.Name.PadRight(34), s.CastChance(viewer));
+    WriteLine(Color.Normal, "Choose spell by character.");
+      
+    Spell selected;
+    while(true)
+    { c=ReadChar();
+      if(rec.Key.VirtualKey==NTConsole.Key.Escape || c=='\r' || c=='\n') { selected=null; break; }
+      int index = c-'a';
+      if(index>=0 && index<viewer.Spells.Count) { selected = (Spell)viewer.Spells[index]; break; }
+    }
+    RestoreScreen();
+    return selected;
   }
 
   public override Spell ChooseSpell(Entity reader, Spellbook book)
@@ -642,6 +669,7 @@ public sealed class ConsoleIO : InputOutput
         case 'W': inp.Action = Action.Wear; break;
         case 'X': inp.Action = Action.ShowMap; break;
         case 'z': inp.Action = Action.ZapWand; break;
+        case 'Z': inp.Action = Action.CastSpell; break;
         case '<': inp.Action = Action.GoUp; break;
         case '>': inp.Action = Action.GoDown; break;
         case '=': inp.Action = Action.Reassign; break;

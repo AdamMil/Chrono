@@ -12,14 +12,25 @@ public sealed class App
   public static InputOutput IO;
   public static bool Quit;
 
+  public static void CastChance(int intel, int skill, int diff) // assuming the user knows it
+  { double div = Math.Pow(1.25, intel)/8;
+    if(skill>0) div += skill*Math.Pow(1.02, skill)*16*div/100;
+    int chance = 100-(int)Math.Round(diff/div);
+    chance = chance<0 ? 0 : chance>100 ? 100 : chance;
+    System.Diagnostics.Debugger.Log(1, "", string.Format("Int: {0}, Skill: {1}, Diff: {2} = {3}%\n", intel, skill, diff, chance));
+  }
+
   public static void Main()
   { IO = new ConsoleIO();
     IO.SetTitle("Chrono 0.02");
     IO.Print("Chrono 0.02 by Adam Milazzo");
     IO.Print();
 
+    for(int d=50; d<1000; d+=100)
+      for(int i=8; i<23; i++) CastChance(i, 0, d);
+
     Map map = Dungeon[0];
-    Player = Player.Generate(EntityClass.Fighter, Race.Human);
+    Player = Player.Generate(EntityClass.Wizard, Race.Human);
     Player.Name = IO.Ask("Enter your name:", false, "I need to know what to call you!");
     
     for(int y=0; y<map.Height; y++) // place Player on the up staircase of the first level

@@ -96,6 +96,38 @@ public class Player : Entity
         break;
       }
       
+      case Action.CastSpell:
+      { if(Spells.Count==0) { App.IO.Print("You don't know any spells!"); break; }
+        if(CarryStress==CarryStress.Overtaxed) goto carrytoomuch;
+        Spell spell = App.IO.ChooseSpell(this);
+        if(spell==null) goto nevermind;
+        if(MP<spell.Power) { App.IO.Print("You don't have enough power to cast this spell!"); goto next; }
+        MP -= spell.Power;
+        if(spell.Memory<2000) App.IO.Print("Your memory of this spell is very faint.");
+        else if(spell.Memory<4000) App.IO.Print("Your memory of this spell is fant.");
+        if(spell.CastTest(this))
+        { switch(spell.Target)
+          { case SpellTarget.Self: spell.Cast(this); break;
+            case SpellTarget.Item:
+              MenuItem[] items = App.IO.ChooseItem("Cast on which item?", Inv, MenuFlag.None, ItemClass.Any);
+              if(items.Length==0) App.IO.Print("The energy rises within you, and then fades.");
+              else spell.Cast(this, items[0].Item);
+              break;
+            case SpellTarget.Tile:
+              RangeTarget rt = App.IO.ChooseTarget(this, spell, true);
+              if(rt.Dir!=Direction.Invalid || rt.Point.X!=-1) spell.Cast(this, rt);
+              else App.IO.Print("The energy rises within you, and then fades.");
+              break;
+          }
+          spell.Memory += 3;
+        }
+        else
+        { App.IO.Print("Your spell fizzles.");
+          spell.Memory++;
+        }
+        break;
+      }
+
       case Action.CloseDoor:
       { if(CarryStress==CarryStress.Overtaxed) goto carrytoomuch;
         Direction dir = App.IO.ChooseDirection(false, false);
@@ -636,7 +668,14 @@ public class Player : Entity
   }
   
   protected virtual void OnAge()
-  { Hunger++;
+  { if(Spells!=null)
+      for(int i=0; i<Spells.Count; i++)
+        if(--((Spell)Spells[i]).Memory<=0)
+        { Spells.RemoveAt(i--);
+          App.IO.Print("You feel as if you've forgotten something... but decide it's nothing.");
+        }
+
+    Hunger++;
     if(HungerLevel>oldHungerLevel)
     { if(HungerLevel==HungerLevel.Starved)
       { App.IO.Print("The world grows dim and you faint from starvation. You don't wake up.");

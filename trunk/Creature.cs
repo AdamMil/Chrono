@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Drawing;
 
 namespace Chrono
@@ -6,7 +7,7 @@ namespace Chrono
 
 public enum Attr
 { Str, Dex, Int, NumBasics,
-  MaxHP=NumBasics, MaxMP, Speed, AC, EV, Age, Exp, ExpLevel, HP, MP, Gold, NumAttributes
+  MaxHP=NumBasics, MaxMP, Speed, AC, EV, Age, Exp, ExpLevel, HP, MP, Gold, Hunger, NumAttributes
 }
 
 public enum Race
@@ -40,6 +41,7 @@ public abstract class Creature
   }
   public int Gold { get { return attr[(int)Attr.Gold]; } set { SetAttr(Attr.Gold, value); } }
   public int HP { get { return attr[(int)Attr.HP]; } set { SetAttr(Attr.HP, value); } }
+  public int Hunger { get { return attr[(int)Attr.Hunger]; } set { SetAttr(Attr.Hunger, value); } }
   public int Int { get { return attr[(int)Attr.Int]; } set { SetAttr(Attr.Int, value); } }
   public int MaxHP { get { return attr[(int)Attr.MaxHP]; } set { SetAttr(Attr.MaxHP, value); } }
   public int MaxMP { get { return attr[(int)Attr.MaxMP]; } set { SetAttr(Attr.MaxMP, value); } }
@@ -78,8 +80,7 @@ public abstract class Creature
       myClass = (CreatureClass)Global.Rand((int)CreatureClass.NumClasses);
     if(race==Race.RandomRace) Race = (Race)Global.Rand((int)Race.NumRaces);
 
-    Class = myClass; Race = race; Title = GetTitle();
-    Light = 6;
+    Class = myClass; Race = race; Title = GetTitle(); Light = 8;
 
     int[] mods = raceAttrs[(int)race].Mods; // attributes for race
     for(int i=0; i<mods.Length; i++) attr[i] += mods[i];
@@ -98,10 +99,47 @@ public abstract class Creature
     while(level-->0) LevelUp();
   }
 
+  public bool IsMonsterVisible() { return IsMonsterVisible(VisibleTiles()); }
+  public bool IsMonsterVisible(Point[] vis)
+  { for(int i=0; i<Map.Creatures.Count; i++)
+      if(Map.Creatures[i]!=this)
+      { Point cp = Map.Creatures[i].Position;
+        for(int j=0; j<vis.Length; j++)
+          if(vis[j]==cp) return true;
+      }
+    return false;
+  }
+
+  public virtual Item Pickup(Item item)
+  { if(Inv==null) Inv = new Inventory();
+    return Inv.Add(item);
+  }
+  public Item Pickup(Inventory inv, int index)
+  { Item item = inv[index];
+    inv.RemoveAt(index);
+    return Pickup(item);
+  }
+  public Item Pickup(Inventory inv, Item item)
+  { inv.Remove(item);
+    return Pickup(item);
+  }
+
   public virtual void Think() { Age++; Timer-=100; }
   
+  public Creature[] VisibleCreatures() { return VisibleCreatures(VisibleTiles()); }
+  public Creature[] VisibleCreatures(Point[] vis)
+  { list.Clear();
+    for(int i=0; i<Map.Creatures.Count; i++)
+      if(Map.Creatures[i]!=this)
+      { Point cp = Map.Creatures[i].Position;
+        for(int j=0; j<vis.Length; j++)
+          if(vis[j]==cp) { list.Add(Map.Creatures[i]); break; }
+      }
+    return (Creature[])list.ToArray(typeof(Creature));
+  }
+
   public Point[] VisibleTiles()
-  { int x=0, y=Light*2, s=1-Light*2;
+  { int x=0, y=Light*4, s=1-y;
     visPts=0;
     VisiblePoint(0, 0);
     while(x<=y)
@@ -129,8 +167,9 @@ public abstract class Creature
   public string Name, Title;
   public int    X, Y;
   public int    Light, Timer;
-  public Map    Map;
+  public Map    Map, Memory;
   public Race   Race;
+  public Color  Color=Color.Dire;
   public CreatureClass Class;
 
   static public Creature MakeCreature(Type type)
@@ -152,6 +191,27 @@ public abstract class Creature
   protected struct AttrMods
   { public AttrMods(params int[] mods) { Mods = mods; }
     public int[] Mods;
+  }
+  
+  protected internal virtual void OnMapChanged() { }
+  
+  protected void UpdateMemory()
+  { if(Memory==null) return;
+    UpdateMemory(VisibleTiles());
+  }
+  protected void UpdateMemory(Point[] vis)
+  { if(Memory==null) return;
+    foreach(Point pt in vis)
+    { Tile tile = Map[pt];
+      tile.Items = tile.Items==null || tile.Items.Count==0 ? null : tile.Items.Clone();
+      Memory[pt] = tile;
+    }
+    Creature[] creats = VisibleCreatures(vis);
+    foreach(Creature c in creats)
+    { Tile tile = Memory[c.Position];
+      tile.Creature = c;
+      Memory[c.Position] = tile;
+    }
   }
 
   struct ClassLevel
@@ -194,7 +254,8 @@ public abstract class Creature
 
   bool VisiblePoint(int x, int y)
   { x += X; y += Y;
-    if(!Map.IsPassable(Map[x, y].Type)) return false;
+    TileType type = Map[x, y].Type;
+    if(type==TileType.Border) return false;
 
     if(visPts==vis.Length)
     { int[] narr = new int[visPts*2];
@@ -203,14 +264,15 @@ public abstract class Creature
     }
 
     int ti = y*Map.Width+x;
-    for(int i=0; i<visPts; i++) if(vis[i]==ti) return true;
+    for(int i=0; i<visPts; i++) if(vis[i]==ti) goto ret;
     vis[visPts++] = ti;
-    return true;
+    ret: return Map.IsPassable(type);
   }
 
   int[] attr = new int[(int)Attr.NumAttributes];
   Flag flags;
 
+  static ArrayList list = new ArrayList();
   static int[] vis = new int[128];
   static int visPts;
 

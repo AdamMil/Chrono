@@ -34,9 +34,6 @@ public sealed class App
       Player = Player.Generate(c=='w' ? EntityClass.Wizard : EntityClass.Fighter, Race.Human);
       Player.Name = IO.Ask("Enter your name:", false, "I need to know what to call you!");
 
-      for(int i=0; i<map.Links.Length; i++)
-        if(map.Links[i].ToLevel==(int)Overworld.Place.Town1) { Player.Position = map.Links[i].FromPoint; break; }
-
       if(Player.Class==EntityClass.Fighter)
       { Player.SetSkill(Skill.Fighting, 1);
         Player.SetSkill(Skill.Armor, 1);
@@ -59,7 +56,12 @@ public sealed class App
       Player.Pickup(new Deodorant());
       foreach(Item i in Player.Inv) Player.AddKnowledge(i);
 
-      map.Entities.Add(Player);
+      for(int i=0; i<map.Links.Length; i++)
+        if(map.Links[i].ToLevel==(int)Overworld.Place.GTown)
+        { Link link = map.GetLink(map.Links[i].FromPoint);
+          link.ToDungeon[link.ToLevel].Entities.Add(Player);
+          break;
+        }
     }
 
     IO.Render(Player);

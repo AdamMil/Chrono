@@ -36,5 +36,7 @@ make time seem to pass in maps the player has not visited in a while
 add other tiles like Town (eg. Cave)
 make lava burn entities, ice freeze them, etc (on base think?)
 move items burning/freezing/bursting etc to TrySpellDamage
-make player unable to climb mountains without appropriate gear
-make walking in woods/mountains/swimming water take longer than grass (move PassTime into ManualMove?)
+make the map generators use only their own random number generators. or else make them all use Global.*
+add HP base values for races (ie, stronger races get more)?
+add animals to the town
+make AI use spells

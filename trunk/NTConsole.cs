@@ -12,12 +12,23 @@ public class NTConsole
   [FlagsAttribute()]
   public enum Attribute : ushort
   { Black=0, Blue=1, Green=2, Red=4, Bright=8,
-    Cyan=Green|Blue, Purple=Red|Blue, Brown=Red|Green, DarkGrey=Red|Green|Blue,
-    Grey=Black|Bright, LightRed=Red|Bright, LightGreen=Green|Bright, LightBlue=Blue|Bright,
-    LightCyan=Cyan|Bright, Magenta=Purple|Bright, Yellow=Brown|Bright, White=DarkGrey|Bright,
+    Cyan=Green|Blue, Purple=Red|Blue, Brown=Red|Green, Grey=Red|Green|Blue,
+    DarkGrey=Black|Bright, LightRed=Red|Bright, LightGreen=Green|Bright, LightBlue=Blue|Bright,
+    LightCyan=Cyan|Bright, Magenta=Purple|Bright, Yellow=Brown|Bright, White=Grey|Bright,
     
     GridTop=0x400, GridLeft=0x800, GridRight=0x1000, GridBottom=0x8000,
     Underlined=GridBottom, ReverseVideo=0x4000
+  };
+  public enum Key : ushort
+  { Back=0x08, Tab=0x09, Clear=0x0C, Return=0x0D, Shift=0x10, Control=0x11, Menu=0x12, Pause=0x13, Capital=0x14,
+    Escape=0x1B, Space=0x20, Prior=0x21, Next=0x22, End=0x23, Home=0x24, Left=0x25, Up=0x26, Right=0x27, Down=0x28,
+    Select=0x29, Print=0x2A, Execute=0x2B, Snapshot=0x2C, Insert=0x2D, Delete=0x2E, Help=0x2F, Lwin=0x5B, Rwin=0x5C,
+    Apps=0x5D, Sleep=0x5F, Numpad0=0x60, Numpad1=0x61, Numpad2=0x62, Numpad3=0x63, Numpad4=0x64, Numpad5=0x65,
+    Numpad6=0x66, Numpad7=0x67, Numpad8=0x68, Numpad9=0x69, Multiply=0x6A, Add=0x6B, Separator=0x6C, Subtract=0x6D,
+    Decimal=0x6E, Divide=0x6F, F1=0x70, F2=0x71, F3=0x72, F4=0x73, F5=0x74, F6=0x75, F7=0x76, F8=0x77, F9=0x78,
+    F10=0x79, F11=0x7A, F12=0x7B, F13=0x7C, F14=0x7D, F15=0x7E, F16=0x7F, F17=0x80, F18=0x81, F19=0x82, F20=0x83,
+    F21=0x84, F22=0x85, F23=0x86, F24=0x87, Numlock=0x90, Scroll=0x91, Lshift=0xA0, Rshift=0xA1, Lcontrol=0xA2,
+    Rcontrol=0xA3, Lmenu=0xA4, Rmenu=0xA5,
   };
   [FlagsAttribute()]
   public enum InputModes : uint
@@ -51,13 +62,15 @@ public class NTConsole
   [FlagsAttribute()]
   public enum Modifier : uint
   { RightAlt=1, LeftAlt=2, RightCtrl=4, LeftCtrl=8, Shift=16,
-    NumLock=32, ScrollLock=64, CapsLock=128, Enhanced=256
+    NumLock=32, ScrollLock=64, CapsLock=128, Enhanced=256,
+    Alt=RightAlt|LeftAlt, Ctrl=RightCtrl|LeftCtrl
   };
   [StructLayout(LayoutKind.Explicit)]
   public struct KeyRecord
-  { [FieldOffset(0)]  public bool     KeyDown;
+  { public bool HasMod(Modifier mod) { return (ControlKeys&mod)!=0; }
+    [FieldOffset(0)]  public bool     KeyDown;
     [FieldOffset(4)]  public ushort   RepeatCount;
-    [FieldOffset(6)]  public ushort   VirtualKey;
+    [FieldOffset(6)]  public Key      VirtualKey;
     [FieldOffset(8)]  public ushort   ScanCode;
     [FieldOffset(10)] public char     Char;
     [FieldOffset(12)] public Modifier ControlKeys;
@@ -225,7 +238,7 @@ public class NTConsole
     Check(SetConsoleWindowInfo(hWrite, true, ref rect));
   }
   
-  public char ReadChar() // FIXME: make this use ReadInput so it can handle escape, modkeys, etc
+  public char ReadChar()
   { InputModes old = inMode;
     if((inMode&InputModes.LineBuffered)!=0) InputMode = inMode & ~(InputModes.LineBuffered|InputModes.Echo);
     uint len;
@@ -254,7 +267,7 @@ public class NTConsole
     do
     { if(ascii)
       { Check(ReadConsoleInputA(hRead, out rec, 1, out read));
-        if(rec.Type==InputType.Keyboard) rec.Key.Char = (char)((ushort)rec.Key.Char&0xFF); // FIXME: rework this
+        if(rec.Type==InputType.Keyboard) rec.Key.Char = (char)((ushort)rec.Key.Char&0xFF);
       }
       else Check(ReadConsoleInputW(hRead, out rec, 1, out read));
     } while(rec.Type>InputType.BufferResize);
@@ -404,12 +417,15 @@ public class NTConsole
     }
   }
 
+  public void Fill() { Fill(Blank); }
   public void Fill(CharInfo c)
   { ScreenBufferInfo si = new ScreenBufferInfo();
     Check(GetConsoleScreenBufferInfo(hWrite, out si));
     Fill(0, 0, si.Window.Right+1, si.Window.Bottom+1, c);
   }
+  public void Fill(Rectangle rect) { Fill(rect.X, rect.Y, rect.Width, rect.Height, Blank); }
   public void Fill(Rectangle rect, CharInfo c) { Fill(rect.X, rect.Y, rect.Width, rect.Height, c); }
+  public void Fill(int x, int y, int width, int height) { Fill(x, y, width, height, Blank); }
   public void Fill(int x, int y, int width, int height, CharInfo c)
   { Coord start = new Coord(x, y);
     short   end = (short)(y+height);

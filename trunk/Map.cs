@@ -30,9 +30,10 @@ public struct Tile
   public void SetFlag(Flag flag, bool on) { if(on) Flags|=(byte)flag; else Flags&=(byte)~flag; }
 
   public Inventory Items;
+  public Creature  Creature; // for memory only
   public TileType  Type;
-  public Point     Dest;    // destination on prev/next level
-  public byte      Subtype; // subtype of tile (ie, type of trap/altar/etc)
+  public Point     Dest;     // destination on prev/next level
+  public byte      Subtype;  // subtype of tile (ie, type of trap/altar/etc)
   public byte      Flags;
   
   public static Tile Border { get { return new Tile(); } }
@@ -49,7 +50,7 @@ public sealed class Map
     public new void Add(object o) { Add((Creature)o); }
     public void Add(Creature c)
     { base.Add(c);
-      c.Map = map;
+      map.Added(c);
     }
     public new void AddRange(ICollection creatures)
     { base.AddRange(creatures);
@@ -94,20 +95,34 @@ public sealed class Map
 
   public int Width  { get { return width; } }
   public int Height { get { return height; } }
-  public Tile this[int x, int y] { get { return x<0 || y<0 || x>=width || y>=height ? Tile.Border : map[y, x]; } }
-  public Tile this[Point pt] { get { return this[pt.X, pt.Y]; } }
+  public Tile this[int x, int y]
+  { get { return x<0 || y<0 || x>=width || y>=height ? Tile.Border : map[y, x]; }
+    set { map[y, x] = value; }
+  }
+  public Tile this[Point pt]
+  { get { return this[pt.X, pt.Y]; }
+    set { map[pt.Y, pt.X] = value; }
+  }
+
+  public void AddItem(Point pt, Item item) { AddItem(pt.X, pt.Y, item); }
+  public void AddItem(int x, int y, Item item)
+  { Inventory inv = map[y,x].Items;
+    if(inv==null) map[y,x].Items = inv = new Inventory();
+    inv.Add(item);
+  }
 
   public bool Contains(int x, int y) { return y>=0 && y<height && x>=0 && x<width; }
-
-  public void SetTile(Point pt, TileType type) { map[pt.Y,pt.X].Type = type; }
-  public void SetTile(int x, int y, TileType type) { map[y,x].Type = type; }
-  public void SetTile(Point pt, Tile tile) { map[pt.Y,pt.X] = tile; }
-  public void SetTile(int x, int y, Tile tile) { map[y,x] = tile; }
 
   public bool GetFlag(Point pt, Tile.Flag flag) { return this[pt.X,pt.Y].GetFlag(flag); }
   public bool GetFlag(int x, int y, Tile.Flag flag) { return this[x,y].GetFlag(flag); }
   public void SetFlag(Point pt, Tile.Flag flag, bool on) { map[pt.Y,pt.X].SetFlag(flag, on); }
   public void SetFlag(int x, int y, Tile.Flag flag, bool on) { map[y,x].SetFlag(flag, on); }
+  
+  public bool HasItems(Point pt) { return HasItems(pt.X, pt.Y); }
+  public bool HasItems(int x, int y) { return map[y,x].Items!=null && map[y,x].Items.Count>0; }
+
+  public void SetType(Point pt, TileType type) { map[pt.Y,pt.X].Type = type; }
+  public void SetType(int x, int y, TileType type) { map[y,x].Type = type; }
 
   public bool IsPassable(Point pt) { return IsPassable(pt.X, pt.Y); }
   public bool IsPassable(int x, int y)
@@ -196,10 +211,11 @@ public sealed class Map
 
   void Added(Creature c)
   { c.Map=this;
-    if(thinking>0) thinkQueue.Enqueue(c);
+    c.OnMapChanged();
   }
   void Removed(Creature c)
   { c.Map=null;
+    c.OnMapChanged();
     if(thinking>0) removedCreatures[c]=true;
   }
 

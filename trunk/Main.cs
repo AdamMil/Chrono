@@ -23,15 +23,19 @@ public sealed class App
 
     Player player = Player.Generate(CreatureClass.Fighter, Race.Human);
     player.Name = IO.Ask("Enter your name:", false, "I need to know what to call you!");
-    Maps.Add(new RoomyMapGenerator().Generate());
-    Maps[0].Creatures.Add(player);
-    Maps[0].Creatures.Add(Creature.Generate(typeof(Fighter), 0, CreatureClass.Fighter, Race.Orc));
-    Maps[0].Creatures[1].Position = Maps[0].FreeSpace();
-    IO.Render(player);
+    Map map = new RoomyMapGenerator().Generate();
+    map.Creatures.Add(Creature.Generate(typeof(Fighter), 0, CreatureClass.Fighter, Race.Orc));
+    map.Creatures[0].Position = map.FreeSpace();
 
-    for(int y=0; y<Maps[0].Height; y++) // place player on the up staircase of the first level
-      for(int x=0; x<Maps[0].Width; x++)
-        if(Maps[0][x, y].Type==TileType.UpStairs) { player.X = x; player.Y = y; break; }
+    for(int i=0; i<50; i++) map.AddItem(map.FreeSpace(true, true), new FortuneCookie());
+
+    for(int y=0; y<map.Height; y++) // place player on the up staircase of the first level
+      for(int x=0; x<map.Width; x++)
+        if(map[x, y].Type==TileType.UpStairs) { player.X = x; player.Y = y; break; }
+    map.Creatures.Add(player);
+
+    Maps.Add(map);
+    IO.Render(player);
 
     while(!Quit)
     { if(CurrentLevel>0) Maps[CurrentLevel-1].Simulate();

@@ -22,6 +22,7 @@ public class RoomyMapGenerator : MapGenerator
   public Map Generate(int minrooms, int maxrooms) { return Generate(60, 60, minrooms, maxrooms); }
   public Map Generate(int width, int height, int minrooms, int maxrooms)
   { map = new Map(width, height);
+    maxRoomSize = new Size(width/3, height/3);
     rooms.Clear();
     while(rooms.Count<minrooms) if(!AddRoom()) throw new UnableToGenerateException("Couldn't add enough rooms.");
     while(rooms.Count<maxrooms) if(!AddRoom()) break;
@@ -60,13 +61,13 @@ public class RoomyMapGenerator : MapGenerator
     if(tri==50) return false;
 
     for(int x=room.Area.X; x<room.Area.Right; x++)
-    { map.SetTile(x, room.Area.Top, TileType.Wall);
-      map.SetTile(x, room.Area.Bottom-1, TileType.Wall);
+    { map.SetType(x, room.Area.Top, TileType.Wall);
+      map.SetType(x, room.Area.Bottom-1, TileType.Wall);
     }
     for(int y=room.Area.Y+1; y<room.Area.Bottom-1; y++)
-    { map.SetTile(room.Area.Left, y, TileType.Wall);
-      for(int x=room.Area.X+1; x<room.Area.Right-1; x++) map.SetTile(x, y, TileType.RoomFloor);
-      map.SetTile(room.Area.Right-1, y, TileType.Wall);
+    { map.SetType(room.Area.Left, y, TileType.Wall);
+      for(int x=room.Area.X+1; x<room.Area.Right-1; x++) map.SetType(x, y, TileType.RoomFloor);
+      map.SetType(room.Area.Right-1, y, TileType.Wall);
     }
     rooms.Add(room);
     return true;
@@ -153,14 +154,14 @@ public class RoomyMapGenerator : MapGenerator
   void Dig(int x, int y)
   { if(map.IsPassable(x, y) || map.IsDoor(x, y)) return;
     if(map.IsWall(x, y))
-    { map.SetTile(x, y, TileType.ClosedDoor);
+    { map.SetType(x, y, TileType.ClosedDoor);
       if(Rand.Next(100)<10) map.SetFlag(x, y, Tile.Flag.Locked, true);
     }
-    else map.SetTile(x, y, TileType.Corridor);
+    else map.SetType(x, y, TileType.Corridor);
   }
 
   void AddStairs(bool up)
-  { map.SetTile(map.RandomTile(TileType.RoomFloor), up ? TileType.UpStairs : TileType.DownStairs);
+  { map.SetType(map.RandomTile(TileType.RoomFloor), up ? TileType.UpStairs : TileType.DownStairs);
   }
 
   bool IsWallJunction(int x, int y)
@@ -183,8 +184,8 @@ public class RoomyMapGenerator : MapGenerator
   
   Map map;
   ArrayList rooms = new ArrayList();
-  Size maxRoomSize = new Size(22, 15);
-  int  darkChance  = 12;
+  Size maxRoomSize;
+  int  darkChance = 12;
 }
 
 } // namespace Chrono

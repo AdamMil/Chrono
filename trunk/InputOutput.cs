@@ -4,7 +4,9 @@ using SD=System.Drawing;
 namespace Chrono
 {
 
-public enum Action { None, Quit, Rest, Move, MoveToInteresting, MoveToDanger, MoveAFAP, OpenDoor, CloseDoor }
+public enum Action
+{ None, Quit, Rest, Move, MoveToInteresting, MoveToDanger, MoveAFAP, OpenDoor, CloseDoor, Pickup, Drop,
+}
 
 public struct Input
 { public Input(Action action) { Action=action; Direction=Direction.Invalid; Count=0; }
@@ -21,6 +23,15 @@ public enum Color
   LightCyan=Cyan|Bright, Magenta=Purple|Bright, Yellow=Brown|Bright, White=Grey|Bright,
   
   Normal=Grey, Warning=Brown, Dire=LightRed
+}
+
+[Flags] public enum MenuFlag { Reletter=1, Multi=2, AllowNum=4 };
+public struct MenuItem
+{ public MenuItem(Item item) { Item=item; Count=0; Char=item.Char; }
+  public MenuItem(Item item, int count) { Item=item; Count=count; Char=item.Char; }
+  public Item Item;
+  public int  Count;
+  public char Char;
 }
 
 public abstract class InputOutput
@@ -62,7 +73,15 @@ public abstract class InputOutput
   public Direction ChooseDirection() { return ChooseDirection(true, true); }
   public abstract Direction ChooseDirection(bool allowSelf, bool allowVertical);
 
+  public void DisplayInventory(System.Collections.ICollection items) { DisplayInventory(items, ItemClass.Invalid); }
+  public abstract void DisplayInventory(System.Collections.ICollection items, ItemClass itemClass);
+
   public abstract Input GetNextInput();
+  
+  public MenuItem[] Menu(System.Collections.ICollection items, MenuFlag flags)
+  { return Menu(items, flags, ItemClass.Invalid);
+  }
+  public abstract MenuItem[] Menu(System.Collections.ICollection items, MenuFlag flags, ItemClass itemClass);
 
   public void Print(string format, params object[] parms) { Print(Color.Normal, format, parms); }
   public void Print(Color color, string format, params object[] parms) { Print(color, String.Format(format, parms)); }

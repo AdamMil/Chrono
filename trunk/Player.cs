@@ -5,7 +5,7 @@ namespace Chrono
 {
 
 public class Player : Creature
-{ public Player() { Timer=100; } // we go first
+{ public Player() { Color=Color.White; Timer=100; /*we go first*/ }
 
   public override void Generate(int level, CreatureClass myClass, Race race)
   { base.Generate(level, myClass, race);
@@ -15,19 +15,27 @@ public class Player : Creature
 
   public override void Think()
   { base.Think();
-    App.IO.Render(this);
 
+    Point[] vis = VisibleTiles();
     next:
-    if(inp.Count==0) inp = App.IO.GetNextInput();
+    if(inp.Count==0)
+    { UpdateMemory(vis);
+      App.IO.Render(this);
+      inp = App.IO.GetNextInput();
+    }
     else inp.Count--;
     switch(inp.Action)
-    { case Action.Rest: VisibleTiles(); break;
+    { case Action.Rest:
+        if(IsMonsterVisible(vis)) { inp.Count=0; goto next; }
+        break;
+
       case Action.Move:
       { Point newpos = Global.Move(Position, inp.Direction);
         if(Map.IsPassable(newpos)) Position = newpos;
         else { inp.Count=0; goto next; }
         break;
       }
+
       case Action.MoveToInteresting: // this needs to be improved, and made continuable
       { inp.Count = 0;
 
@@ -44,13 +52,15 @@ public class Player : Creature
           if(Map.IsPassable(np) || Map.IsDoor(np)) options++;
         }
         while(true)
-        { Map.Simulate(this); base.Think();
+        { Map.Simulate(this); base.Think(); UpdateMemory(vis); vis = VisibleTiles();
+          if(Map.HasItems(np)) goto done;
           int newopts=0;
           for(int i=0; i<5; i++)
           { np = Global.Move(Position, (Direction)chk[i]);
             if(Map.IsPassable(np) || Map.IsDoor(np)) newopts++;
           }
-          if(newopts!=options) goto done;
+          if(newopts!=options || IsMonsterVisible(vis)) goto done;
+
           np = Global.Move(Position, inp.Direction);
           if(Map.IsPassable(np)) Position = np;
           else goto done;
@@ -58,6 +68,23 @@ public class Player : Creature
         done:
         break;
       }
+
+      case Action.Pickup:
+      { inp.Count = 0;
+        if(!Map.HasItems(Position)) { App.IO.Print("There are no items here."); goto next; }
+        Inventory inv = Map[Position].Items;
+        if(inv.Count==1)
+        { Item item = Pickup(inv, 0);
+          App.IO.Print("{0} - {1}", item.Char, item.FullName);
+        }
+        else
+          foreach(MenuItem item in App.IO.Menu(inv, MenuFlag.AllowNum|MenuFlag.Multi))
+          { if(item.Count==item.Item.Count) Pickup(inv, item.Item);
+            else Pickup(item.Item.Split(item.Count));
+          }
+        break;
+      }
+
       case Action.OpenDoor:
       { Direction dir = App.IO.ChooseDirection(false, false);
         inp.Count = 0;
@@ -67,10 +94,11 @@ public class Player : Creature
           if(tile.Type==TileType.OpenDoor) App.IO.Print("That door is already open.");
           else if(tile.Type!=TileType.ClosedDoor) App.IO.Print("There is no door there.");
           else if(tile.GetFlag(Tile.Flag.Locked)) App.IO.Print("That door is locked.");
-          else { Map.SetTile(newpos, TileType.OpenDoor); break; }
+          else { Map.SetType(newpos, TileType.OpenDoor); break; }
         }
         goto next;
       }
+
       case Action.CloseDoor:
       { Direction dir = App.IO.ChooseDirection(false, false);
         inp.Count = 0;
@@ -79,10 +107,11 @@ public class Player : Creature
           Tile tile = Map[newpos];
           if(tile.Type==TileType.ClosedDoor) App.IO.Print("That door is already closed.");
           else if(tile.Type!=TileType.OpenDoor) App.IO.Print("There is no door there.");
-          else { Map.SetTile(newpos, TileType.ClosedDoor); break;  }
+          else { Map.SetType(newpos, TileType.ClosedDoor); break;  }
         }
         goto next;
       }
+
       case Action.Quit: 
         inp.Count = 0;
         if(App.IO.YesNo(Color.Warning, "Do you really want to quit?", false)) App.Quit=true;
@@ -93,7 +122,12 @@ public class Player : Creature
   public static Player Generate(CreatureClass myClass, Race race)
   { return (Player)Creature.Generate(typeof(Player), 0, myClass, race);
   }
-  
+
+  protected internal override void OnMapChanged()
+  { base.OnMapChanged();
+    Memory = Map==null ? null : new Map(Map.Width, Map.Height);
+  }
+
   Input inp;
 }
 

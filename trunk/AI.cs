@@ -146,6 +146,7 @@ public abstract class AI : Entity
   { base.Think();
     if(HP<=0) return;
     if(attacker!=null && attacker.HP<=0) attacker=null;
+    if(target!=null && target.HP<=0) target=null;
     if(shout)
     { Map.MakeNoise(Position, this, Noise.Alert, 150);
       shout=false;

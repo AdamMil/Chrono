@@ -99,7 +99,6 @@ public sealed class Map
   { this.width  = width;
     this.height = height;
     map = new Tile[height, width];
-    scentbuf = new ushort[height*width];
     creatures = new CreatureCollection(this);
   }
 
@@ -276,7 +275,8 @@ public sealed class Map
   }
   
   public void SpreadScent()
-  { for(int y=0,i=0; y<height; y++)
+  { if(scentbuf==null || scentbuf.Length<width*height) scentbuf=new ushort[width*height];
+    for(int y=0,i=0; y<height; y++)
       for(int x=0; x<width; i++,x++)
       { if(!IsPassable(map[y,x].Type)) continue;
         int val=0, n=0;
@@ -308,11 +308,12 @@ public sealed class Map
   Tile[,] map;
   Link[]  links = new Link[0];
   Map     memory;
-  ushort[] scentbuf;
   CreatureCollection creatures;
   PriorityQueue thinkQueue = new PriorityQueue(new CreatureComparer());
   Hashtable removedCreatures = new Hashtable();
   int width, height, thinking, timer;
+
+  static ushort[] scentbuf;
 
   [Flags]
   enum TileFlag : byte { None=0, Passable=1, Wall=2, Door=4, Dangerous=8 }

@@ -51,7 +51,7 @@ public sealed class ConsoleIO : InputOutput
     { if(doRebuke) AddLine(color, rebuke, false);
       AddLine(color, sprompt);
       console.SetCursorPosition(sprompt.Length, Math.Min(uncleared, LineSpace)+MapHeight-1);
-      char c = ReadChar();
+      char c = ReadChar(true);
       if(c=='\r' || rec.Key.VirtualKey==NTConsole.Key.Escape) c = defaultChar;
       if(chars==null || c==defaultChar ||
          (caseInsensitive ? chars.ToLower() : chars).IndexOf(c) != -1)
@@ -76,17 +76,48 @@ public sealed class ConsoleIO : InputOutput
     return d;
   }
 
-  public override void DisplayInventory(System.Collections.ICollection items, ItemClass itemClass)
+  public override MenuItem[] ChooseItem(string prompt, IKeyedInventory items, MenuFlag flags, ItemClass itemClass)
+  { string chars = items.CharString(itemClass);
+    if(itemClass==ItemClass.Any && chars.Length==0) return new MenuItem[0];
+    chars += chars.Length==0 ? "*" : "?*";
+
+    string sprompt = prompt + " [" + chars + "] ";
+    bool doRebuke  = false;
+    TextInput = true;
+    while(true)
+    { int num=-1;
+      if(doRebuke) AddLine(Color.Normal, "Invalid selection!", false);
+      AddLine(Color.Normal, sprompt);
+      console.SetCursorPosition(sprompt.Length, Math.Min(uncleared, LineSpace)+MapHeight-1);
+      char c = ReadChar(true);
+      if(c=='\r' || rec.Key.VirtualKey==NTConsole.Key.Escape) return new MenuItem[0];
+      if(char.IsDigit(c) && (flags&MenuFlag.AllowNum)!=0)
+      { num = c-'0';
+        while(char.IsDigit(c=ReadChar(true))) num = c-'0' + num*10;
+      }
+      if(num<-1 || num==0 || chars.IndexOf(c)==-1) { doRebuke=true; continue; }
+      if(char.IsLetter(c) && num>items[c].Count) { AddLine(Color.Normal, "You don't have that many!"); continue; }
+      TextInput = false;
+      if(c=='?') return Menu(items, flags, itemClass);
+      if(c=='*') return Menu(items, flags, ItemClass.Any);
+      return new MenuItem[1] { new MenuItem(items[c], num==-1 ? items[c].Count : num) };
+    }
+  }
+
+  public override void DisplayInventory(IKeyedInventory items, ItemClass itemClass)
   {
   }
 
   public override MenuItem[] Menu(System.Collections.ICollection items, MenuFlag flags, ItemClass itemClass)
   { if(items.Count==0) throw new ArgumentException("No items in the collection.", "items");
-    if(items.Count>52) throw new NotSupportedException("Too many items in the collection.");
+    if(items.Count>52 && (flags&MenuFlag.Reletter)==0)
+      throw new NotSupportedException("Too many items in the collection.");
 
-    Item[] itemarr = new Item[items.Count];
+    Item[] itemarr = new Item[items.Count]; // first sort by character
     items.CopyTo(itemarr, 0);
     Array.Sort(itemarr, ItemComparer.Default);
+    
+    bool reletter=(flags&MenuFlag.Reletter)!=0, allownum=(flags&MenuFlag.AllowNum)!=0;
 
     if(itemClass==ItemClass.Invalid)
     { menu = new MenuItem[items.Count];
@@ -100,38 +131,82 @@ public sealed class ConsoleIO : InputOutput
       for(int i=0,mi=0; i<itemarr.Length; i++) if(itemarr[i].Class==itemClass) menu[mi++] = new MenuItem(itemarr[i]);
     }
 
-    if((flags|MenuFlag.Reletter)!=0)
-    { char c='a';
-      for(int i=0; i<menu.Length; c++,i++)
-      { if(c>'z') c='A';
-        menu[i].Char = c;
+    int cs=0, width=Math.Min(MapWidth, console.Width);
+    int height=reletter ? Math.Min(54, console.Height) : console.Height, iheight=height-2;
+
+    while(true)
+    { redraw:
+      console.Fill(0, 0, width, height); // clear the area we'll be using
+      ItemClass head = ItemClass.Invalid;
+      int mc=cs, yi=0;
+      char c='a';
+      for(; yi<iheight && mc<menu.Length; yi++) // draw the menu items
+      { if(menu[mc].Item.Class != head)
+        { head = menu[mc].Item.Class;
+          PutString(NTConsole.Attribute.White, 0, yi, head.ToString());
+        }
+        else
+        { if(reletter) menu[mc].Char=c;
+          DrawMenuItem(yi, menu[mc++], flags);
+          if(++c>'z') c='A';
+        }
+      }
+      PutString(0, yi, "Enter selection:");
+
+      while(true)
+      { int num=-1;
+        c = ReadChar();
+        
+        if(allownum && char.IsDigit(c)) // read the number of items if allowed
+        { num = c-'0';
+          while(char.IsDigit(c=ReadChar())) num = c-'0' + num*10;
+          if(num<0) continue;
+        }
+        if(char.IsLetter(c))
+        { head = ItemClass.Invalid;
+          for(int i=reletter?cs:0,end=reletter?mc:menu.Length,y=-1; i<end; i++)
+          { if(i>=cs && i<cs+mc) // if it's onscreen
+            { if(head!=menu[i].Item.Class) { head=menu[i].Item.Class; y++; } // calculate the offset to the item
+              y++;
+            }
+            if(menu[i].Char==c)
+            { menu[i].Count = num>-1 ? Math.Min(num, menu[i].Item.Count) : menu[i].Count>0 ? 0 : menu[i].Item.Count;
+              if((flags&MenuFlag.Multi)==0 && menu[i].Count>0) // unselect others if !Multi
+                for(int j=0; j<menu.Length; j++) if(j!=i) menu[i].Count=0;
+              if(i>=cs && i<cs+mc)                 // if it's onscreen
+              { DrawMenuItem(y, menu[i], flags);   // draw it
+                console.SetCursorPosition(16, yi); // and restore the cursor, 16 == length of "Enter selection:"
+              }
+              break;
+            }
+          }
+        }
+        else if(c==0) switch(rec.Key.VirtualKey)
+        { case NTConsole.Key.Prior: case NTConsole.Key.Up: case NTConsole.Key.Numpad8:
+            if(cs>0) { cs -= Math.Min(iheight, cs); goto redraw; } // page up
+            break;
+          case NTConsole.Key.Next: case NTConsole.Key.Down: case NTConsole.Key.Numpad2:
+            if(menu.Length>cs+mc) { cs += mc; goto redraw; } // page down
+            break;
+          case NTConsole.Key.Escape: return new MenuItem[0];
+        }
+        else switch(c)
+        { case '+': for(int i=0; i<menu.Length; i++) menu[i].Count = menu[i].Item.Count; goto redraw;
+          case '-': for(int i=0; i<menu.Length; i++) menu[i].Count = 0; goto redraw;
+          case '\r': case '\n': goto done;
+        }
       }
     }
-
-    int ci=0, y=0, width=Math.Min(MapWidth, console.Width), height=console.Height, iheight=height-2;
-    console.Fill(0, 0, width, height); // clear the area we'll be using
-
-    ItemClass head = ItemClass.Invalid;
-    for(int mi=0,yi=0; yi<iheight && mi<menu.Length; yi++)
-    { if(menu[mi].Item.Class != head)
-      { head = menu[mi].Item.Class;
-        PutString(NTConsole.Attribute.White, 0, y+yi, head.ToString());
-      }
-      else
-      { PutString(0, y+yi, "[{0}] {1}",
-                  (flags&MenuFlag.AllowNum)==0 ?
-                    menu[mi].Count==0 ? "-" : "+" :
-                    menu[mi].Count==0 ? " - " :
-                                      menu[mi].Count==menu[mi].Item.Count ? " + " : menu[mi].Count.ToString("d3"),
-                  menu[mi].Item.FullName);
-      }
-    }
-    console.SetCursorPosition((flags&MenuFlag.AllowNum)==0 ? 1 : 2, ci-y);
+    done:
+    cs = 0;
+    for(int i=0; i<menu.Length; i++) if(menu[i].Count>0) cs++;
+    MenuItem[] ret = new MenuItem[cs];
+    for(int i=0,mi=0; i<menu.Length; i++) if(menu[i].Count>0) { menu[i].Char=menu[i].Item.Char; ret[mi++]=menu[i]; }
 
     if(buf!=null) console.PutBlock(0, 0, 0, 0, mapW, mapH, buf); // replace what we've overwritten
     DrawLines();
 
-    return null;
+    return ret;
   }
 
   public override void Print() { AddLine(Color.Normal, ""); }
@@ -146,35 +221,33 @@ public sealed class ConsoleIO : InputOutput
       if(c==0)
         {
         }
-      else if(rec.Key.HasMod(NTConsole.Modifier.Ctrl))
-        switch(c+64)
-        { case 'Q': inp.Action = Action.Quit; break;
-        }
-      else
-        switch(c)
-        { case 'b': case 'h': case 'j': case 'k': case 'l': case 'n': case 'u': case 'y':
-            inp.Action = Action.Move;
-            inp.Direction = CharToDirection(c);
-            break;
-          case 'B': case 'H': case 'J': case 'K': case 'L': case 'N': case 'U': case 'Y':
-            inp.Action = Action.MoveToInteresting;
-            inp.Direction = CharToDirection(c);
-            break;
-          case '.': inp.Action = Action.Rest; break;
-          case ',': inp.Action = Action.Pickup; break;
-          case 'c': inp.Action = Action.CloseDoor; break;
-          case 'd': inp.Action = Action.Drop; break;
-          case 'D': inp.Action = Action.DropType; break;
-          case 'e': inp.Action = Action.Eat; break;
-          case 'o': inp.Action = Action.OpenDoor; break;
-          case '<': inp.Action = Action.GoUp; break;
-          case '>': inp.Action = Action.GoDown; break;
-          case '/':
-            inp.Direction = CharToDirection(ReadChar());
-            if(inp.Direction==Direction.Self) { count=100; inp.Action=Action.Rest; }
-            else if(inp.Direction!=Direction.Invalid) inp.Action = Action.MoveToInteresting;
-            break;
-        }
+      else if(rec.Key.HasMod(NTConsole.Modifier.Ctrl)) switch(c+64)
+      { case 'Q': inp.Action = Action.Quit; break;
+      }
+      else switch(c)
+      { case 'b': case 'h': case 'j': case 'k': case 'l': case 'n': case 'u': case 'y':
+          inp.Action = Action.Move;
+          inp.Direction = CharToDirection(c);
+          break;
+        case 'B': case 'H': case 'J': case 'K': case 'L': case 'N': case 'U': case 'Y':
+          inp.Action = Action.MoveToInteresting;
+          inp.Direction = CharToDirection(c);
+          break;
+        case '.': inp.Action = Action.Rest; break;
+        case ',': inp.Action = Action.Pickup; break;
+        case 'c': inp.Action = Action.CloseDoor; break;
+        case 'd': inp.Action = Action.Drop; break;
+        case 'D': inp.Action = Action.DropType; break;
+        case 'e': inp.Action = Action.Eat; break;
+        case 'o': inp.Action = Action.OpenDoor; break;
+        case '<': inp.Action = Action.GoUp; break;
+        case '>': inp.Action = Action.GoDown; break;
+        case '/':
+          inp.Direction = CharToDirection(ReadChar());
+          if(inp.Direction==Direction.Self) { count=100; inp.Action=Action.Rest; }
+          else if(inp.Direction!=Direction.Invalid) inp.Action = Action.MoveToInteresting;
+          break;
+      }
       if(inp.Action != Action.None)
       { inp.Count = count;
         count = 0;
@@ -298,24 +371,31 @@ public sealed class ConsoleIO : InputOutput
     console.SetCursorPosition(mapW/2, mapH/2);
   }
 
+  void DrawMenuItem(int y, MenuItem item, MenuFlag flags)
+  { PutString(0, y, "[{0}] {1} - {2}",
+              (flags&MenuFlag.AllowNum)==0 ?
+                item.Count==0 ? "-" : "+" :
+                item.Count==0 ? " - " : item.Count==item.Item.Count ? " + " : item.Count.ToString("d3"),
+              item.Char, item.Item.FullName);
+  }
+
   char NormalizeDirChar()
   { char c = rec.Key.Char;
     if(rec.Key.VirtualKey>=NTConsole.Key.Numpad1 && rec.Key.VirtualKey<=NTConsole.Key.Numpad9)
     { c = dirLets[(int)rec.Key.VirtualKey-(int)NTConsole.Key.Numpad1];
       if(rec.Key.HasMod(NTConsole.Modifier.Shift)) c = char.ToUpper(c);
     }
-    else
-      switch(rec.Key.VirtualKey)
-      { case NTConsole.Key.End:   c='B'; break;
-        case NTConsole.Key.Down:  c='J'; break;
-        case NTConsole.Key.Next:  c='N'; break;
-        case NTConsole.Key.Left:  c='H'; break;
-        case NTConsole.Key.Right: c='L'; break;
-        case NTConsole.Key.Home:  c='Y'; break;
-        case NTConsole.Key.Up:    c='K'; break;
-        case NTConsole.Key.Prior: c='U'; break;
-        default: return c;
-      }
+    else switch(rec.Key.VirtualKey)
+    { case NTConsole.Key.End:   c='B'; break;
+      case NTConsole.Key.Down:  c='J'; break;
+      case NTConsole.Key.Next:  c='N'; break;
+      case NTConsole.Key.Left:  c='H'; break;
+      case NTConsole.Key.Right: c='L'; break;
+      case NTConsole.Key.Home:  c='Y'; break;
+      case NTConsole.Key.Up:    c='K'; break;
+      case NTConsole.Key.Prior: c='U'; break;
+      default: return c;
+    }
     return rec.Key.Char = c;
   }
 
@@ -334,13 +414,27 @@ public sealed class ConsoleIO : InputOutput
     console.Write(str);
   }
 
-  char ReadChar()
+  void PutStringP(int width, int x, int y, string str) { PutStringP(Color.Normal, width, x, y, str); }
+  void PutStringP(int width, int x, int y, string format, params object[] parms)
+  { PutStringP(Color.Normal, width, x, y, string.Format(format, parms));
+  }
+  void PutStringP(Color color, int width, int x, int y, string str)
+  { PutString(color, x, y, str);
+    for(int i=str.Length; i<width; i++) console.WriteChar(' ');
+  }
+  void PutStringP(Color color, int width, int x, int y, string format, params object[] parms)
+  { PutStringP(color, width, x, y, string.Format(format, parms));
+  }
+
+  char ReadChar() { return ReadChar(false); }
+  char ReadChar(bool echo)
   { if(rec.Type==NTConsole.InputType.Keyboard && --rec.Key.RepeatCount<=0)
       rec.Type=NTConsole.InputType.BufferResize;
     while(rec.Type!=NTConsole.InputType.Keyboard || !rec.Key.KeyDown || rec.Key.Char==0 &&
           (rec.Key.VirtualKey>=NTConsole.Key.Shift && rec.Key.VirtualKey<=NTConsole.Key.Menu ||
            rec.Key.VirtualKey>=NTConsole.Key.Numlock))
       rec = console.ReadInput();
+    if(echo && rec.Key.Char!=0) console.WriteChar(rec.Key.Char);
     return rec.Key.Char;
   }
 
@@ -356,21 +450,26 @@ public sealed class ConsoleIO : InputOutput
   
   void RenderStats(Creature player)
   { const int x = MapWidth+2;
-    int healthpct = player.HP*100/player.MaxHP;
-    PutString(x, 0, "{0} the {1} (lv {2})", player.Name, player.Title, player.ExpLevel+1);
-    PutString(x, 1, "Human");
-    PutString(healthpct<25 ? Color.Dire : healthpct<50 ? Color.Warning : Color.Normal,
-              x, 2, "HP:   {0}/{1}", player.HP, player.MaxHP);
-    PutString(x, 3, "MP:   {0}/{1}", player.MP, player.MaxMP);
-    PutString(x, 4, "AC:   {0}", player.AC);
-    PutString(x, 5, "EV:   {0}", player.EV);
-    PutString(x, 6, "Str:  {0}", player.Str);
-    PutString(x, 7, "Int:  {0}", player.Int);
-    PutString(x, 8, "Dex:  {0}", player.Dex);
-    PutString(x, 9, "Gold: {0}", 0);
-    PutString(x,10, "Exp:  {0}/{0}", player.Exp, player.NextExp);
-    PutString(x,11, "Turn: {0}", player.Age);
-    PutString(x,12, "Dungeon level {0}", App.CurrentLevel+1);
+    int y=0, healthpct=player.HP*100/player.MaxHP, xlines=0, width=console.Width-x;
+    PutStringP(width, x, y++, "{0} the {1} (lv {2})", player.Name, player.Title, player.ExpLevel+1);
+    PutStringP(width, x, y++, "Human");
+    PutStringP(healthpct<25 ? Color.Dire : healthpct<50 ? Color.Warning : Color.Normal,
+               width, x, y++, "HP:   {0}/{1}", player.HP, player.MaxHP);
+    PutStringP(width, x, y++, "MP:   {0}/{1}", player.MP, player.MaxMP);
+    PutStringP(width, x, y++, "AC:   {0}", player.AC);
+    PutStringP(width, x, y++, "EV:   {0}", player.EV);
+    PutStringP(width, x, y++, "Str:  {0}", player.Str);
+    PutStringP(width, x, y++, "Int:  {0}", player.Int);
+    PutStringP(width, x, y++, "Dex:  {0}", player.Dex);
+    PutStringP(width, x, y++, "Gold: {0}", 0);
+    PutStringP(width, x, y++, "Exp:  {0}/{0}", player.Exp, player.NextExp);
+    PutStringP(width, x, y++, "Turn: {0}", player.Age);
+    PutStringP(width, x, y++, "Dungeon level {0}", App.CurrentLevel+1);
+
+    if(player.HungerLevel==Hunger.Hungry) { PutStringP(Color.Warning, width, x, y++, "Hungry"); xlines++; }
+    else if(player.HungerLevel==Hunger.Starving) { PutStringP(Color.Dire, width, x, y++, "Starving"); xlines++; }
+    if(xlines<statLines) console.Fill(x, y, width, statLines-xlines);
+    statLines=xlines;
   }
 
   NTConsole.CharInfo[] buf;
@@ -379,7 +478,7 @@ public sealed class ConsoleIO : InputOutput
   NTConsole console = new NTConsole();
   LinkedList lines = new LinkedList(); // a circular array would be better
   NTConsole.InputRecord rec;
-  int  uncleared=0, maxLines=200, mapW, mapH, count;
+  int  uncleared=0, maxLines=200, mapW, mapH, count, statLines;
   bool inputMode, redrawStats=true;
 
   static NTConsole.Attribute ColorToAttr(Color color)
@@ -402,17 +501,16 @@ public sealed class ConsoleIO : InputOutput
   static NTConsole.CharInfo TileToChar(Tile tile, bool visible)
   { NTConsole.CharInfo ci;
     if(tile.Items!=null && tile.Items.Count>0) ci = ItemToChar(tile.Items[0]);
-    else
-      switch(tile.Type)
-      { case TileType.Wall:       ci = new NTConsole.CharInfo('#', NTConsole.Attribute.Brown); break;
-        case TileType.ClosedDoor: ci = new NTConsole.CharInfo('+', NTConsole.Attribute.Yellow); break;
-        case TileType.OpenDoor:   ci = new NTConsole.CharInfo((char)254, NTConsole.Attribute.Yellow); break;
-        case TileType.RoomFloor:  ci = new NTConsole.CharInfo((char)250, NTConsole.Attribute.Grey); break;
-        case TileType.Corridor:   ci = new NTConsole.CharInfo((char)176, NTConsole.Attribute.Grey); break;
-        case TileType.UpStairs:   ci = new NTConsole.CharInfo('<', NTConsole.Attribute.Grey); break;
-        case TileType.DownStairs: ci = new NTConsole.CharInfo('>', NTConsole.Attribute.Grey); break;
-        default: ci = new NTConsole.CharInfo(' ', NTConsole.Attribute.Black); break;
-      }
+    else switch(tile.Type)
+    { case TileType.Wall:       ci = new NTConsole.CharInfo('#', NTConsole.Attribute.Brown); break;
+      case TileType.ClosedDoor: ci = new NTConsole.CharInfo('+', NTConsole.Attribute.Yellow); break;
+      case TileType.OpenDoor:   ci = new NTConsole.CharInfo((char)254, NTConsole.Attribute.Yellow); break;
+      case TileType.RoomFloor:  ci = new NTConsole.CharInfo((char)250, NTConsole.Attribute.Grey); break;
+      case TileType.Corridor:   ci = new NTConsole.CharInfo((char)176, NTConsole.Attribute.Grey); break;
+      case TileType.UpStairs:   ci = new NTConsole.CharInfo('<', NTConsole.Attribute.Grey); break;
+      case TileType.DownStairs: ci = new NTConsole.CharInfo('>', NTConsole.Attribute.Grey); break;
+      default: ci = new NTConsole.CharInfo(' ', NTConsole.Attribute.Black); break;
+    }
     if(!visible) ci.Attributes = NTConsole.Attribute.DarkGrey;
     return ci;
   }

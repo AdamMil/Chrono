@@ -17,17 +17,18 @@ public class Player : Creature
   { base.Think();
 
     Point[] vis = VisibleTiles();
+
     next:
     int count = inp.Count;
     if(count==0) // inp.Count drops to zero unless set to 'count' by an action
     { UpdateMemory(vis);
       App.IO.Render(this);
       inp = App.IO.GetNextInput();
+      count = inp.Count;
     }
-    else
-    { count--;
-      inp.Count = 0;
-    }
+    else count--;
+    inp.Count=0;
+
     switch(inp.Action)
     { case Action.CloseDoor:
       { Direction dir = App.IO.ChooseDirection(false, false);
@@ -43,29 +44,41 @@ public class Player : Creature
 
       case Action.Drop:
       { if(Inv.Count==0) { App.IO.Print("You're not carrying anything."); goto next; }
-        char c = App.IO.CharChoice("Drop which item?", Inv.CharString()+"?");
-        if(c==0) { App.IO.Print("Never mind."); goto next; }
-        Drop(c);
+        MenuItem[] items = App.IO.ChooseItem("Drop what?", Inv, MenuFlag.AllowNum|MenuFlag.Multi, ItemClass.Any);
+        if(items.Length==0) { App.IO.Print("Never mind."); goto next; }
+        foreach(MenuItem i in items) App.IO.Print("Dropped "+Drop(i.Char, i.Count));
         break;
       }
 
       case Action.Eat:
-      { Item toEat=null;
+      { if(Hunger<100) { App.IO.Print("You're still full."); goto next; }
+
+        Food toEat=null;
+        IInventory inv=null;
         if(Map.HasItems(Position))
         { Item[] items = Map[Position].Items.GetItems(ItemClass.Food);
           foreach(Item i in items)
-            if(App.IO.YesNo(string.Format("There {0} {1} here. Eat {2}?", i.AreIs, i.FullName, i.ItOne),
+            if(App.IO.YesNo(string.Format("There {0} {1} here. Eat {2}?", i.AreIs, i, i.ItOne),
                             false))
-            { toEat=i;
+            { toEat=(Food)i; inv=Map[Position].Items;
               break;
             }
         }
         if(toEat==null)
-        { string chars = Inv.CharString(ItemClass.Food);
-          chars += chars.Length==0 ? "*" : "?*";
-          char c = App.IO.CharChoice("Eat what?", chars);
-          if(c==0) { App.IO.Print("Never mind."); goto next; }
+        { if(!Inv.Has(ItemClass.Food)) { App.IO.Print("You have nothing to eat!"); goto next; }
+          MenuItem[] items = App.IO.ChooseItem("What do you want to eat?", Inv, MenuFlag.None, ItemClass.Food);
+          if(items.Length==0) { App.IO.Print("Never mind."); goto next; }
+          toEat = items[0].Item as Food;
+          if(toEat==null) { App.IO.Print("You can't eat that!"); goto next; }
+          inv = Inv;
         }
+        if(toEat==null) goto next;
+        if(toEat.Count>1)
+        { toEat = (Food)toEat.Split(1);
+          if(!toEat.Use(this)) inv.Add(toEat);
+        }
+        else if(toEat.Use(this)) inv.Remove(toEat);
+        App.IO.RedrawStats=true;
         break;
       }
 
@@ -124,8 +137,10 @@ public class Player : Creature
       { if(!Map.HasItems(Position)) { App.IO.Print("There are no items here."); goto next; }
         ItemPile inv = Map[Position].Items;
         if(inv.Count==1)
-        { Item item = Pickup(inv, 0);
-          App.IO.Print("{0} - {1}", item.Char, item.FullName);
+        { Item item = inv[0], newItem = Pickup(inv, 0);
+          string s = string.Format("{0} - {1}", newItem.Char, item.FullName);
+          if(item.Count!=newItem.Count) s += string.Format(" (now {0})", newItem.Count);
+          App.IO.Print(s);
         }
         else
           foreach(MenuItem item in App.IO.Menu(inv, MenuFlag.AllowNum|MenuFlag.Multi))
@@ -140,9 +155,20 @@ public class Player : Creature
         break;
 
       case Action.Rest:
-        if(IsMonsterVisible(vis)) goto next;
+        if(IsMonsterVisible(vis)) break;
         inp.Count = count;
         break;
+    }
+
+    Hunger++;
+    if(Hunger==HungryAt || Hunger==StarvingAt || Hunger==StarveAt)
+    { if(Hunger==HungryAt) App.IO.Print(Color.Warning, "You're getting hungry.");
+      else if(Hunger==StarvingAt) App.IO.Print(Color.Dire, "You're starving!");
+      else
+      { App.IO.Print("You die of starvation.");
+      }
+      App.IO.RedrawStats = true;
+      inp.Count = 0;
     }
   }
   

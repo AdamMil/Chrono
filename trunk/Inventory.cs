@@ -12,6 +12,8 @@ public interface IInventory : ICollection
   
   Item[] GetItems(ItemClass itemClass);
   
+  bool Has(ItemClass itemClass);
+  
   void Remove(Item item);
   void RemoveAt(int index);
 }
@@ -20,6 +22,8 @@ public interface IKeyedInventory : IInventory
 { Item this[char c] { get; }
   string CharString();
   string CharString(ItemClass itemClass);
+  
+  void Remove(char c);
 }
 
 #region ItemPile
@@ -54,6 +58,11 @@ public sealed class ItemPile : IInventory
         if(mi==count) break;
       }
     return ret;
+  }
+  
+  public bool Has(ItemClass itemClass)
+  { for(int i=0; i<items.Count; i++) if(this[i].Class==itemClass) return true;
+    return false;
   }
 
   public void Remove(Item item) { items.Remove(item); }
@@ -102,31 +111,40 @@ public sealed class Inventory : IKeyedInventory
     return item;
   }
 
-  public string CharString()
-  { string ret=string.Empty;
-    if(items!=null) foreach(Item i in items.Values) ret += i.Char;
-    return ret;
-  }
-
+  public string CharString() { return CharString(ItemClass.Any); }
   public string CharString(ItemClass itemClass)
   { string ret=string.Empty;
-    if(items!=null) foreach(Item i in items.Values) if(i.Class==itemClass) ret += i.Char;
+    if(items!=null) foreach(Item i in items.Values) if(itemClass==ItemClass.Any || i.Class==itemClass) ret += i.Char;
     return ret;
   }
 
   public Item[] GetItems(ItemClass itemClass)
   { if(items==null || items.Count==0) return new Item[0];
-    int count=0, mi=0;
-    foreach(Item i in items.Values) if(i.Class==itemClass) count++;
-    Item[] ret = new Item[count];
-    foreach(Item i in items.Values)
-      if(i.Class==itemClass)
-      { ret[mi++]=i;
-        if(mi==count) break;
-      }
+    Item[] ret;
+    if(itemClass==ItemClass.Any)
+    { ret = new Item[Count];
+      items.Values.CopyTo(ret, 0);
+      return ret;
+    }
+    else
+    { int count=0, mi=0;
+      foreach(Item i in items.Values) if(i.Class==itemClass) count++;
+      ret = new Item[count];
+      foreach(Item i in items.Values)
+        if(i.Class==itemClass)
+        { ret[mi++]=i;
+          if(mi==count) break;
+        }
+    }
     return ret;
   }
 
+  public bool Has(ItemClass itemClass)
+  { for(int i=0; i<items.Count; i++) if(this[i].Class==itemClass) return true;
+    return false;
+  }
+
+  public void Remove(char c) { items.Remove(c); }
   public void Remove(Item item) { items.RemoveAt(items.IndexOfValue(item)); }
   public void RemoveAt(int index) { items.RemoveAt(index); }
 

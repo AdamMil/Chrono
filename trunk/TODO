@@ -35,3 +35,5 @@ save when moving between levels, load levels on demand, unload unused levels
 redo formula for MaxHP/MaxMP gain (make based somewhat on race)
 fix annoying disappearing stats bar
 make the AI affected by carry weight (unable to move, etc)
+improve spell targeting (make it affected by skills, dex, etc)
+make AI re-evaluate weapons on pickup

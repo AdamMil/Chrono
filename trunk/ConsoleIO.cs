@@ -111,6 +111,61 @@ public sealed class ConsoleIO : InputOutput
     }
   }
 
+  public override Spell ChooseSpell(Entity viewer)
+  { return null;
+  }
+
+  public override Spell ChooseSpell(Entity reader, Spellbook book)
+  { Spell selected=null;
+    bool clear=true;
+    while(true)
+    { if(clear)
+      { ClearScreen();
+        console.SetCursorPosition(0, 0);
+        WriteLine(Color.Normal, "The "+book.FullName);
+        console.WriteLine();
+        clear=false;
+      }
+      else console.SetCursorPosition(0, 2);
+      char c='a';
+      foreach(Spell s in book.Spells)
+      { Color color;
+        int knowledge = reader.SpellKnowledge(s);
+        if(knowledge>0) color = knowledge<2500 ? Color.Dire : knowledge<5000 ? Color.Warning : Color.Normal;
+        else
+        { int chance = s.LearnChance(reader);
+          if(chance>=80) color = Color.LightGreen;
+          else if(chance>=50) color = Color.Green;
+          else if(chance>=25) color = Color.Cyan;
+          else color = Color.DarkGrey;
+        }
+        WriteLine(color, "{0} {1} {2} (lv. {3}, {4})", c++, s==selected ? '+' : '-', s.Name, s.Level, s.Class);
+      }
+      WriteLine(Color.Normal, "Choose spell by character. ? to view description.");
+      
+      nextchar: c=ReadChar();
+      if(rec.Key.VirtualKey==NTConsole.Key.Escape) { selected=null; break; }
+      if(c=='\r' || c=='\n') break;
+      if(c=='?' && selected!=null)
+      { ClearScreen();
+        console.SetCursorPosition(0, 0);
+        WriteLine(Color.Normal, "{0} (lv. {1}, {2})", selected.Name, selected.Level, selected.Class);
+        console.WriteLine();
+        int height = WordWrap(selected.Description, mapW);
+        for(int i=0; i<height; i++) console.WriteLine(wrapped[i]);
+        ReadChar();
+        clear=true;
+        continue;
+      }
+
+      int index = c-'a';
+      if(index>=0 && index<book.Spells.Length) { selected = book.Spells[index]; continue; }
+      goto nextchar;
+    }
+    RestoreScreen();
+    return selected;
+  }
+
   public override RangeTarget ChooseTarget(Entity viewer, Spell spell, bool allowDir)
   { ClearLines();
     Point[] vpts = viewer.VisibleTiles();
@@ -295,14 +350,14 @@ public sealed class ConsoleIO : InputOutput
     }
   }
 
-  public override void DisplayMap(Entity viewer)
+  public override Point DisplayMap(Entity viewer)
   { ClearLines();
     int oldW = mapW;
     mapW = console.Width-1; 
     console.Fill(0, 0, mapW, mapH);
     SetCursorToPlayer();
     Point[] vpts = viewer.VisibleTiles();
-    Point pos = viewer.Position;
+    Point pos = viewer.Position, ret = new Point(-1, -1);
     while(true)
     { RenderMap(viewer, pos, vpts);
       DescribeTile(viewer, pos, vpts);
@@ -318,6 +373,7 @@ public sealed class ConsoleIO : InputOutput
         case 'y': pos.Offset(-1, -1); break;
         case 'k': pos.Y--; break;
         case 'u': pos.Offset(1, -1); break;
+        case 'g': ret = pos; goto done;
         case '@': pos = viewer.Position; break;
         case ' ': case '\r': case '\n': goto done;
         default: goto nextChar;
@@ -329,6 +385,7 @@ public sealed class ConsoleIO : InputOutput
     RestoreLines();
     RestoreScreen();
     renderStats=true;
+    return ret;
   }
 
   public override void ExamineItem(Entity viewer, Item item)
@@ -588,11 +645,10 @@ public sealed class ConsoleIO : InputOutput
   }
 
   public override void Render(Entity viewer)
-  { if((viewer.Flags&Entity.Flag.Asleep)!=0) return;
+  { if(viewer.Is(Entity.Flag.Asleep)) return;
     mapW = Math.Min(console.Width, MapWidth); mapH = Math.Min(console.Height, MapHeight);
     RenderMap(viewer, viewer.Position, viewer.VisibleTiles());
     RenderStats(viewer);
-    SetCursorToPlayer();
     uncleared = 0;
     DrawLines();
   }
@@ -617,7 +673,7 @@ public sealed class ConsoleIO : InputOutput
 
   int LineSpace { get { return console.Height-MapHeight-1; } }
   int MapWidth  { get { return Math.Max(console.Width-30, 50); } }
-  int MapHeight { get { return 1; } } //Math.Max(console.Height-16, 40); } }
+  int MapHeight { get { return Math.Max(console.Height-16, 40); } }
 
   bool TextInput
   { get { return inputMode; }
@@ -704,7 +760,7 @@ public sealed class ConsoleIO : InputOutput
     for(int i=0; i<vpts.Length; i++) if(vpts[i]==pos) { visible=true; break; }
     lines.Clear(); uncleared=0;
     if(!visible)
-    { if(viewer.Memory[pos].Type==TileType.Border) { AddLine("You can't see that position."); return; }  
+    { if(!viewer.Memory.GetFlag(pos, Tile.Flag.Seen)) { AddLine("You can't see that position.", true); return; }  
       AddLine("You can't see that position, but here's what you remember:");
     }
     Map map = visible ? viewer.Map : viewer.Memory;
@@ -905,7 +961,7 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
     if(buf==null || buf.Length<size) buf = new NTConsole.CharInfo[size];
     if(vis==null || vis.Length<size) vis = new bool[size];
 
-    seeInvisible = viewer.GetFlag(Entity.Flag.SeeInvisible);
+    seeInvisible = viewer.Is(Entity.Flag.SeeInvisible);
 
     Map map = viewer.Memory==null ? viewer.Map : viewer.Memory;
     if(map==viewer.Map)
@@ -933,7 +989,7 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
 
   void RenderMonsters(System.Collections.ICollection coll, Point[] vpts, Rectangle rect)
   { foreach(Entity c in coll)
-    { if(!seeInvisible && c.GetFlag(Entity.Flag.Invisible)) continue;
+    { if(!seeInvisible && c.Is(Entity.Flag.Invisible)) continue;
       Point cp = c.Position;
       int bi = (c.Y-rect.Y)*rect.Width + c.X-rect.X;
       if(!rect.Contains(cp) || !vis[bi]) continue;
@@ -1000,6 +1056,9 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
         case CarryStress.Stressed: PutStringP(Color.Dire, width, x, y++, "Stressed"); xlines++; break;
         case CarryStress.Overtaxed: PutStringP(Color.Dire, width, x, y++, "Overtaxed"); xlines++; break;
       }
+      
+      if(player.Is(Entity.Flag.Confused)) { PutStringP(Color.Warning, width, x, y++, "Confused"); xlines++; }
+      if(player.Is(Entity.Flag.Hallucinating)) { PutStringP(Color.Warning, width, x, y++, "Hallucinating"); xlines++; }
 
       if(xlines<statLines) console.Fill(x, y, width, statLines-xlines);
       statLines=xlines;
@@ -1074,6 +1133,10 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
     console.Write(string.Format(format, parms));
   }
 
+  void WriteLine(Color color, string str)
+  { console.Attributes = ColorToAttr(color);
+    console.WriteLine(str);
+  }
   void WriteLine(Color color, string format, params object[] parms)
   { console.Attributes = ColorToAttr(color);
     console.WriteLine(string.Format(format, parms));

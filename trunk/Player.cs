@@ -61,7 +61,7 @@ public class Player : Entity
     if(--count<=0)
     { UpdateMemory(vis);
       App.IO.Render(this);
-      inp = (oldFlags&Flag.Asleep)!=0 ? new Input(Action.Rest) : App.IO.GetNextInput();
+      inp = Is(Flag.Asleep) ? new Input(Action.Rest) : App.IO.GetNextInput();
       count = inp.Count;
     }
     inp.Count=0; // inp.Count drops to zero unless set to 'count' by an action
@@ -349,12 +349,55 @@ public class Player : Entity
         if(!GroundPackUse(typeof(Readable), "Read", out read, out inv, ItemClass.Scroll, ItemClass.Spellbook))
           goto next;
         Scroll scroll = read as Scroll;
-        if(scroll != null)
+        if(scroll != null) // read scroll
         { if(scroll.Count>1) ((Scroll)scroll.Split(1)).Read(this);
           else { inv.Remove(scroll); scroll.Read(this); }
         }
-        else
-        { /* read spellbook */
+        else // read spellbook
+        { Spellbook book = (Spellbook)read;
+          if(book.Reads==0) { App.IO.Print("This spellbook is too worn to read."); goto next; }
+          if(book.Spells.Length==0) { App.IO.Print("This spellbook is empty!"); goto next; }
+          Spell spell = App.IO.ChooseSpell(this, book);
+          if(spell==null) goto nevermind;
+          int knowledge = SpellKnowledge(spell), chance = Math.Max(knowledge/50, spell.LearnChance(this));
+          if(knowledge>0)
+          { if(!App.IO.YesNo("You already know this spell. Refresh your memory?", false)) goto next;
+          }
+          else if(chance<25)
+          { if(!App.IO.YesNo("This spell seems very difficult. Continue?", false)) goto next;
+          }
+          else if(chance<50 && !App.IO.YesNo("This spell seems difficult. Continue?", false)) goto next;
+
+          bool success = Global.Rand(100)<chance;
+          if(success) // succeeded
+          { int turns = spell.Level;
+            while(--turns>0 && !ThinkUpdate(ref vis));
+            if(turns>0) { App.IO.Print("Your concentration is broken!"); goto next; } // don't use up the book
+          }
+
+          book.Reads--;
+          if(book.Reads<5) App.IO.Print("This spellbook is getting extremely worn!");
+          else if(book.Reads<10) App.IO.Print("This spellbook is getting worn.");
+
+          if(success)
+          { int newknow = Math.Max(Math.Min(chance, 100)*100, 1000);
+            if(newknow>knowledge)
+            { MemorizeSpell(spell, newknow);
+              App.IO.Print("You {0} the {1} spell.", knowledge>0 ? "refresh your memory of" : "memorize", spell.Name);
+            }
+            else App.IO.Print("You don't feel that your knowledge of that spell has improved.");
+          }
+          else
+          { App.IO.Print("Something has gone wrong! Dark energies cloud your mind.");
+            int effect = Global.Rand(chance);
+            AddEffect(new Effect(book, Flag.Confused, 100-effect));
+            if(effect<30) TeleportSpell.Default.Cast(this);
+            if(effect<10) AmnesiaSpell.Default.Cast(this);
+            if(effect<5)
+            { App.IO.Print("You start to shake uncontrollably, and the world goes dark.");
+              AddEffect(new Effect(book, Flag.Asleep, Global.NdN(4, 15)));
+            }
+          }
         }
         break;
       }
@@ -407,7 +450,26 @@ public class Player : Entity
         }
         break;
 
-      case Action.ShowMap: App.IO.DisplayMap(this); goto next;
+      case Action.ShowMap:
+      { Point pt = App.IO.DisplayMap(this);
+        if(pt.X==-1 || !path.Start(Memory, Position, pt)) goto next;
+        PathNode node = path.GetPathFrom(Position);
+        do
+        { Point od = node.Parent.Point;
+          TileType type = Map[od].Type;
+          if(Map.IsPassable(type)) Position = od;
+          else
+          { if(type==TileType.ClosedDoor && !Map.GetFlag(node.Point, Tile.Flag.Locked))
+            { Map.SetType(od, TileType.OpenDoor);
+              continue;
+            }
+            else if(!path.Blocked(node) || node.Parent.Point==od) break;
+          }
+          node = node.Parent;
+App.IO.Render(this);
+        } while(!ThinkUpdate(ref vis) && Position!=path.Goal);
+        goto next;
+      }
       
       case Action.SwapAB:
       { if(CarryStress==CarryStress.Overtaxed) goto carrytoomuch;
@@ -662,13 +724,15 @@ public class Player : Entity
     if(Map==null) Memory=null;
     else
     { Memory = Map.RestoreMemory();
-      if(Memory==null) Memory = new Map(Map.Width, Map.Height);
+      if(Memory==null) Memory = new Map(Map.Width, Map.Height, TileType.Border, false);
     }
   }
 
   protected virtual void Die(string cause)
   { App.IO.Print("You die.");
-    App.IO.Print("Goodbye {0} the {1}... you were killed by: {2}", Name, Title, cause);
+    if(Is(Flag.Asleep)) cause += ", while sleeping";
+    App.IO.Print("Goodbye {0} the {1}...", Name, Title);
+    App.IO.Print("You were killed by: "+cause);
     if(!App.IO.YesNo("Die?", false))
     { App.IO.Print("Okay, you're alive again.");
       HP = MaxHP;
@@ -693,6 +757,7 @@ public class Player : Entity
 
   Input inp;
   HungerLevel oldHungerLevel;
+  PathFinder path = new PathFinder();
 }
 
 } // namespace Chrono

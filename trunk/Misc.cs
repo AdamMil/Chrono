@@ -40,7 +40,7 @@ public sealed class Global
   public static bool Coinflip() { return Random.Next(100)<50; }
   public static Point Move(Point pt, Direction d) { return Move(pt, (int)d); }
   public static Point Move(Point pt, int d)
-  { if(d<0) d = d%8+8;
+  { if(d<0) { d=d%8; if(d!=0) d+=8; }
     else if(d>7) d = d%8;
     pt.Offset(DirMap[d].X, DirMap[d].Y);
     return pt;

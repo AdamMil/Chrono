@@ -9,31 +9,28 @@ public class UnableToGenerateException : ApplicationException
 { public UnableToGenerateException(string message) : base(message) { }
 }
 
-public class MapGenerator
+public abstract class MapGenerator
 { public void Reseed(int s) { Rand = new Random(s); }
   public Random Rand = new Random();
+
+  public Map Generate() { return Generate(60, 60); }
+  public abstract Map Generate(int width, int height);
 }
 
+#region RoomyMapGenerator
 public class RoomyMapGenerator : MapGenerator
-{ public int DarkChance { get { return darkChance; } set { darkChance=value; } }
-  public Size MaxRoomSize { get { return maxRoomSize; } set { maxRoomSize=value; } }
+{ public Size MaxRoomSize { get { return maxRoomSize; } set { maxRoomSize=value; } }
 
-  public Map Generate() { return Generate(60, 60, 4, 12); }
-  public Map Generate(int minrooms, int maxrooms) { return Generate(60, 60, minrooms, maxrooms); }
+  public override Map Generate(int width, int height)
+  { int size = width*height;
+    return Generate(width, height, Math.Max(size/900, 1), Math.Max(size/300, 1));
+  }
   public Map Generate(int width, int height, int minrooms, int maxrooms)
   { map = new Map(width, height);
     maxRoomSize = new Size(width/3, height/3);
     rooms.Clear();
     while(rooms.Count<minrooms) if(!AddRoom()) throw new UnableToGenerateException("Couldn't add enough rooms.");
     while(rooms.Count<maxrooms) if(!AddRoom()) break;
-
-    foreach(Room r in rooms)
-    { if(Rand.Next(darkChance)!=0)
-      { for(int y=r.Area.Y+1; y<r.Area.Bottom; y++)
-          for(int x=r.Area.X+1; x<r.Area.Right; x++)
-            map.SetFlag(x, y, Tile.Flag.PermaLit, true);
-      }
-    }
 
     for(int i=1; i<rooms.Count; i++) Connect((Room)rooms[i-1], (Room)rooms[i]);
 
@@ -188,7 +185,45 @@ public class RoomyMapGenerator : MapGenerator
   Map map;
   ArrayList rooms = new ArrayList();
   Size maxRoomSize;
-  int  darkChance = 12;
+}
+#endregion
+
+public class MetaCaveGenerator : MapGenerator
+{
+  public override Map Generate(int width, int height) { return Generate(width, height, 50); }
+  public Map Generate(int width, int height, int ncircles)
+  { Point[] centers = new Point[ncircles];
+    for(int i=0; i<ncircles; i++) centers[i] = new Point(Global.Rand(width-8)+4, Global.Rand(height-8)+4);
+
+    Map map = new Map(width, height);
+    for(int y=0; y<height; y++)
+      for(int x=0; x<width; x++)
+      { double sum=0;
+        for(int i=0; i<ncircles; i++)
+        { int xd=x-centers[i].X, yd=y-centers[i].Y;
+          sum += 1.0/(xd*xd+yd*yd);
+        }
+        map.SetType(x, y, sum>0.2 ? TileType.RoomFloor : TileType.Wall); // 0.178571
+      }
+    for(int x=0; x<width; x++)
+    { map.SetType(x, 0, TileType.Wall);
+      map.SetType(x, height-1, TileType.Wall);
+    }
+    for(int y=0; y<height; y++)
+    { map.SetType(0, y, TileType.Wall);
+      map.SetType(width-1, y, TileType.Wall);
+    }
+      
+    AddStairs(map, false);
+    AddStairs(map, true);
+    return map;
+  }
+
+  void AddStairs(Map map, bool down)
+  { Point point = map.RandomTile(TileType.RoomFloor);
+    map.SetType(point, down ? TileType.DownStairs : TileType.UpStairs);
+    map.AddLink(new Link(point, down));
+  }
 }
 
 } // namespace Chrono

@@ -111,6 +111,100 @@ public sealed class ConsoleIO : InputOutput
     }
   }
 
+  public override RangeTarget ChooseTarget(Entity viewer, bool allowDir)
+  { ClearLines();
+    Point[] vpts = viewer.VisibleTiles();
+    Entity[] mons = viewer.VisibleCreatures(vpts);
+    Point pos = new Point(mapW/2, mapH/2), mpos;
+    int monsi = 0;
+    bool arbitrary=false, first=true;
+    
+    try
+    { while(true)
+      { if(pos.X<0) pos.X=0;
+        else if(pos.X>=mapW) pos.X=mapW-1;
+        if(pos.Y<0) pos.Y=0;
+        else if(pos.Y>=mapH) pos.X=mapH-1;
+        mpos = DisplayToMap(pos, viewer.Position);
+        if(first) { AddLine("Choose target [direction or *+-= to target creatures]:"); first=false; }
+        else DescribeTile(viewer, mpos, vpts);
+        console.SetCursorPosition(pos);
+
+        nextChar:
+        ReadChar();
+        if(rec.Key.VirtualKey==NTConsole.Key.Escape) return new RangeTarget(new Point(-1, -1), Direction.Invalid);
+        switch(char.ToLower(NormalizeDirChar()))
+        { case 'b':
+            if(arbitrary) pos.Offset(-1, 1);
+            else return new RangeTarget(Direction.DownLeft);
+            break;
+          case 'j':
+            if(arbitrary) pos.Y++;
+            else return new RangeTarget(Direction.Down);
+            break;
+          case 'n':
+            if(arbitrary) pos.Offset(1, 1);
+            else return new RangeTarget(Direction.DownRight);
+            break;
+          case 'h':
+            if(arbitrary) pos.X--;
+            else return new RangeTarget(Direction.Left);
+            break;
+          case '.':
+            if(arbitrary) return new RangeTarget(mpos);
+            else return new RangeTarget(Direction.Self);
+          case 'l':
+            if(arbitrary) pos.X++;
+            else return new RangeTarget(Direction.Right);
+            break;
+          case 'y':
+            if(arbitrary) pos.Offset(-1, -1);
+            else return new RangeTarget(Direction.UpLeft);
+            break;
+          case 'k':
+            if(arbitrary) pos.Y--;
+            else return new RangeTarget(Direction.Up);
+            break;
+          case 'u':
+            if(arbitrary) pos.Offset(1, -1);
+            else return new RangeTarget(Direction.UpRight);
+            break;
+          case '@': pos = new Point(mapW/2, mapH/2); break;
+          case '<': if(!arbitrary) return new RangeTarget(Direction.Above); break;
+          case '>': if(!arbitrary) return new RangeTarget(Direction.Below); break;
+          case '*': AddLine("Move cursor to target position."); arbitrary=true; goto nextChar;
+          case '+':
+            if(mons.Length>0)
+            { monsi = (monsi+1)%mons.Length;
+              pos = MapToDisplay(mons[monsi].Position, viewer.Position);
+            }
+            else goto nextChar;
+            break;
+          case '-':
+            if(mons.Length>0)
+            { monsi = (monsi+mons.Length-1)%mons.Length;
+              pos = MapToDisplay(mons[monsi].Position, viewer.Position);
+            }
+            else goto nextChar;
+            break;
+          case '=':
+            if(lastTarget!=null)
+            { int i;
+              for(i=0; i<mons.Length; i++) if(mons[i]==lastTarget) break;
+              if(i==mons.Length) { lastTarget=null; goto nextChar; }
+              else pos = MapToDisplay(mons[monsi=i].Position, viewer.Position);
+            }
+            break;
+          case ' ': case '\r': case '\n':
+            if(arbitrary || mpos!=viewer.Position) return new RangeTarget(mpos);
+            else goto nextChar;
+          default: goto nextChar;
+        }
+      }
+    }
+    finally { RestoreLines(); }
+  }
+
   public override void DisplayInventory(IKeyedInventory items, params ItemClass[] classes)
   { SetupMenu(items, MenuFlag.None, classes);
 
@@ -161,35 +255,38 @@ public sealed class ConsoleIO : InputOutput
     RestoreScreen();
   }
 
-  public override void DisplayTileItems(IInventory items)
+  public override void DisplayTileItems(IInventory items) { DisplayTileItems(items, true); }
+  public void DisplayTileItems(IInventory items, bool visible)
   { if(items.Count==0) return;
-    if(items.Count==1) AddLine("You see here: "+items[0]);
+    if(items.Count==1) AddLine((visible ? "You see here: " : "You saw here: ")+items[0]);
     else
     { int nitems=items.Count+1, space=LineSpace-uncleared-2;
       bool other=false;
       if(nitems>space)
       { nitems = space;
         if(nitems<=1) AddLine("There are several items here.");
-        else if(nitems==2) { AddLine("You see here: "+items[0]); other=true; }
+        else if(nitems==2) { AddLine((visible ? "You see here: " : "You saw here: ")+items[0]); other=true; }
       }
       if(nitems<=space || nitems>2)
       { AddLine("You see here:"); nitems--;
         if(nitems<items.Count) { other=true; nitems--; }
         for(int i=0; i<nitems; i++) AddLine(items[i].ToString());
       }
-      if(other) AddLine("There are other items here as well.");
+      if(other) AddLine(visible ? "There are other items here as well." : "There were other items there as well.");
     }
   }
 
   public override void DisplayMap(Entity viewer)
-  { Size old = new Size(mapW, mapH);
-    mapW = console.Width-1; mapH = console.Height-1;
+  { ClearLines();
+    int oldW = mapW;
+    mapW = console.Width-1; 
     console.Fill(0, 0, mapW, mapH);
     SetCursorToPlayer();
     Point[] vpts = viewer.VisibleTiles();
     Point pos = viewer.Position;
     while(true)
     { RenderMap(viewer, pos, vpts);
+      DescribeTile(viewer, pos, vpts);
       nextChar:
       ReadChar();
       if(rec.Key.VirtualKey==NTConsole.Key.Escape) break;
@@ -209,7 +306,8 @@ public sealed class ConsoleIO : InputOutput
     }
     done:
     console.Fill(0, 0, mapW, mapH);
-    mapW=old.Width; mapH=old.Height;
+    mapW=oldW;
+    RestoreLines();
     RestoreScreen();
     renderStats=true;
   }
@@ -373,7 +471,9 @@ public sealed class ConsoleIO : InputOutput
           break;
         case '.': inp.Action = Action.Rest; break;
         case ',': inp.Action = Action.Pickup; break;
+        case 'a': inp.Action = Action.UseItem; break;
         case 'c': inp.Action = Action.CloseDoor; break;
+        case 'C': inp.Action = Action.Carve; break;
         case 'd': inp.Action = Action.Drop; break;
         case 'D': inp.Action = Action.DropType; break;
         case 'e': inp.Action = Action.Eat; break;
@@ -563,10 +663,39 @@ public sealed class ConsoleIO : InputOutput
     }
   }
 
+  void ClearLines() { oldLines = lines; lines = new LinkedList(); }
+
   void ClearScreen() // doesn't clear stat area
   { int width=Math.Min(MapWidth, console.Width), height=console.Height, mheight=MapHeight;
     console.Fill(0, 0, width, height); // clear map area
     console.Fill(0, mheight, console.Width, height-mheight); // clear message area
+  }
+
+  void DescribeTile(Entity viewer, Point pos, Point[] vpts)
+  { bool visible=false, dfloor=true;
+    for(int i=0; i<vpts.Length; i++) if(vpts[i]==pos) { visible=true; break; }
+    lines.Clear(); uncleared=0;
+    if(!visible)
+    { if(viewer.Memory[pos].Type==TileType.Border) { AddLine("You can't see that position."); return; }  
+      AddLine("You can't see that position, but here's what you remember:", false);
+    }
+    Map map = visible ? viewer.Map : viewer.Memory;
+
+    Entity e = visible ? map.GetEntity(pos) : map[pos].Entity;
+    if(e!=null)
+    { AddLine(string.Format("{0} is here.", e.AName), false);
+      Weapon w = e.Weapon;
+      if(w!=null) AddLine(string.Format("It is wielding {0} {1}.", Global.AorAn(w.Name), w.Name), false);
+      if(e is AI)
+      { AI ai = (AI)e;
+        if(ai.State != AIState.Alerted) AddLine("It doesn't appear to have noticed you.", false);
+      }
+      dfloor=false;
+    }
+    if(viewer.Map.HasItems(pos)) { DisplayTileItems(map[pos].Items, visible); dfloor=false; }
+    if(dfloor) AddLine(map[pos].Type.ToString()+'.', false);
+    DrawLines();
+    uncleared = 0;
   }
 
   bool Diff(Entity player, Attr attr) { return renderStats || player.GetAttr(attr)!=stats[(int)attr]; }
@@ -576,19 +705,19 @@ public sealed class ConsoleIO : InputOutput
   { ClearScreen();
     string helptext =
 @"                   Chrono Help
-a - use special ability     A - list abilities
-c - close door
-d - drop item(s)
+a - use/apply item
+c - close door              C - carve up corpse
+d - drop item(s)            D - drop item types
 e - eat food
 f - fire weapon/attack
 i - inventory listing       I - invoke item power
 o - open door
+m - use special ability     M - list abilities
 p - pray
 q - quaff a potion
 r - read scroll or book     R - remove a worn item
 s - search adjacent tiles   S - manage skills
 t - throw an item
-u - use item
 v - view item description   V - version info
 w - wield an item           W - wear an item
 x - examine surroundings    X - examine level map
@@ -598,7 +727,8 @@ z - zap a wand              Z - cast a spell
 : - examine occupied tile   \ - check knowledge
 < - ascend staircase        > - descend staircase
 = - reassign item letters   ^ - describe religion
-/ . - rest 100 turns        / DIR - long walk
+b, h, j, k, l, n, u, y        - nethack-like movement
+/ .    - rest 100 turns     / DIR  - long walk
 Ctrl-A - toggle autopickup  Ctrl-Q - quit
 Ctrl-P - see old messages   Ctrl-X - quit + save";
 
@@ -643,6 +773,8 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
     done: RestoreScreen();
   }
 
+  Point DisplayToMap(Point pt, Point mapCenter) { return new Point(pt.X-mapW/2+mapCenter.X, pt.Y-mapH/2+mapCenter.Y); }
+
   void DrawLines()
   { int maxlines=LineSpace, li=maxlines-1;
     Line[] arr = new Line[maxlines];;
@@ -676,6 +808,8 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
   }
 
   int LineHeight(string line) { return WordWrap(line); }
+
+  Point MapToDisplay(Point pt, Point mapCenter) { return new Point(pt.X-mapCenter.X+mapW/2, pt.Y-mapCenter.Y+mapH/2); }
 
   char NormalizeDirChar()
   { char c = rec.Key.Char;
@@ -810,7 +944,7 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
     bool drewHands=false;
     { string ws="";
       for(int i=0; i<player.Hands.Length; i++) if(player.Hands[i]!=null) ws += player.Hands[i].FullName;
-      if(equipStr!=ws)
+      if(renderStats || equipStr!=ws)
       { handLines=0; drewHands=true;
         for(int i=0; i<player.Hands.Length; i++)
           if(player.Hands[i]!=null)
@@ -822,16 +956,24 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
       }
     }
     y = 13 + handLines;
-    if(drewHands || hunger!=player.HungerLevel || playerFlags!=player.Flags)
+    if(drewHands || hunger!=player.HungerLevel || playerFlags!=player.Flags || sick!=player.Sickness)
     { xlines=handLines;
+
       if(player.HungerLevel==HungerLevel.Hungry) { PutStringP(Color.Warning, width, x, y++, "Hungry"); xlines++; }
       else if(player.HungerLevel==HungerLevel.Starving) { PutStringP(Color.Dire, width, x, y++, "Starving"); xlines++; }
+
+      if(player.Sickness>0)
+      { PutStringP(player.Sickness>1 ? Color.Dire : Color.Warning, width, x, y++, "Sick"); xlines++;
+      }
+
       if(xlines<statLines) console.Fill(x, y, width, statLines-xlines);
       statLines=xlines;
     }
     UpdateStats(player);
     renderStats=false;
   }
+
+  void RestoreLines() { lines=oldLines; oldLines=null; }
 
   void RestoreScreen()
   { if(buf!=null) console.PutBlock(0, 0, 0, 0, mapW, mapH, buf); // replace what we've overwritten
@@ -866,9 +1008,8 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
 
   void UpdateStats(Entity player)
   { for(int i=0; i<(int)Attr.NumAttributes; i++) stats[i] = player.GetAttr((Attr)i);
-    playerFlags = player.Flags;
-    hunger = player.HungerLevel;
     age=player.Age; exp=player.Exp; expLevel=player.ExpLevel; gold=player.Gold; hp=player.HP; mp=player.MP;
+    sick=player.Sickness; hunger=player.HungerLevel; playerFlags=player.Flags;
     equipStr = "";
     for(int i=0; i<player.Hands.Length; i++) if(player.Hands[i]!=null) equipStr += player.Hands[i].FullName;
   }
@@ -912,17 +1053,18 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
   bool[] vis;
   MenuItem[] menu;
   string[] wrapped = new string[4];
+  Entity lastTarget;
 
   // these are used for stat rendering
   int[] stats = new int[(int)Attr.NumAttributes];
   Entity.Flag playerFlags;
   HungerLevel hunger;
   string equipStr="";
-  int age=-1, exp=-1, expLevel=-1, gold=-1, hp=-1, mp=-1, handLines;
+  int age=-1, exp=-1, expLevel=-1, gold=-1, hp=-1, mp=-1, sick=-1, handLines;
   bool renderStats;
 
   NTConsole console = new NTConsole();
-  LinkedList lines = new LinkedList(); // a circular array would be more efficient...
+  LinkedList lines = new LinkedList(), oldLines; // a circular array would be more efficient...
   NTConsole.InputRecord rec;
   int  uncleared, maxLines=200, blX, blY, mapW, mapH, statLines;
   bool inputMode, seeInvisible;
@@ -962,6 +1104,7 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
       default: ci = new NTConsole.CharInfo(' ', NTConsole.Attribute.Black); break;
     }
     if(!visible && tile.Type!=TileType.ClosedDoor) ci.Attributes = NTConsole.Attribute.DarkGrey;
+    ci.Attributes |= NTConsole.ForeToBack((NTConsole.Attribute)((tile.Sound*15+Map.MaxSound-1)/Map.MaxSound));
     return ci;
   }
 

@@ -14,22 +14,22 @@ public abstract class Fighter : AI
 
   public override void OnHitBy(Entity hit, Weapon w, int damage)
   { base.OnHitBy(hit, w, damage);
-    alerted = true; Shout();
+    Alerted = true; Shout();
   }
 
   public override void OnMissBy(Entity hit, Weapon w)
   { base.OnMissBy(hit, w);
-    if(Global.Coinflip()) { alerted = true; Shout(); }
+    if(Global.Coinflip()) { Alerted = true; Shout(); }
   }
 
   public override void OnNoise(Entity source, Noise type, int volume)
   { if(!HasEars) return;
-    if(!alerted) switch(type)
-    { case Noise.Alert: case Noise.NeedHelp: if(volume>Map.MaxSound*8/100) alerted=true; break;
-      case Noise.Bang:  case Noise.Combat:   if(volume>Map.MaxSound*10/100) alerted=true; break;
-      case Noise.Walking: if(volume>Map.MaxSound*15/100) alerted=true; break;
+    if(!Alerted) switch(type)
+    { case Noise.Alert: case Noise.NeedHelp: if(volume>Map.MaxSound*8/100)  Alerted=true; break;
+      case Noise.Bang:  case Noise.Combat:   if(volume>Map.MaxSound*10/100) Alerted=true; break;
+      case Noise.Walking: if(volume>Map.MaxSound*15/100) Alerted=true; break;
     }
-    if(alerted)
+    if(Alerted)
     { for(int i=0; i<8; i++)
       { Tile t = Map[Global.Move(Position, i)];
         if(t.Sound>maxNoise) { maxNoise=t.Sound; noiseDir=(Direction)i; }
@@ -39,12 +39,12 @@ public abstract class Fighter : AI
 
   public override void Think()
   { base.Think();
-    bool dontign = alerted || Global.Rand(100)>=App.Player.Stealth*10-5;
+    bool dontign = Alerted || Global.Rand(100)>=App.Player.Stealth*10-3;
     Direction dir = dontign && HasEyes ? LookAt(App.Player) : Direction.Invalid; // first try vision
 
     bool saw = dir!=Direction.Invalid;
     if(saw) 
-    { if(alerted) tries=0;
+    { if(Alerted) tries=0;
       Shout();
     }
     // then try sound (not affected by stealth because sound is already dampened by stealth)
@@ -56,7 +56,8 @@ public abstract class Fighter : AI
       { Tile t = Map[Global.Move(Position, i)];
         if(Map.IsPassable(t.Type) && t.Scent>maxScent) { maxScent=t.Scent; dir=(Direction)i; }
       }
-      if(!alerted && maxScent<(Map.MaxScent/20)) dir=Direction.Invalid; // ignore light scents (<5%) when not alerted
+      if(!Alerted && maxScent<(Map.MaxScent/10)) dir=Direction.Invalid; // ignore light scents (<10%) when not Alerted
+      else { int p=5; }
     }
 
     if(dir==Direction.Invalid) dir = lastDir; // then try memory
@@ -64,7 +65,7 @@ public abstract class Fighter : AI
     if(dir!=Direction.Invalid)
     { bool giveup = false;
       lastDir = dir;
-      if(!alerted) { alerted=true; goto done; } // take a turn to wake up
+      if(!Alerted) { Alerted=true; goto done; } // take a turn to wake up
       for(int i=-1; i<=1; i++) // if player is in front, attack
       { Point pp = Global.Move(Position, dir+i);
         if(Map.GetEntity(pp)==App.Player) { Attack(App.Player); lastDir=dir; tries=0; goto done; }
@@ -74,19 +75,20 @@ public abstract class Fighter : AI
       else if(TryMove(np)) goto done; // otherwise, try moving forward
       else if(TryMove(dir-1)) { lastDir--; goto done; }
       else if(TryMove(dir+1)) { lastDir++; goto done; }
-      if(giveup) { tries=0; lastDir=Direction.Invalid; alerted=shouted=false; } // else give up, reset state
+      if(giveup) { tries=0; lastDir=Direction.Invalid; Alerted=shouted=false; } // else give up, reset state
       else if(!saw && noiseDir==Direction.Invalid) tries++; // we're not giving up yet.. keep searching
     }
     done:
     noiseDir=Direction.Invalid; maxNoise=0;
   }
 
+  bool Alerted { get { return state==AIState.Alerted; } set { state = value ? AIState.Alerted : AIState.Idle; } }
   void Shout() { if(!shouted) { Map.MakeNoise(Position, this, Noise.Alert, 150); shouted=true; } }
 
   Direction lastDir=Direction.Invalid, noiseDir=Direction.Invalid;
   int tries=3;
   byte maxNoise;
-  bool alerted, shouted;
+  bool shouted;
 }
 
 public class Orc : Fighter

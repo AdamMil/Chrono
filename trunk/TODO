@@ -19,9 +19,12 @@ make monsters fill in around the player (if i'm next to player and an empty spac
 Check all the Global.Rand(100)'s for correctness
 document interfaces!
 implement Gold item
-consider moving some things out of attributes and into simple variables (gold, exp, exppool, explevel, sickness, etc)
 make visibility checks stop at boulders, etc (once we have them)
 make LevelDown decrease stats
-make ConsoleIO display invisible entities if viewer can see invisible
 make an OnFlagsChanged event and use to drive flag-related output
 make carry weight affect smell gain
+add a way to determine whether a creature is hostile, friendly, or neutral
+add reasonable defaults for USEing items (scroll, potion, etc)
+make character hesitant to eat raw flesh
+make deodorant set smell to 0
+handle case when inventory is full in various places

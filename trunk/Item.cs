@@ -20,7 +20,7 @@ public abstract class Item : ICloneable
     Age=item.Age; Count=item.Count; Weight=item.Weight; Color=item.Color; Char=item.Char;
   }
 
-  public virtual void Think(Entity holder) { Age++; }
+  public virtual bool Think(Entity holder) { Age++; return false; }
 
   public string AreIs { get { return Count>1 ? "are" : "is"; } }
 
@@ -41,11 +41,12 @@ public abstract class Item : ICloneable
   public virtual object Clone() { return GetType().GetConstructor(copyCons).Invoke(new object[] { this }); }
   #endregion
 
-  public virtual bool Use(Entity user, Direction dir)
-  { if(user==App.Player) App.IO.Print("Nothing seems to happen.");
+  public virtual bool Use(Entity user, Direction dir) // returns true if item should be consumed
+  { if(!UseDirection) return Use(user, Global.Move(user.Position, dir));
+    if(user==App.Player) App.IO.Print("Nothing seems to happen.");
     return false;
   }
-  public virtual bool Use(Entity user, Entity target)
+  public virtual bool Use(Entity user, System.Drawing.Point target) // returns true item should be consumed
   { if(user==App.Player) App.IO.Print("Nothing seems to happen.");
     return false;
   }
@@ -125,6 +126,11 @@ public abstract class Wearable : Modifying
   public virtual void OnRemove(Entity equipper) { worn=false;  }
   public virtual void OnWear  (Entity equipper) { worn=true; }
 
+  public override bool Use(Entity user, System.Drawing.Point target)
+  { if(user==App.Player) App.IO.Print("Perhaps you should try wearing it instead.");
+    return false;
+  }
+
   public string EquipText;
   public Slot Slot;
   bool worn;
@@ -141,6 +147,11 @@ public abstract class Wieldable : Modifying
 
   public virtual void OnEquip  (Entity equipper) { equipped=true;  }
   public virtual void OnUnequip(Entity equipper) { equipped=false; }
+
+  public override bool Use(Entity user, System.Drawing.Point target)
+  { if(user==App.Player) App.IO.Print("Perhaps you should try wielding it instead.");
+    return false;
+  }
 
   public Attr Exercises;
   public bool AllHandWield;

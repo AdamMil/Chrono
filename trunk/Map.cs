@@ -234,7 +234,8 @@ public sealed class Map
           for(int d=0; d<8; d++)
           { Point np = Global.Move(cp, d);
             Tile   t = this[np];
-            if(IsPassable(t.Type) && val>t.Sound)
+            int tval = t.Type==TileType.ClosedDoor ? val-60 : val;
+            if((IsPassable(t.Type) || t.Type==TileType.ClosedDoor) && tval>t.Sound)
             { if(t.Sound==0)
               { if(nslen==soundStack.Length)
                 { Point[] narr = new Point[nslen+128];
@@ -243,7 +244,7 @@ public sealed class Map
                 }
                 soundStack[nslen++] = np;
               }
-              map[np.Y,np.X].Sound = (byte)val;
+              map[np.Y,np.X].Sound = (byte)tval;
               changed = true;
             }
           }
@@ -306,7 +307,7 @@ public sealed class Map
           for(int y=0; y<height; y++)
             for(int x=0; x<width; x++)
             { ItemPile items = map[y,x].Items;
-              if(items!=null) for(int i=0; i<items.Count; i++) items[i].Think(null);
+              if(items!=null) for(int i=0; i<items.Count; i++) if(items[i].Think(null)) items.RemoveAt(i--);
             }
           age++;
           if(numCreatures<50 && (Index==App.CurrentLevel && age%75==0 || Index!=App.CurrentLevel && age%150==0))

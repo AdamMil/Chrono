@@ -16,14 +16,24 @@ public abstract class Scroll : Readable
 
 public class TeleportScroll : Scroll
 { public TeleportScroll()
-  { name="teleport"; Color=Color.White;
+  { name="teleport"; Color=Color.White; UseTarget=true;
   }
   public TeleportScroll(Item item) : base(item) { }
   
   public override void Read(Entity user)
   { user.OnReadScroll(this);
     user.Position = user.Map.FreeSpace();
-    if(user!=App.Player) App.IO.Print("{0} disappears.");
+    if(user!=App.Player) App.IO.Print("{0} disappears.", user.TheName);
+  }
+
+  public override bool Use(Entity user, System.Drawing.Point target)
+  { Entity e = user.Map.GetEntity(target);
+    if(e!=null)
+    { if(user==App.Player) Read(e);
+      else App.IO.Print("{0} disappears.", e.TheName);
+    }
+    else if(user==App.Player) App.IO.Print("Nothing seems to happen.");
+    return true;
   }
 }
 

@@ -52,7 +52,7 @@ public class TwigOfDeath : Weapon
     return success;
   }
 
-  public override void Think(Entity holder)
+  public override bool Think(Entity holder)
   { base.Think(holder);
     if(holder!=null && Age%30==0)
     { App.IO.Print("Your twig is making a run for it!");
@@ -60,6 +60,7 @@ public class TwigOfDeath : Weapon
       if(holder.Equipped(this)) holder.Unequip(this);
       holder.Drop(this);
     }
+    return false;
   }
 
   public override int CalculateDamage(Entity user) { return Global.NdN(8, 8) - user.StrBonus; }

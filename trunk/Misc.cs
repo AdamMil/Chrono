@@ -23,7 +23,12 @@ public sealed class Global
     if(fc=='a' || fc=='e' || fc=='i' || fc=='o' || fc=='u') return "an";
     else return "a";
   }
-
+  public static string Cap1(string s)
+  { if(s.Length==0) return s;
+    string ret = char.ToUpper(s[0]).ToString();
+    if(s.Length>1) ret += s.Substring(1);
+    return ret;
+  }
   public static bool Coinflip() { return Random.Next(100)<50; }
   public static Point Move(Point pt, Direction d) { return Move(pt, (int)d); }
   public static Point Move(Point pt, int d)
@@ -42,6 +47,7 @@ public sealed class Global
   { for(int i=0; i<8; i++) if(DirMap[i]==off) return (Direction)i;
     return Direction.Invalid;
   }
+  public static bool OneIn(int n) { return Random.Next(n)==0; }
   public static int Rand(int min, int max) { return Random.Next(min, max); }
   public static int Rand(int max) { return Random.Next(max); }
 

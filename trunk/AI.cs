@@ -4,8 +4,12 @@ using System.Drawing;
 namespace Chrono
 {
 
+public enum AIState { Idle, Alerted };
+
 public abstract class AI : Entity
-{ public override void Die(Entity killer, Item impl) { Die(); }
+{ public AIState State { get { return state; } }
+
+  public override void Die(Entity killer, Item impl) { Die(); }
   public override void Die(Death cause) { Die(); }
 
   public override void Generate(int level, EntityClass myClass)
@@ -26,6 +30,35 @@ public abstract class AI : Entity
     else skills=null;
     AddSkills(300*level, skills);
   }
+  
+  public override void OnDrink(Potion potion)
+  { if(App.Player.CanSee(this)) App.IO.Print("{0} drinks {1}.", TheName, potion.FullName);
+  }
+  public override void OnDrop(Item item) { if(App.Player.CanSee(this)) App.IO.Print("{0} drops {1}.", TheName, item); }
+  public override void OnEquip(Wieldable item)
+  { if(App.Player.CanSee(this)) App.IO.Print("{0} equips {1}.", TheName, item.FullName);
+  }
+  public override void OnPickup(Item item)
+  { if(App.Player.CanSee(this)) App.IO.Print("{0} picks up {1}.", TheName, item.FullName);
+  }
+  public override void OnReadScroll(Scroll scroll)
+  { if(App.Player.CanSee(this)) App.IO.Print("{0} reads {1}.", TheName, scroll.FullName);
+  }
+  public override void OnRemove(Wearable item)
+  { if(App.Player.CanSee(this)) App.IO.Print("{0} removes {1}.", TheName, item.FullName);
+  }
+  public override void OnSick(string howSick) { if(App.Player.CanSee(this)) App.IO.Print("{0} looks {1}.", TheName); }
+  public override void OnSkillUp(Skill skill)
+  { if(App.Player.CanSee(this)) App.IO.Print("{0} looks more experienced.", TheName);
+  }
+  public override void OnUnequip(Wieldable item)
+  { if(App.Player.CanSee(this)) App.IO.Print("{0} unequips {1}.", TheName, item.FullName);
+  }
+  public override void OnWear(Wearable item)
+  { if(App.Player.CanSee(this)) App.IO.Print("{0} puts on {1}.", TheName, item.FullName);
+  }
+
+  public bool HasEyes=true, HasEars=true, HasNose=true;
 
   protected virtual void Die()
   { if(Global.Rand(100)<30) Map.AddItem(Position, new Corpse(this)); // 30% chance of leaving a corpse
@@ -33,8 +66,8 @@ public abstract class AI : Entity
     Map.Entities.Remove(this);
   }
 
-  public bool HasEyes=true, HasEars=true, HasNose=true;
-  
+  protected AIState state;
+
   void AddSkills(int points, Skill[] skills)
   { int[] skillTable = RaceSkills[(int)Race];
     int add=points/40, min=int.MaxValue, max=0, range;

@@ -111,7 +111,7 @@ public sealed class ConsoleIO : InputOutput
     }
   }
 
-  public override RangeTarget ChooseTarget(Entity viewer, bool allowDir)
+  public override RangeTarget ChooseTarget(Entity viewer, Spell spell, bool allowDir)
   { ClearLines();
     Point[] vpts = viewer.VisibleTiles();
     Entity[] mons = viewer.VisibleCreatures(vpts);
@@ -128,6 +128,22 @@ public sealed class ConsoleIO : InputOutput
         mpos = DisplayToMap(pos, viewer.Position);
         if(first) { AddLine("Choose target [direction or *+-= to target creatures]:"); first=false; }
         else DescribeTile(viewer, mpos, vpts);
+        
+        if(spell!=null)
+        { System.Collections.ICollection affected = spell.TracePath(viewer, mpos);
+          if(affected!=null && affected.Count>0)
+          { RenderMap(viewer, viewer.Position, vpts);
+            foreach(Point ap in affected)
+              for(int i=0; i<vpts.Length; i++)
+                if(vpts[i]==ap)
+                { Point pt = MapToDisplay(ap, viewer.Position);
+                  buf[pt.Y*mapW+pt.X].Attributes |= NTConsole.ForeToBack(NTConsole.Attribute.Red);
+                  break;
+                }
+            console.PutBlock(0, 0, 0, 0, mapW, mapH, buf);
+          }
+        }
+
         console.SetCursorPosition(pos);
 
         nextChar:
@@ -178,6 +194,7 @@ public sealed class ConsoleIO : InputOutput
             { monsi = (monsi+1)%mons.Length;
               lastTarget = mons[monsi];
               pos = MapToDisplay(lastTarget.Position, viewer.Position);
+              arbitrary=true;
             }
             else goto nextChar;
             break;
@@ -186,6 +203,7 @@ public sealed class ConsoleIO : InputOutput
             { monsi = (monsi+mons.Length-1)%mons.Length;
               lastTarget = mons[monsi];
               pos = MapToDisplay(lastTarget.Position, viewer.Position);
+              arbitrary=true;
             }
             else goto nextChar;
             break;
@@ -195,6 +213,7 @@ public sealed class ConsoleIO : InputOutput
               for(i=0; i<mons.Length; i++) if(mons[i]==lastTarget) break;
               if(i==mons.Length) { lastTarget=null; goto nextChar; }
               else pos = MapToDisplay(mons[monsi=i].Position, viewer.Position);
+              arbitrary=true;
             }
             break;
           case ' ': case '\r': case '\n':

@@ -5,7 +5,7 @@ namespace Chrono
 {
 
 public class Player : Entity
-{ public Player() { Color=Color.White; Timer=50; /*we get a headstart*/ }
+{ public Player() { Color=Color.White; Timer=50; SetRawAttr(Attr.Light, 12); /*we get a headstart*/ }
 
   public override void Die(object killer, Death cause)
   { switch(cause)
@@ -517,7 +517,7 @@ public class Player : Entity
         if(items.Length==0) goto nevermind;
         Wand wand = items[0].Item as Wand;
         if(wand==null) { App.IO.Print("You can't zap that!"); goto next; }
-        RangeTarget rt = App.IO.ChooseTarget(this, true);
+        RangeTarget rt = App.IO.ChooseTarget(this, wand.Spell, true); // FIXME: should be null if not identified
         bool destroy;
         if(rt.Dir!=Direction.Invalid)
         { Point np = rt.Dir>=Direction.Above ? Position : Global.Move(Position, rt.Dir);

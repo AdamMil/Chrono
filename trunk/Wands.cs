@@ -46,7 +46,7 @@ public abstract class Wand : Chargeable
 
   protected virtual void Cast(Entity user, Point target, Direction dir)
   { if(Spell.AutoIdentify && !App.Player.KnowsAbout(this))
-    { if(user==App.Player || App.Player.CanSee(Position)) user.AddKnowledge(this);
+    { if(user==App.Player || App.Player.CanSee(user.Position)) user.AddKnowledge(this);
       if(user==App.Player) App.IO.Print("This is {0}.", GetAName(user));
     }
     Spell.Cast(user, Status, target, dir);

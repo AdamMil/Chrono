@@ -7,7 +7,12 @@ namespace Chrono
 
 public enum Attr
 { Str, Dex, Int, NumBasics,
-  MaxHP=NumBasics, MaxMP, Speed, AC, EV, Age, Exp, ExpLevel, HP, MP, Gold, Hunger, NumAttributes
+  MaxHP=NumBasics, MaxMP, Speed, AC, EV, NumModifiable,
+  Age=NumModifiable, Exp, ExpLevel, HP, MP, Gold, Hunger, NumAttributes
+}
+
+public enum Slot
+{ Ring=-2, Invalid=-1, Head, Cloak, Torso, Legs, Neck, Hands, Feet, LRing, RRing, NumSlots
 }
 
 public enum Race
@@ -23,10 +28,10 @@ public enum Hunger { Normal, Hungry, Starving };
 public abstract class Creature
 { [Flags] public enum Flag { None=0, Confused=1, Stunned=2, Hallucinating=4, Asleep=8 }
 
-  public int AC { get { return attr[(int)Attr.AC]; } set { SetAttr(Attr.AC, value); } }
+  public int AC { get { return GetModAttr(Attr.AC); } }
   public int Age { get { return attr[(int)Attr.Age]; } set { SetAttr(Attr.Age, value); } }
-  public int Dex { get { return attr[(int)Attr.Dex]; } set { SetAttr(Attr.Dex, value); } }
-  public int EV { get { return attr[(int)Attr.EV]; } set { SetAttr(Attr.EV, value); } }
+  public int Dex { get { return GetModAttr(Attr.Dex); } }
+  public int EV { get { return GetModAttr(Attr.EV); } }
   public int Exp
   { get { return attr[(int)Attr.Exp]; }
     set
@@ -48,12 +53,12 @@ public abstract class Creature
   public Hunger HungerLevel
   { get { return Hunger<HungryAt ? Chrono.Hunger.Normal : Hunger<StarvingAt ? Chrono.Hunger.Hungry : Chrono.Hunger.Starving; }
   }
-  public int Int { get { return attr[(int)Attr.Int]; } set { SetAttr(Attr.Int, value); } }
-  public int MaxHP { get { return attr[(int)Attr.MaxHP]; } set { SetAttr(Attr.MaxHP, value); } }
-  public int MaxMP { get { return attr[(int)Attr.MaxMP]; } set { SetAttr(Attr.MaxMP, value); } }
+  public int Int { get { return GetModAttr(Attr.Int); } }
+  public int MaxHP { get { return GetModAttr(Attr.MaxHP); } }
+  public int MaxMP { get { return GetModAttr(Attr.MaxMP); } }
   public int MP { get { return attr[(int)Attr.MP]; } set { SetAttr(Attr.MP, value); } }
-  public int Speed { get { return attr[(int)Attr.Speed]; } set { SetAttr(Attr.Speed, value); } }
-  public int Str { get { return attr[(int)Attr.Str]; } set { SetAttr(Attr.Str, value); } }
+  public int Speed { get { return GetModAttr(Attr.Speed); } }
+  public int Str { get { return GetModAttr(Attr.Str); } }
 
   public Flag Flags { get { return flags; } set { flags=value; /* FIXME: redraw stats */ } }
 
@@ -66,10 +71,15 @@ public abstract class Creature
   }
   public Point Position { get { return new Point(X, Y); } set { X=value.X; Y=value.Y; } }
 
+  public bool CanRemove(Slot slot) { return true; }
+  public bool CanRemove(Wearable item) { return true; }
+
   public Item Drop(char c)
   { Item i = Inv[c];
     Inv.Remove(c);
     Map.AddItem(Position, i);
+    i.OnDrop(this);
+    OnDrop(i);
     return i;
   }
   public Item Drop(char c, int count)
@@ -77,6 +87,8 @@ public abstract class Creature
     if(count==i.Count) Inv.Remove(c);
     else i = i.Split(count);
     Map.AddItem(Position, i);
+    i.OnDrop(this);
+    OnDrop(i);
     return i;
   }
 
@@ -105,9 +117,9 @@ public abstract class Creature
     int[] mods = raceAttrs[(int)race].Mods; // attributes for race
     for(int i=0; i<mods.Length; i++) attr[i] += mods[i];
 
-    mods = classAttrs[(int)myClass].Mods;     // attribute modifiers from class
+    mods = classAttrs[(int)myClass].Mods;   // attribute modifiers from class
     for(int i=0; i<mods.Length; i++) attr[i] += mods[i];
-    
+
     int points = 8; // allocate extra points randomly
     while(points>0)
     { int a = Global.Rand((int)Attr.NumBasics);
@@ -119,6 +131,8 @@ public abstract class Creature
     while(level-->0) LevelUp();
   }
 
+  public void Interrupt() { interrupt = true; }
+
   public bool IsMonsterVisible() { return IsMonsterVisible(VisibleTiles()); }
   public bool IsMonsterVisible(Point[] vis)
   { for(int i=0; i<Map.Creatures.Count; i++)
@@ -129,9 +143,18 @@ public abstract class Creature
       }
     return false;
   }
+  
+  public void ItemThink() { for(int i=0; i<Inv.Count; i++) Inv[i].Think(this); }
+
+  public virtual void OnDrop(Item item) { }
+  public virtual void OnRemove(Wearable item) { }
+  public virtual void OnRemoveFail(Wearable item) { }
+  public virtual void OnWear(Wearable item) { }
 
   public virtual Item Pickup(Item item)
-  { return Inv.Add(item);
+  { Item ret = Inv.Add(item);
+    ret.OnPickup(this);
+    return ret;
   }
   public Item Pickup(IInventory inv, int index)
   { Item item = inv[index];
@@ -143,8 +166,28 @@ public abstract class Creature
     return Pickup(item);
   }
 
-  public virtual void Think() { Age++; Timer-=100; }
+  public void Remove(Item item)
+  { for(int i=0; i<Slots.Length; i++) if(Slots[i]==item) { Remove((Slot)i); return; }
+    throw new ApplicationException("Not wearing item!");
+  }
+  public void Remove(Slot slot)
+  { Wearable item = Slots[(int)slot];
+    Slots[(int)slot] = null;
+    item.OnRemove(this);
+    OnRemove(item);
+  }
+
+  public virtual void Think() { Age++; Timer-=Speed; }
   
+  public bool TryRemove(Item item)
+  { Remove(item);
+    return true;
+  }
+  public bool TryRemove(Slot slot)
+  { Remove(slot);
+    return true;
+  }
+
   public Creature[] VisibleCreatures() { return VisibleCreatures(VisibleTiles()); }
   public Creature[] VisibleCreatures(Point[] vis)
   { list.Clear();
@@ -182,7 +225,20 @@ public abstract class Creature
     return ret;
   }
 
-  public Inventory Inv = new Inventory();
+  public void Wear(Wearable item)
+  { Slots[(int)item.Slot] = item;
+    OnWear(item);
+    item.OnWear(this);
+  }
+
+  public bool Wearing(Slot slot) { return Slots[(int)slot]!=null; }
+  public bool Wearing(Item item)
+  { for(int i=0; i<Slots.Length; i++) if(Slots[i]==item) return true;
+    return false;
+  }
+
+  public Inventory  Inv = new Inventory();
+  public Wearable[] Slots = new Wearable[(int)Slot.NumSlots];
   public string Name, Title;
   public int    X, Y;
   public int    Light, Timer;
@@ -235,10 +291,18 @@ public abstract class Creature
     }
   }
 
+  protected bool interrupt;
+
   struct ClassLevel
   { public ClassLevel(int level, string title) { Level=level; Title=title; }
     public int Level;
     public string Title;
+  }
+
+  int GetModAttr(Attr attribute)
+  { int idx=(int)attribute, val = attr[idx];
+    for(int i=0; i<Slots.Length; i++) if(Slots[i]!=null) val += Slots[i].Mods[idx];
+    return val;
   }
 
   string GetTitle()
@@ -302,7 +366,7 @@ public abstract class Creature
     new AttrMods(9, 3, 4)  // Orc
   };
   static readonly AttrMods[] classAttrs = new AttrMods[(int)CreatureClass.NumClasses]
-  { new AttrMods(7, 0, 3, 15, 0, 10) // Fighter
+  { new AttrMods(7, 0, 3, 15, 2, 75) // Fighter
   };
   static readonly ClassLevel[][] classTitles = new ClassLevel[(int)CreatureClass.NumClasses][]
   { new ClassLevel[]

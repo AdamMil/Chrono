@@ -22,6 +22,7 @@ public interface IKeyedInventory : IInventory
 { Item this[char c] { get; }
   string CharString();
   string CharString(ItemClass itemClass);
+  string CharString(ItemClass[] classes);
   
   void Remove(char c);
 }
@@ -115,6 +116,11 @@ public sealed class Inventory : IKeyedInventory
   public string CharString(ItemClass itemClass)
   { string ret=string.Empty;
     if(items!=null) foreach(Item i in items.Values) if(itemClass==ItemClass.Any || i.Class==itemClass) ret += i.Char;
+    return ret;
+  }
+  public string CharString(ItemClass[] classes)
+  { string ret=string.Empty;
+    for(int i=0; i<classes.Length; i++) ret += CharString(classes[i]);
     return ret;
   }
 

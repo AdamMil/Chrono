@@ -12,7 +12,7 @@ public class EmptyEnumerator : System.Collections.IEnumerator
   public void Reset() { }
 }
 
-public enum Direction
+public enum Direction : byte
 { Up=0, UpRight, Right, DownRight, Down, DownLeft, Left, UpLeft,
   Above, Below, Self, Invalid
 };

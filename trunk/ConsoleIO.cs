@@ -848,9 +848,12 @@ public sealed class ConsoleIO : InputOutput
       AddLine(string.Format(prefix+" here.", e.AName));
       Weapon w = e.Weapon;
       if(w!=null) AddLine(string.Format(prefix+" wielding {1} {2}.", "It", Global.AorAn(w.Name), w.Name));
-      if(e!=viewer && e is AI)
-      { AI ai = (AI)e;
-        if(ai.State != AIState.Alerted) AddLine("It doesn't appear to have noticed you.");
+      if(e!=viewer && e is AI) switch(((AI)e).State)
+      { case AIState.Asleep: AddLine("It appears to be asleep."); break;
+        case AIState.Attacking: AddLine("It looks angry!"); break;
+        case AIState.Escaping: AddLine("It looks frightened."); break;
+        case AIState.Idle: case AIState.Patrolling: case AIState.Wandering: AddLine("It looks bored."); break;
+        default: AddLine("UNKNOWN AI STATE"); break;
       }
     }
     if(viewer.Map.HasItems(pos)) DisplayTileItems(map[pos].Items, visible);

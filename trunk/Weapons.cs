@@ -21,13 +21,16 @@ public abstract class Weapon : Wieldable
       string status = StatusString;
       if(status!="") status += ' ';
       string ret = (Count>1 ? Count.ToString()+' ' : "") + status +
-                   (damageBonus<baseDamage ? "" : "+") + (damageBonus-baseDamage) + ',' +
-                   (ToHitBonus<baseToHit ? "" : "+") + (ToHitBonus-baseToHit) + ' ' + Name;
+                   (DamageMod<0 ? "" : "+") + DamageMod + ',' +
+                   (ToHitMod <0 ? "" : "+") + ToHitMod  + ' ' + Name;
       if(Count>1) ret += PluralSuffix;
       if(Title!=null) ret += " named "+Title;
       return ret;
     }
   }
+
+  public int DamageBonus { get { return BaseDamage+DamageMod; } }
+  public int ToHitBonus  { get { return BaseToHit+ToHitMod; } }
 
   public abstract Damage CalculateDamage(Entity user, Ammo ammo, Entity target); // ammo and target can be null
 
@@ -40,10 +43,9 @@ public abstract class Weapon : Wieldable
 
   public WeaponClass wClass;
   public int  Delay;  // delay (percentage of speed)
-  public int  ToHitBonus;
+  public int  BaseDamage, BaseToHit; // base bonuses
+  public int  DamageMod, ToHitMod;   // modifiers to the base bonuses
   public bool Ranged;
-  
-  protected int baseToHit, baseDamage, damageBonus; // base bonuses
 }
 
 public abstract class FiringWeapon : Weapon
@@ -92,7 +94,7 @@ public class Dart : Weapon
   public Dart(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override Damage CalculateDamage(Entity user, Ammo ammo, Entity target)
-  { Damage d = new Damage(Global.NdN(1, 3+(int)CompatibleWith(user)) + user.StrBonus/2 + damageBonus);
+  { Damage d = new Damage(Global.NdN(1, 3+(int)CompatibleWith(user)) + user.StrBonus/2 + DamageBonus);
     if(Global.Rand(100)<100/(target.Poison+1)) d.Poison = 1;
     return d;
   }
@@ -112,7 +114,7 @@ public class Bow : FiringWeapon
 
   public override Damage CalculateDamage(Entity user, Ammo ammo, Entity target)
   { Damage dam = new Damage(ammo==null ? 1 : Global.NdN(1, 5+(int)CompatibleWith(user)+(int)CompatibleWith(ammo))
-                            + user.DexBonus + damageBonus);
+                            + user.DexBonus + DamageBonus);
     return ammo.ModDamage(dam);
   }
 }
@@ -126,7 +128,7 @@ public class ShortSword : Weapon
   public ShortSword(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override Damage CalculateDamage(Entity user, Ammo ammo, Entity target)
-  { return new Damage(Global.NdN(1, 6+(int)CompatibleWith(user)) + user.StrBonus + damageBonus);
+  { return new Damage(Global.NdN(1, 6+(int)CompatibleWith(user)) + user.StrBonus + DamageBonus);
   }
 }
 

@@ -57,6 +57,7 @@ public abstract class Item : UniqueObject, ICloneable
       return ret;
     }
   }
+  public int FullWeight { get { return Weight*Count; } }
 
   public bool Identified { get { return (Status&ItemStatus.Identified)!=0; } }
 
@@ -116,7 +117,8 @@ public abstract class Item : UniqueObject, ICloneable
 
   public virtual bool Think(Entity holder) { Age++; return false; }
 
-  public virtual bool Use(Entity user, Direction dir) // returns true if item should be consumed
+  public bool Use(Entity user) { return Use(user, Direction.Self); } // returns true if item should be consumed
+  public virtual bool Use(Entity user, Direction dir)
   { if((Usability&ItemUse.UseDirection)==0 && (int)dir<8) return Use(user, Global.Move(user.Position, dir));
     if(user==App.Player) App.IO.Print("Nothing seems to happen.");
     return false;

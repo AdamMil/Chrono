@@ -9,37 +9,11 @@ public abstract class Fighter : AI
 { public Fighter() { }
   protected Fighter(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
-  public override void Generate(int level, EntityClass myClass)
+/*  public override void Generate(int level, EntityClass myClass)
   { if(myClass==EntityClass.RandomClass) // choose random fighting class
     { myClass = EntityClass.Fighter;
     }
     base.Generate(level, myClass);
-  }
-
-  public override void OnHitBy(Entity attacker, object item, Damage damage)
-  { base.OnHitBy(attacker, item, damage);
-    Alerted = true; Shout();
-  }
-
-  public override void OnMissBy(Entity attacker, object item)
-  { base.OnMissBy(attacker, item);
-    if(Global.Coinflip()) { Alerted = true; Shout(); }
-  }
-
-  public override void OnNoise(Entity source, Noise type, int volume)
-  { if(!HasEars) return;
-    if(!Alerted) switch(type)
-    { case Noise.Alert: case Noise.NeedHelp: if(volume>Map.MaxSound*8/100)  Alerted=true; break;
-      case Noise.Bang:  case Noise.Combat: case Noise.Zap: if(volume>Map.MaxSound*10/100) Alerted=true; break;
-      case Noise.Walking: if(volume>Map.MaxSound*15/100) Alerted=true; break;
-      case Noise.Item:    if(volume>Map.MaxSound*12/100) Alerted=true; break;
-    }
-    if(Alerted)
-    { for(int i=0; i<8; i++)
-      { Tile t = Map[Global.Move(Position, i)];
-        if(t.Sound>maxNoise) { maxNoise=t.Sound; noiseDir=(Direction)i; }
-      }
-    }
   }
 
   public override void Think()
@@ -102,7 +76,7 @@ public abstract class Fighter : AI
   Direction lastDir=Direction.Invalid, noiseDir=Direction.Invalid;
   int tries=3;
   byte maxNoise;
-  bool shouted;
+  bool shouted;*/
 }
 
 [Serializable]

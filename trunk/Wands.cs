@@ -51,13 +51,13 @@ public abstract class Wand : Chargeable
     }
     Spell.Cast(user, Status, target, dir);
   }
-  
-  public static void Deserialize(System.IO.Stream stream, IFormatter formatter)
+
+  public static void Deserialize(System.IO.Stream stream, IFormatter formatter) // deserialize static data
   { namemap = (Hashtable)formatter.Deserialize(stream);
     names   = (string[])formatter.Deserialize(stream);
     namei   = (int)formatter.Deserialize(stream);
   }
-  public static void Serialize(System.IO.Stream stream, IFormatter formatter)
+  public static void Serialize(System.IO.Stream stream, IFormatter formatter) // serialize static data
   { formatter.Serialize(stream, namemap);
     formatter.Serialize(stream, names);
     formatter.Serialize(stream, namei);

@@ -79,8 +79,7 @@ public abstract class Creature
     if(race==Race.RandomRace) Race = (Race)Global.Rand((int)Race.NumRaces);
 
     Class = myClass; Race = race; Title = GetTitle();
-
-    Light = 8;
+    Light = 6;
 
     int[] mods = raceAttrs[(int)race].Mods; // attributes for race
     for(int i=0; i<mods.Length; i++) attr[i] += mods[i];
@@ -98,7 +97,33 @@ public abstract class Creature
 
     while(level-->0) LevelUp();
   }
+
   public virtual void Think() { Age++; Timer-=100; }
+  
+  public Point[] VisibleTiles()
+  { int x=0, y=Light*2, s=1-Light*2;
+    visPts=0;
+    VisiblePoint(0, 0);
+    while(x<=y)
+    { VisibleLine(x, y);
+      VisibleLine(x, -y);
+      VisibleLine(-x, y);
+      VisibleLine(-x, -y);
+      VisibleLine(y, x);
+      VisibleLine(y, -x);
+      VisibleLine(-y, x);
+      VisibleLine(-y, -x);
+      if(s<0) s = s+2*x+3;
+      else { s = s+2*(x-y)+5; y--; }
+      x++;
+    }
+    Point[] ret = new Point[visPts];
+    for(visPts--; visPts>=0; visPts--)
+    { y = Math.DivRem(vis[visPts], Map.Width, out x);
+      ret[visPts] = new Point(x, y);
+    }
+    return ret;
+  }
 
   public Inventory Inv = new Inventory();
   public string Name, Title;
@@ -145,10 +170,50 @@ public abstract class Creature
     return title;
   }
 
+  void VisibleLine(int x2, int y2)
+  { int x=0, y=0, dx=Math.Abs(x2), dy=Math.Abs(y2), xi=Math.Sign(x2), yi=Math.Sign(y2), r, ru, p;
+    if(dx>=dy)
+    { r=dy*2; ru=r-dx*2; p=r-dx;
+      do
+      { if(p>0) { y+=yi; p+=ru; }
+        else p+=r;
+        x+=xi; dx--;
+        if(Math.Sqrt(x*x+y*y)-0.5>Light) break;
+      } while(dx>=0 && VisiblePoint(x, y));
+    }
+    else
+    { r=dx*2; ru=r-dy*2; p=r-dy;
+      do
+      { if(p>0) { x+=xi; p+=ru; }
+        else p+=r;
+        y+=yi; dy--;
+        if(Math.Sqrt(x*x+y*y)-0.5>Light) break;
+      } while(dy>=0 && VisiblePoint(x, y));
+    }
+  }
+
+  bool VisiblePoint(int x, int y)
+  { x += X; y += Y;
+    if(!Map.IsPassable(Map[x, y].Type)) return false;
+
+    if(visPts==vis.Length)
+    { int[] narr = new int[visPts*2];
+      Array.Copy(vis, narr, visPts);
+      vis = narr;
+    }
+
+    int ti = y*Map.Width+x;
+    for(int i=0; i<visPts; i++) if(vis[i]==ti) return true;
+    vis[visPts++] = ti;
+    return true;
+  }
+
   int[] attr = new int[(int)Attr.NumAttributes];
   Flag flags;
 
-  
+  static int[] vis = new int[128];
+  static int visPts;
+
   static readonly AttrMods[] raceAttrs = new AttrMods[(int)Race.NumRaces]
   { new AttrMods(6, 6, 6), // Human
     new AttrMods(9, 3, 4)  // Orc

@@ -58,14 +58,17 @@ public enum Race
 }
 
 public enum Skill
-{ // these match weapon classes
-  Dagger, ShortBlade, LongBlade, Axe, MaceFlail, PoleArm, Staff, Bow, Crossbow, Throwing, WeaponSkills,
+{ WeaponSkills,
+  // these match weapon classes
+  Dagger=WeaponSkills, ShortBlade, LongBlade, Axe, MaceFlail, PoleArm, Staff, Bow, Crossbow, Throwing,
+
+  MagicSkills,
   // these match magic types
-  Summoning=WeaponSkills, Enchantment, Telekinesis, Translocation, Transformation, Divination, Channeling, Necromancy,
-  Elemental, Poison, MagicSkills,
+  Summoning=MagicSkills, Enchantment, Telekinesis, Translocation, Transformation, Divination, Channeling, Necromancy,
+  Elemental, Poison,
   
-  LocksTraps=MagicSkills, Invoking, Casting, // general
-  UnarmedCombat, Dodge, Fighting, Shields, Armor, MagicResistance, // fighting
+  GeneralSkills, LocksTraps=GeneralSkills, Invoking, Casting, // general
+  FightingSkills, UnarmedCombat=FightingSkills, Dodge, Fighting, Shields, Armor, MagicResistance, // fighting
   
   NumSkills
 }
@@ -798,7 +801,7 @@ public abstract class Entity : UniqueObject
   public bool TryRemove(Slot slot) { return Wearing(slot) ? TryRemove(Slots[(int)slot]) : true; }
 
   public bool TrySpellDamage(Spell spell, Point point, Damage damage) // 'damage' is base damage (no modifiers)
-  { int skill = spell.GetSpellSkill(this);
+  { int skill = GetSkill(spell.Skill);
     damage.Modify(skill*10); // damage up 10% per skill level
 
     Entity e = Map.GetEntity(point);
@@ -905,14 +908,22 @@ public abstract class Entity : UniqueObject
   public int Age, ExpPool, Hunger;
 
   // generates a creature, creates it and calls the creature's Generate() method. class is RandomClass if not passed
-  static public Entity Generate(Type type, int level) { return Generate(type, level, EntityClass.RandomClass); }
-  static public Entity Generate(Type type, int level, EntityClass myClass)
+  public static Entity Generate(Type type, int level) { return Generate(type, level, EntityClass.RandomClass); }
+  public static Entity Generate(Type type, int level, EntityClass myClass)
   { Entity creature = MakeEntity(type);
     creature.Generate(level, myClass);
     return creature;
   }
 
-  static public Entity MakeEntity(Type type) // constructs an entity and returns it
+  public static bool IsFighter(EntityClass c) // returns true if the class is, in general, a fighting class
+  { return c==EntityClass.Fighter;
+  }
+
+  public static bool IsSpellCaster(EntityClass c) // returns true if the class is, in general, a spellcasting class
+  { return c==EntityClass.Wizard;
+  }
+
+  public static Entity MakeEntity(Type type) // constructs an entity and returns it
   { Entity c = type.GetConstructor(Type.EmptyTypes).Invoke(null) as Entity;
     App.Assert(c!=null, "{0} is not a valid creature type", type);
     return c;

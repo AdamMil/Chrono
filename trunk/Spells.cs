@@ -10,7 +10,9 @@ namespace Chrono
 public enum SpellTarget { Self, Item, Tile };
 public enum SpellClass // remember to add these to the Skill enum as well
 { Summoning, Enchantment, Telekinesis, Translocation, Transformation, Divination, Channeling, Necromancy, Elemental,
-  Poison
+  Poison,
+  
+  NumClasses
 }
 
 [Serializable]
@@ -50,12 +52,12 @@ public abstract class Spell : UniqueObject
     else base.GetObjectData(info, context);
   }
 
-  public Skill Exercises { get { return (Skill)((int)Class+(int)Skill.WeaponSkills); } }
-  public int Level { get { return (Difficulty+1)/2; } }
+  public int Level { get { return (Difficulty+1)/2; } } // returns skill level (1-9)
+  public Skill Skill { get { return (Skill)((int)Class+(int)Skill.MagicSkills); } }
 
   // (Int-7) * 100 * (1.2 - 1/(skill^1.175)) / Difficulty - 10
   public int CastChance(Entity user) // assuming the user knows it
-  { int skill = (user.GetSkill(Skill.Casting)+GetSpellSkill(user)+1)/2;
+  { int skill = (user.GetSkill(Skill.Casting)+user.GetSkill(Skill)+1)/2;
     double smul = 1.2-1/Math.Pow(1.1746189430880190059144636656919, skill);
     int chance = (int)Math.Round((user.Int-7)*100*smul/Difficulty) - 10;
     int penalty = CastPenalty(user);
@@ -77,11 +79,9 @@ public abstract class Spell : UniqueObject
 
   public bool CastTest(Entity user) { return Global.Rand(100)<CastChance(user); }
 
-  public int GetSpellSkill(Entity user) { return user.GetSkill((Skill)((int)Class+(int)Skill.WeaponSkills)); }
-
   // (Int-8) * 100 * (1.1 - 1/(skill^1.126)) / Difficulty - 20
   public int LearnChance(Entity user)
-  { double smul = 1.1-1/Math.Pow(1.2589254117941672104239541063958, GetSpellSkill(user));
+  { double smul = 1.1-1/Math.Pow(1.2589254117941672104239541063958, user.GetSkill(Skill));
     int chance = (int)Math.Round((user.Int-8)*100*smul/Difficulty) - 20;
     int penalty = (int)user.HungerLevel*10; // -10% per hunger level
     if(penalty>0) chance -= chance*penalty/100;

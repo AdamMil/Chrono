@@ -135,7 +135,7 @@ public class Player : Entity
         MP -= spell.Power;
         Exercise(Attr.Int);
         Exercise(Skill.Casting);
-        Exercise(spell.Exercises);
+        Exercise(spell.Skill);
         if(spell.Memory<2000) App.IO.Print("Your memory of this spell is very faint.");
         else if(spell.Memory<4000) App.IO.Print("Your memory of this spell is fant.");
         if(spell.CastTest(this))
@@ -497,7 +497,7 @@ public class Player : Entity
         Scroll scroll = read as Scroll;
         if(scroll != null) // read scroll
         { Exercise(Attr.Int);
-          Exercise(scroll.Spell.Exercises);
+          Exercise(scroll.Spell.Skill);
           if(scroll.Count>1) scroll = (Scroll)scroll.Split(1);
           else inv.Remove(scroll);
           OnReadScroll(scroll);
@@ -520,7 +520,7 @@ public class Player : Entity
           else if(chance<50 && !App.IO.YesNo("This spell seems difficult. Continue?", false)) goto next;
 
           Exercise(Attr.Int);
-          Exercise(spell.Exercises);
+          Exercise(spell.Skill);
 
           bool success = Global.Rand(100)<chance;
           if(success) // succeeded

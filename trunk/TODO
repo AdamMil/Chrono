@@ -34,3 +34,4 @@ add a line giving a monster's general health to DescribeTile
 save when moving between levels, load levels on demand, unload unused levels
 redo formula for MaxHP/MaxMP gain (make based somewhat on race)
 fix annoying disappearing stats bar
+make the AI affected by carry weight (unable to move, etc)

@@ -29,7 +29,7 @@ public abstract class Fighter : AI
 
   public override void Think()
   { base.Think();
-    bool dontign = alerted || Globals.Rand(100)>=App.Player.Stealth*10-5;
+    bool dontign = alerted || Global.Rand(100)>=App.Player.Stealth*10-5;
     Direction dir = dontign && HasEyes ? LookAt(App.Player) : Direction.Invalid; // first try vision
 
     bool saw = dir!=Direction.Invalid;

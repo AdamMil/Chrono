@@ -271,6 +271,10 @@ public abstract class Entity
     if(attribute>=Attr.NumModifiable) return val;
     for(int i=0; i<Slots.Length; i++) if(Slots[i]!=null) val += Slots[i].Mods[idx];
     for(int i=0; i<Hands.Length; i++) if(Hands[i]!=null) val += Hands[i].Mods[idx];
+    if(attribute==Attr.Stealth) // stealth is from 0 to 10
+    { if(val<0) val=0;
+      if(val>10) val=10;
+    }
     return val;
   }
 
@@ -674,14 +678,15 @@ string msg = string.Format("HIT: (toHit: {0}, EV: {1}, roll: {2} = {3})", toHit,
         n = Global.Rand(100);
       }
       else n=0;
-      if(shield==null || n*2>=blockchance) // shield blocks 100% damage half the time that it comes into effect
+      if(shield==null || n*2>=blockchance)  // shield blocks 100% damage half the time that it comes into effect
       { int damage=(w==null ? CalculateDamage() : w.CalculateDamage(this)), ac=c.AC;
+        damage += damage * wepskill*10/100; // damage up 10% per skill level
         int odam=damage;
-        if(n<blockchance) damage /= 2;     // shield blocks 50% damage the other half of the time
-        if(ac>5) c.Exercise(Skill.Armor);  // if wearing substantial armor, exercise it
+        if(n<blockchance) damage /= 2;      // shield blocks 50% damage the other half of the time
+        if(ac>5) c.Exercise(Skill.Armor);   // if wearing substantial armor, exercise it
         n = Global.Rand(ac);
         damage -= n + n*c.GetSkill(Skill.Armor)*10/100; // armor absorbs damage (+10% per skill level)
-        if(damage<0) damage = 0;           // normalize damage
+        if(damage<0) damage = 0;            // normalize damage
         App.IO.Print(Color.DarkGrey, "{4}, DAMAGE: {0} -> {1}, HP: {2} -> {3}", odam, damage, c.HP, c.HP-damage, msg);
         c.HP -= damage;
         c.OnHitBy(this, w, damage);

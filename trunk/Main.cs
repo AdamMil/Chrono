@@ -33,6 +33,8 @@ public sealed class App
       for(int x=0; x<map.Width; x++)
         if(map[x, y].Type==TileType.UpStairs) { player.X = x; player.Y = y; break; }
     map.Creatures.Add(player);
+    
+    player.Pickup(new PaperBag());
 
     Maps.Add(map);
     IO.Render(player);

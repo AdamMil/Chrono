@@ -84,6 +84,11 @@
         <Files>
             <Include>
                 <File
+                    RelPath = "Armor.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
                     RelPath = "AssemblyInfo.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
@@ -155,6 +160,11 @@
                 />
                 <File
                     RelPath = "Player.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
+                    RelPath = "Weapons.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
                 />

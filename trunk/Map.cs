@@ -124,6 +124,9 @@ public sealed class Map
   public void SetType(Point pt, TileType type) { map[pt.Y,pt.X].Type = type; }
   public void SetType(int x, int y, TileType type) { map[y,x].Type = type; }
 
+  public bool IsDangerous(Point pt) { return IsDangerous(this[pt.X, pt.Y].Type); }
+  public bool IsDangerous(int x, int y) { return IsDangerous(this[x,y].Type); }
+
   public bool IsPassable(Point pt) { return IsPassable(pt.X, pt.Y); }
   public bool IsPassable(int x, int y)
   { Tile tile = this[x,y];
@@ -171,9 +174,10 @@ public sealed class Map
     throw new ArgumentException("No such tile on this map!");
   }
 
+  public static bool IsDangerous(TileType type) { return (tileFlag[(int)type]&TileFlag.Dangerous) != TileFlag.None; }
   public static bool IsPassable(TileType type) { return (tileFlag[(int)type]&TileFlag.Passable) != TileFlag.None; }
-  public static bool IsWall(TileType type) { return (tileFlag[(int)type]&TileFlag.IsWall) != TileFlag.None; }
-  public static bool IsDoor(TileType type) { return (tileFlag[(int)type]&TileFlag.IsDoor) != TileFlag.None; }
+  public static bool IsWall(TileType type) { return (tileFlag[(int)type]&TileFlag.Wall) != TileFlag.None; }
+  public static bool IsDoor(TileType type) { return (tileFlag[(int)type]&TileFlag.Door) != TileFlag.None; }
 
   public CreatureCollection Creatures { get { return creatures; } }
 
@@ -183,14 +187,25 @@ public sealed class Map
 
     while(thinkQueue.Count==0)
     { while(thinkQueue.Count==0)
+      { timer += 10;
         for(int i=0; i<creatures.Count; i++)
         { Creature c = creatures[i];
-          c.Timer += c.Speed;
-          if(c.Timer>=100)
+          c.Timer += 10;
+          if(c.Timer>=c.Speed)
           { if(c==player) addedPlayer=true;
             thinkQueue.Enqueue(c);
           }
         }
+        if(timer>=100)
+        { timer -= 100;
+          for(int i=0; i<creatures.Count; i++) creatures[i].ItemThink();
+          for(int y=0; y<height; y++)
+            for(int x=0; x<width; x++)
+            { ItemPile items = map[y,x].Items;
+              if(items!=null) for(int i=0; i<items.Count; i++) items[i].Think(null);
+            }
+        }
+      }
       if(addedPlayer) break;
       Simulate(null);
     }
@@ -223,19 +238,25 @@ public sealed class Map
   CreatureCollection creatures;
   PriorityQueue thinkQueue = new PriorityQueue(new CreatureComparer());
   GameLib.Collections.Map removedCreatures = new GameLib.Collections.Map();
-  int width, height, thinking;
+  int width, height, thinking, timer;
 
   [Flags]
-  enum TileFlag : byte { None=0, Passable=1, IsWall=2, IsDoor=4 }
+  enum TileFlag : byte { None=0, Passable=1, Wall=2, Door=4, Dangerous=8 }
   static readonly TileFlag[] tileFlag = new TileFlag[]
   { TileFlag.None,   // Border
     TileFlag.None,   // SolidRock
-    TileFlag.IsWall, // Wall
-    TileFlag.IsDoor, // ClosedDoor
-    TileFlag.IsDoor|TileFlag.Passable, // OpenDoor
-    TileFlag.Passable, TileFlag.Passable, TileFlag.Passable, TileFlag.Passable, // others
-    TileFlag.Passable, TileFlag.Passable, TileFlag.Passable, TileFlag.Passable,
-    TileFlag.Passable, TileFlag.Passable, TileFlag.Passable, TileFlag.Passable
+    TileFlag.Wall,   // Wall
+    TileFlag.Door,   // ClosedDoor
+    TileFlag.Door|TileFlag.Passable, // OpenDoor
+    TileFlag.Passable, TileFlag.Passable, TileFlag.Passable, TileFlag.Passable, // RoomFloor, Corridor, stairs
+    TileFlag.Passable, // ShallowWater
+    TileFlag.Passable|TileFlag.Dangerous, // DeepWater
+    TileFlag.Passable, // Ice
+    TileFlag.Passable|TileFlag.Dangerous, // Lava
+    TileFlag.Passable|TileFlag.Dangerous, // Pit
+    TileFlag.Passable|TileFlag.Dangerous, // Hole
+    TileFlag.Passable|TileFlag.Dangerous, // Trap
+    TileFlag.Passable // Altar
   };
 }
 

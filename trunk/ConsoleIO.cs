@@ -34,8 +34,9 @@ public sealed class ConsoleIO : InputOutput
     while(true)
     { if(doRebuke) AddLine(color, rebuke, false);
       AddLine(color, sprompt);
-      console.SetCursorPosition(sprompt.Length, Math.Min(uncleared, LineSpace)+MapHeight-1);
+      SetCursorAtEOBL();
       string answer = console.ReadLine();
+      AppendToBL(answer);
       if(answer!="" || allowEmpty) { TextInput = false; return answer; }
       doRebuke = true;
     }
@@ -50,9 +51,10 @@ public sealed class ConsoleIO : InputOutput
     while(true)
     { if(doRebuke) AddLine(color, rebuke, false);
       AddLine(color, sprompt);
-      console.SetCursorPosition(sprompt.Length, Math.Min(uncleared, LineSpace)+MapHeight-1);
+      SetCursorAtEOBL();
       char c = ReadChar(true);
-      if(c=='\r' || rec.Key.VirtualKey==NTConsole.Key.Escape) c = defaultChar;
+      if(c=='\r' || c=='\n' || rec.Key.VirtualKey==NTConsole.Key.Escape) c = defaultChar;
+      else AppendToBL(c);
       if(chars==null || c==defaultChar ||
          (caseInsensitive ? chars.ToLower() : chars).IndexOf(c) != -1)
       { TextInput = false;
@@ -76,9 +78,11 @@ public sealed class ConsoleIO : InputOutput
     return d;
   }
 
-  public override MenuItem[] ChooseItem(string prompt, IKeyedInventory items, MenuFlag flags, ItemClass itemClass)
-  { string chars = items.CharString(itemClass);
-    if(itemClass==ItemClass.Any && chars.Length==0) return new MenuItem[0];
+  public override MenuItem[] ChooseItem(string prompt, IKeyedInventory items, MenuFlag flags,
+                                        params ItemClass[] classes)
+  { string chars = items.CharString(classes);
+    if((flags&MenuFlag.AllowNothing)!=0) chars = "-"+chars;
+    if(Array.IndexOf(classes, ItemClass.Any)!=-1 && chars.Length==0) return new MenuItem[0];
     chars += chars.Length==0 ? "*" : "?*";
 
     string sprompt = prompt + " [" + chars + "] ";
@@ -88,9 +92,10 @@ public sealed class ConsoleIO : InputOutput
     { int num=-1;
       if(doRebuke) AddLine(Color.Normal, "Invalid selection!", false);
       AddLine(Color.Normal, sprompt);
-      console.SetCursorPosition(sprompt.Length, Math.Min(uncleared, LineSpace)+MapHeight-1);
+      SetCursorAtEOBL();
       char c = ReadChar(true);
-      if(c=='\r' || rec.Key.VirtualKey==NTConsole.Key.Escape) return new MenuItem[0];
+      if(c=='\r' || c=='\n' || rec.Key.VirtualKey==NTConsole.Key.Escape) return new MenuItem[0];
+      else AppendToBL(c);
       if(char.IsDigit(c) && (flags&MenuFlag.AllowNum)!=0)
       { num = c-'0';
         while(char.IsDigit(c=ReadChar(true))) num = c-'0' + num*10;
@@ -98,7 +103,8 @@ public sealed class ConsoleIO : InputOutput
       if(num<-1 || num==0 || chars.IndexOf(c)==-1) { doRebuke=true; continue; }
       if(char.IsLetter(c) && num>items[c].Count) { AddLine(Color.Normal, "You don't have that many!"); continue; }
       TextInput = false;
-      if(c=='?') return Menu(items, flags, itemClass);
+      if(c=='-') return new MenuItem[1] { new MenuItem(null, 0) };
+      if(c=='?') return Menu(items, flags, classes);
       if(c=='*') return Menu(items, flags, ItemClass.Any);
       return new MenuItem[1] { new MenuItem(items[c], num==-1 ? items[c].Count : num) };
     }
@@ -108,7 +114,7 @@ public sealed class ConsoleIO : InputOutput
   {
   }
 
-  public override MenuItem[] Menu(System.Collections.ICollection items, MenuFlag flags, ItemClass itemClass)
+  public override MenuItem[] Menu(System.Collections.ICollection items, MenuFlag flags, params ItemClass[] classes)
   { if(items.Count==0) throw new ArgumentException("No items in the collection.", "items");
     if(items.Count>52 && (flags&MenuFlag.Reletter)==0)
       throw new NotSupportedException("Too many items in the collection.");
@@ -119,24 +125,24 @@ public sealed class ConsoleIO : InputOutput
     
     bool reletter=(flags&MenuFlag.Reletter)!=0, allownum=(flags&MenuFlag.AllowNum)!=0;
 
-    if(itemClass==ItemClass.Invalid)
+    if(Array.IndexOf(classes, ItemClass.Any)!=-1)
     { menu = new MenuItem[items.Count];
       for(int i=0,mi=0; i<(int)ItemClass.NumClasses; i++) // then group by item class
         for(int j=0; j<itemarr.Length; j++) if(itemarr[j].Class==(ItemClass)i) menu[mi++] = new MenuItem(itemarr[j]);
     }
     else
-    { int count=0;
-      for(int i=0; i<itemarr.Length; i++) if(itemarr[i].Class==itemClass) count++;
-      menu = new MenuItem[count];
-      for(int i=0,mi=0; i<itemarr.Length; i++) if(itemarr[i].Class==itemClass) menu[mi++] = new MenuItem(itemarr[i]);
+    { System.Collections.ArrayList list = new System.Collections.ArrayList();
+      for(int i=0; i<itemarr.Length; i++)
+        if(Array.IndexOf(classes, itemarr[i].Class)!=-1) list.Add(new MenuItem(itemarr[i]));
+      menu = (MenuItem[])list.ToArray(typeof(MenuItem));
     }
 
     int cs=0, width=Math.Min(MapWidth, console.Width);
     int height=reletter ? Math.Min(54, console.Height) : console.Height, iheight=height-2;
 
+    console.Fill(0, 0, width, height); // clear the area we'll be using
     while(true)
     { redraw:
-      console.Fill(0, 0, width, height); // clear the area we'll be using
       ItemClass head = ItemClass.Invalid;
       int mc=cs, yi=0;
       char c='a';
@@ -171,9 +177,11 @@ public sealed class ConsoleIO : InputOutput
             }
             if(menu[i].Char==c)
             { menu[i].Count = num>-1 ? Math.Min(num, menu[i].Item.Count) : menu[i].Count>0 ? 0 : menu[i].Item.Count;
-              if((flags&MenuFlag.Multi)==0 && menu[i].Count>0) // unselect others if !Multi
-                for(int j=0; j<menu.Length; j++) if(j!=i) menu[i].Count=0;
-              if(i>=cs && i<cs+mc)                 // if it's onscreen
+              if((flags&MenuFlag.Multi)==0 && menu[i].Count>0)
+              { for(int j=0; j<menu.Length; j++) if(j!=i) menu[j].Count=0;
+                goto redraw;
+              }
+              else if(i>=cs && i<cs+mc)            // if it's onscreen
               { DrawMenuItem(y, menu[i], flags);   // draw it
                 console.SetCursorPosition(16, yi); // and restore the cursor, 16 == length of "Enter selection:"
               }
@@ -183,10 +191,18 @@ public sealed class ConsoleIO : InputOutput
         }
         else if(c==0) switch(rec.Key.VirtualKey)
         { case NTConsole.Key.Prior: case NTConsole.Key.Up: case NTConsole.Key.Numpad8:
-            if(cs>0) { cs -= Math.Min(iheight, cs); goto redraw; } // page up
+            if(cs>0) // page up
+            { cs -= Math.Min(iheight, cs);
+              console.Fill(0, 0, width, height); // clear the area we'll be using
+              goto redraw;
+            }
             break;
           case NTConsole.Key.Next: case NTConsole.Key.Down: case NTConsole.Key.Numpad2:
-            if(menu.Length>cs+mc) { cs += mc; goto redraw; } // page down
+            if(menu.Length>cs+mc) // page down
+            { cs += mc;
+              console.Fill(0, 0, width, height); // clear the area we'll be using
+              goto redraw;
+            }
             break;
           case NTConsole.Key.Escape: return new MenuItem[0];
         }
@@ -240,6 +256,8 @@ public sealed class ConsoleIO : InputOutput
         case 'D': inp.Action = Action.DropType; break;
         case 'e': inp.Action = Action.Eat; break;
         case 'o': inp.Action = Action.OpenDoor; break;
+        case 'w': inp.Action = Action.Wield; break;
+        case 'W': inp.Action = Action.Wear; break;
         case '<': inp.Action = Action.GoUp; break;
         case '>': inp.Action = Action.GoDown; break;
         case '/':
@@ -290,9 +308,10 @@ public sealed class ConsoleIO : InputOutput
     console.PutBlock(new Rectangle(0, 0, rect.Width, rect.Height), buf);
     if(redrawStats)
     { RenderStats(viewer);
-      console.SetCursorPosition(mapW/2, mapH/2);
+      SetCursorToPlayer();
       redrawStats=false;
     }
+    uncleared = 0;
   }
 
   public override void SetTitle(string title) { console.Title = title; }
@@ -313,9 +332,9 @@ public sealed class ConsoleIO : InputOutput
     public static readonly ItemComparer Default = new ItemComparer();
   }
 
-  const int MapWidth=50, MapHeight=40;
-
   int LineSpace { get { return console.Height-MapHeight-1; } }
+  int MapWidth  { get { return Math.Max(console.Width-30, 50); } }
+  int MapHeight { get { return Math.Max(console.Height-16, 40); } }
 
   bool TextInput
   { get { return inputMode; }
@@ -323,7 +342,6 @@ public sealed class ConsoleIO : InputOutput
     { if(value==inputMode) return;
       console.InputMode = value ? NTConsole.InputModes.LineBuffered|NTConsole.InputModes.Echo
                                 : NTConsole.InputModes.None;
-      uncleared = 0;
       DrawLines();
       inputMode = value;
     }
@@ -331,12 +349,43 @@ public sealed class ConsoleIO : InputOutput
 
   void AddLine(Color color, string line) { AddLine(color, line, true); }
   void AddLine(Color color, string line, bool redraw)
-  { lines.Append(new Line(color, line));
-    uncleared++;
+  { uncleared += LineHeight(line);
+    if(!TextInput && uncleared >= LineSpace-1)
+    { lines.Append(new Line(Color.Normal, "--more--"));
+      DrawLines();
+      SetCursorAtEOBL();
+      while(true)
+      { char c = ReadChar();
+        if(c==' ' || c=='\r' || c=='\n' || rec.Key.VirtualKey==NTConsole.Key.Escape) break;
+      }
+      SetCursorToPlayer();
+      uncleared = 0;
+    }
+    lines.Append(new Line(color, line));
     while(lines.Count>maxLines) lines.Remove(lines.Head);
     if(redraw) DrawLines();
   }
   
+  void AddWrapped(int i, string line)
+  { if(wrapped.Length<i)
+    { string[] narr = new string[wrapped.Length*2];
+      Array.Copy(wrapped, narr, i);
+      wrapped = narr;
+    }
+    wrapped[i] = line;
+  }
+
+  void AppendToBL(char c)
+  { Line line = (Line)lines.Tail.Data;
+    line.Text += c;
+    lines.Tail.Data = line;
+  }
+  void AppendToBL(string s)
+  { Line line = (Line)lines.Tail.Data;
+    line.Text += s;
+    lines.Tail.Data = line;
+  }
+
   Direction CharToDirection(char c) { return CharToDirection(c, true, false); }
   Direction CharToDirection(char c, bool allowSelf, bool allowVertical)
   { c = char.ToLower(NormalizeDirChar());
@@ -357,18 +406,28 @@ public sealed class ConsoleIO : InputOutput
   }
 
   void DrawLines()
-  { console.Fill(0, 40, console.Width, console.Height-MapHeight);
-    console.SetCursorPosition(0, 40);
-
-    LinkedList.Node node = lines.Tail;
-    int nlines = Math.Min(uncleared, LineSpace);
-    for(int i=1; i<nlines; i++) node=node.PrevNode;
-    for(int i=0; i<nlines; node=node.NextNode,i++)
-    { Line line = (Line)node.Data;
-      console.Attributes = ColorToAttr(line.Color);
-      console.WriteLine(line.Text);
+  { Line[] arr;
+    { LinkedList.Node node = lines.Tail;
+      int nlines = Math.Min(lines.Count, LineSpace), i=nlines-1, height;
+      arr = new Line[nlines];
+      while(i>=0)
+      { Line line = (Line)node.Data;
+        height = WordWrap(line.Text);
+        while(height-->0 && i>=0) arr[i--] = new Line(line.Color, wrapped[height]);
+        node=node.PrevNode;
+      }
     }
-    console.SetCursorPosition(mapW/2, mapH/2);
+
+    blY=MapHeight-1;
+    console.Fill(0, MapHeight, console.Width, console.Height-MapHeight);
+    console.SetCursorPosition(0, blY+1); // MapHeight
+
+    for(int i=0; i<arr.Length; i++)
+    { console.Attributes = ColorToAttr(arr[i].Color);
+      console.WriteLine(arr[i].Text);
+      blX = arr[i].Text.Length; blY++;
+    }
+    SetCursorToPlayer();
   }
 
   void DrawMenuItem(int y, MenuItem item, MenuFlag flags)
@@ -378,6 +437,8 @@ public sealed class ConsoleIO : InputOutput
                 item.Count==0 ? " - " : item.Count==item.Item.Count ? " + " : item.Count.ToString("d3"),
               item.Char, item.Item.FullName);
   }
+
+  int LineHeight(string line) { return WordWrap(line); }
 
   char NormalizeDirChar()
   { char c = rec.Key.Char;
@@ -449,8 +510,7 @@ public sealed class ConsoleIO : InputOutput
   }
   
   void RenderStats(Creature player)
-  { const int x = MapWidth+2;
-    int y=0, healthpct=player.HP*100/player.MaxHP, xlines=0, width=console.Width-x;
+  { int x=MapWidth+2, y=0, healthpct=player.HP*100/player.MaxHP, xlines=0, width=console.Width-x;
     PutStringP(width, x, y++, "{0} the {1} (lv {2})", player.Name, player.Title, player.ExpLevel+1);
     PutStringP(width, x, y++, "Human");
     PutStringP(healthpct<25 ? Color.Dire : healthpct<50 ? Color.Warning : Color.Normal,
@@ -473,13 +533,36 @@ public sealed class ConsoleIO : InputOutput
     statLines=xlines;
   }
 
+  void SetCursorAtEOBL() { console.SetCursorPosition(blX, blY); }
+  void SetCursorToPlayer() { console.SetCursorPosition(mapW/2, mapH/2); }
+  
+  int WordWrap(string line)
+  { int width=console.Width, s=0, e=line.Length, height=0;
+    if(e==0) { AddWrapped(0, ""); return 1; }
+    
+    while(e-s>width)
+    { for(int i=Math.Min(s+width, e)-1; i>=s; i--)
+        if(char.IsWhiteSpace(line[i]))
+        { AddWrapped(height++, line.Substring(s, i));
+          s = i+1;
+          goto next;
+        }
+      AddWrapped(height++, line.Substring(s, width));
+      s += width;
+      next:;
+    }
+    if(e-s>0) AddWrapped(height++, line.Substring(s, e-s));
+    return height;
+  }
+
   NTConsole.CharInfo[] buf;
   bool[] vis;
   MenuItem[] menu;
+  string[] wrapped = new string[4];
   NTConsole console = new NTConsole();
   LinkedList lines = new LinkedList(); // a circular array would be better
   NTConsole.InputRecord rec;
-  int  uncleared=0, maxLines=200, mapW, mapH, count, statLines;
+  int  uncleared, maxLines=200, blX, blY, mapW, mapH, count, statLines;
   bool inputMode, redrawStats=true;
 
   static NTConsole.Attribute ColorToAttr(Color color)

@@ -5,7 +5,7 @@ namespace Chrono
 {
 
 public class Player : Creature
-{ public Player() { Color=Color.White; Timer=100; /*we go first*/ }
+{ public Player() { Color=Color.White; Timer=50; /*we get a headstart*/ }
 
   public override void Generate(int level, CreatureClass myClass, Race race)
   { base.Generate(level, myClass, race);
@@ -14,8 +14,8 @@ public class Player : Creature
   }
 
   public override void Think()
-  { base.Think();
-
+  { if(interrupt) { inp.Count=0; interrupt=false; }
+    base.Think();
     Point[] vis = VisibleTiles();
 
     next:
@@ -46,7 +46,10 @@ public class Player : Creature
       { if(Inv.Count==0) { App.IO.Print("You're not carrying anything."); goto next; }
         MenuItem[] items = App.IO.ChooseItem("Drop what?", Inv, MenuFlag.AllowNum|MenuFlag.Multi, ItemClass.Any);
         if(items.Length==0) { App.IO.Print("Never mind."); goto next; }
-        foreach(MenuItem i in items) App.IO.Print("Dropped "+Drop(i.Char, i.Count));
+        foreach(MenuItem i in items)
+        { if(Wearing(i.Item) && TryRemove(i.Item)) break;
+          Drop(i.Char, i.Count);
+        }
         break;
       }
 
@@ -75,9 +78,10 @@ public class Player : Creature
         if(toEat==null) goto next;
         if(toEat.Count>1)
         { toEat = (Food)toEat.Split(1);
-          if(!toEat.Use(this)) inv.Add(toEat);
+          if(!toEat.Eat(this)) inv.Add(toEat);
         }
-        else if(toEat.Use(this)) inv.Remove(toEat);
+        else if(toEat.Eat(this)) inv.Remove(toEat);
+        if(Hunger<100) App.IO.Print("You feel full.");
         App.IO.RedrawStats=true;
         break;
       }
@@ -103,20 +107,21 @@ public class Player : Creature
           if(Map.IsPassable(np) || Map.IsDoor(np)) options++;
         }
         while(true)
-        { Map.Simulate(this); base.Think(); UpdateMemory(vis); vis = VisibleTiles();
-          if(Map.HasItems(np)) goto done;
+        { if(ThinkUpdate(ref vis)) break;
+          TileType type = Map[np].Type;
+          if(type==TileType.UpStairs || type==TileType.DownStairs || Map.HasItems(np)) break;
+
           int newopts=0;
           for(int i=0; i<5; i++)
           { np = Global.Move(Position, (Direction)chk[i]);
             if(Map.IsPassable(np) || Map.IsDoor(np)) newopts++;
           }
-          if(newopts!=options || IsMonsterVisible(vis)) goto done;
+          if(newopts!=options || IsMonsterVisible(vis)) break;
 
           np = Global.Move(Position, inp.Direction);
-          if(Map.IsPassable(np)) Position = np;
-          else goto done;
+          if(Map.IsPassable(np) && !Map.IsDangerous(np)) Position = np;
+          else break;
         }
-        done:
         break;
       }
 
@@ -150,7 +155,7 @@ public class Player : Creature
         break;
       }
       
-      case Action.Quit: 
+      case Action.Quit:
         if(App.IO.YesNo(Color.Warning, "Do you really want to quit?", false)) App.Quit=true;
         break;
 
@@ -158,9 +163,28 @@ public class Player : Creature
         if(IsMonsterVisible(vis)) break;
         inp.Count = count;
         break;
+      
+      case Action.Wear:
+      { MenuItem[] items = App.IO.ChooseItem("Wear what?", Inv, MenuFlag.None, wearableClasses);
+        if(items.Length==0) { App.IO.Print("Never mind."); goto next; }
+        Wearable item = items[0].Item as Wearable;
+        if(item==null) { App.IO.Print("You can't wear that!"); goto next; }
+        if(Wearing(item)) { App.IO.Print("You're already wearing that!"); goto next; }
+        if(Wearing(item.Slot) && !TryRemove(item.Slot)) goto next;
+        Wear(item);
+        break;
+      }
     }
 
-    Hunger++;
+    OnAge();
+  }
+  
+  public static Player Generate(CreatureClass myClass, Race race)
+  { return (Player)Creature.Generate(typeof(Player), 0, myClass, race);
+  }
+
+  protected virtual void OnAge()
+  { Hunger++;
     if(Hunger==HungryAt || Hunger==StarvingAt || Hunger==StarveAt)
     { if(Hunger==HungryAt) App.IO.Print(Color.Warning, "You're getting hungry.");
       else if(Hunger==StarvingAt) App.IO.Print(Color.Dire, "You're starving!");
@@ -168,18 +192,34 @@ public class Player : Creature
       { App.IO.Print("You die of starvation.");
       }
       App.IO.RedrawStats = true;
-      inp.Count = 0;
+      Interrupt();
     }
   }
-  
-  public static Player Generate(CreatureClass myClass, Race race)
-  { return (Player)Creature.Generate(typeof(Player), 0, myClass, race);
+
+  public override void OnDrop(Item item) { App.IO.Print("You drop {0}.", item); }
+  public override void OnRemove(Wearable item) { App.IO.Print("You remove {0}.", item); }
+  public override void OnWear(Wearable item)
+  { if(item.EquipText!=null) App.IO.Print(item.EquipText);
+    else App.IO.Print("You put on {0}.", item);
   }
 
   protected internal override void OnMapChanged()
   { base.OnMapChanged();
     Memory = Map==null ? null : new Map(Map.Width, Map.Height);
   }
+  
+  protected bool ThinkUpdate(ref Point[] vis)
+  { Map.Simulate(this);
+    base.Think();
+    if(vis!=null) UpdateMemory(vis);
+    vis = VisibleTiles();
+    if(interrupt) { interrupt=false; return true; }
+    return false;
+  }
+  
+  protected static readonly ItemClass[] wearableClasses =  new ItemClass[]
+  { ItemClass.Amulet, ItemClass.Armor, ItemClass.Ring
+  };
 
   Input inp;
 }

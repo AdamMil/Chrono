@@ -21,13 +21,12 @@ public abstract class Ring : Wearable
 
   public override string GetFullName(Entity e, bool forceSingular)
   { if(e==null || e.KnowsAbout(this)) return base.GetFullName(e, forceSingular);
-    string tn = GetType().ToString(), rn = (string)namemap[tn];
-    if(rn==null) namemap[tn] = rn = names[namei++];
-    rn += " ring";
+    int i = (int)namemap[GetType().ToString()];
+    string rn = names[i] + " ring";
     if(Title!=null) rn += " named "+Title;
     return rn;
   }
-  
+
   public static void Deserialize(System.IO.Stream stream, IFormatter formatter)
   { namemap = (Hashtable)formatter.Deserialize(stream);
     names   = (string[])formatter.Deserialize(stream);

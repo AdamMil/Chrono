@@ -20,12 +20,13 @@ public enum CarryStress { Normal, Burdened, Stressed, Overtaxed } // states rela
 public struct Damage
 { public Damage(int damage) { Physical=(ushort)damage; Direct=Heat=Cold=Electricity=Poison=0; }
   public int Total { get { return Direct+Physical+Heat+Cold+Electricity; } } // doesn't count poison
-  public void Modify(int percent)
-  { Direct += (ushort)(Direct*percent/100);
-    Physical += (ushort)(Physical*percent/100);
-    Heat += (ushort)(Heat*percent/100);
-    Cold += (ushort)(Cold*percent/100);
-    Electricity += (ushort)(Electricity*percent/100);
+  public void Modify(double mul)
+  { Direct = (ushort)Math.Round(Direct*mul);
+    Physical = (ushort)Math.Round(Physical*mul);
+    Heat = (ushort)Math.Round(Heat*mul);
+    Cold = (ushort)Math.Round(Cold*mul);
+    Electricity = (ushort)Math.Round(Electricity*mul);
+    Poison = (ushort)Math.Round(Poison*mul);
   }
   public ushort Direct, Physical, Heat, Cold, Electricity, Poison;
 }
@@ -145,7 +146,7 @@ public abstract class Entity : UniqueObject
     }
   }
   public int Int { get { return GetAttr(Attr.Int); } }
-  public int KillExp { get { return baseKillExp*ExpLevel; } } // experience given for killing me
+  public int KillExp { get { return baseKillExp; } } // experience given for killing me
   public int Light { get { return GetAttr(Attr.Light); } }
   public int MaxHP { get { return GetAttr(Attr.MaxHP); } }
   public int MaxMP { get { return GetAttr(Attr.MaxMP); } }
@@ -427,8 +428,8 @@ public abstract class Entity : UniqueObject
   public void Exercise(Attr attribute) // exercises an attribute (not guaranteed)
   { int aval = attr[(int)attribute];
     if(aval>17) // over 17, it gets harder to increase attributes through exercise
-    { aval -= 18;
-      if(Global.Rand(100) < aval*10+50) return; // returns: 18:50%, 19:60%, 20:70%, 21:80%, 22:90%, 23+:100%
+    { aval -= 13;
+      if(Global.Rand(100) < aval*10) return; // returns: 18:50%, 19:60%, 20:70%, 21:80%, 22:90%, 23+:100%
     }
     int points = Math.Min(Global.Rand(6), ExpPool);
     if(points==0) return;
@@ -447,6 +448,7 @@ public abstract class Entity : UniqueObject
     if(points==0) return;
     if(Global.Rand(100)<33) // 33% chance of exercise
     { int need = RaceSkills[(int)Race][(int)skill];
+      need += (int)Math.Round(Math.Pow(1.1, GetSkill(skill)) * need); // it takes more XP to gain higher skills
       ExpPool -= points;
       if((SkillExp[(int)skill] += points) >= need)
       { SkillExp[(int)skill] -= need;
@@ -820,7 +822,8 @@ public abstract class Entity : UniqueObject
 
   public bool TrySpellDamage(Spell spell, Point point, Damage damage) // 'damage' is base damage (no modifiers)
   { int skill = GetSkill(spell.Skill);
-    damage.Modify(skill*10); // damage up 10% per skill level
+    if(skill==0) damage.Modify(0.5);
+    else damage.Modify(SkillCombatMul(skill));
 
     Entity e = Map.GetEntity(point);
     if(e!=null)
@@ -1009,11 +1012,16 @@ public abstract class Entity : UniqueObject
 
   protected void GiveKillExp(Entity killed)
   { Exp += killed.KillExp;
-    ExpPool += Global.NdN(2, killed.baseKillExp); // TODO: this probably needs revision
+    ExpPool += Global.NdN(2, killed.baseKillExp)-2; // TODO: this probably needs revision
   }
 
   // called when the creature is added to or removed from a map
   protected internal virtual void OnMapChanged() { }
+
+  // for skills 1-10, returns a multiplier >= 1
+  protected double SkillCombatMul(double skill)
+  { return (1-1/Math.Pow(1.3, skill-1)) * 1.1041178682161386195553037077594 + 1;
+  }
 
   protected void UpdateMemory() // updates Memory using the visible area
   { if(Memory==null) return;
@@ -1062,15 +1070,17 @@ public abstract class Entity : UniqueObject
 
   bool TryDamage(Entity c, Item item, Ammo ammo) // returns true if 'item' should be destroyed
   { Weapon w = item as Weapon;
-    int wepskill = GetSkill(Skill.Fighting) +
+    int wepskill = GetSkill(Skill.Fighting) + // sum of Fighting and the particular weapon skill
                    (w==null ? GetSkill(item==null ? Skill.UnarmedCombat : Skill.Throwing) : GetSkill((Skill)w.wClass));
-    wepskill = (wepskill+1)/2; // average of fighting and weapon skill
     bool destroyed=false;
 
     Damage dam;
     if(item==null || w!=null) dam=(w==null ? CalculateDamage(c) : w.CalculateDamage(this, ammo, c)); // real weapon (possibly our fists)
     else dam = new Damage((item.Weight+4)/5); // regular item, one damage per pound (rounded up)
-    dam.Physical += (ushort)(dam.Physical * wepskill*10/100); // damage up 10% per skill level
+
+    if(wepskill==0) dam.Physical /= 2;
+    else if(wepskill==1) dam.Physical -= (ushort)(dam.Physical/4);
+    else dam.Physical = (ushort)Math.Round(dam.Physical * SkillCombatMul(wepskill/2.0));
 
     c.OnHitBy(this, item, dam);
     OnHit(c, item, dam);
@@ -1079,7 +1089,7 @@ public abstract class Entity : UniqueObject
 
     return destroyed;
   }
-  
+
   bool TryDamageTile(Point pt, Damage damage)
   { Tile t=Map[pt];
     string msg=null;
@@ -1106,13 +1116,15 @@ public abstract class Entity : UniqueObject
 
   bool TryHit(Entity c, Item item)
   { Weapon w = item as Weapon;
-    int toHit   = (Dex+EV+1)/2 + (w!=null ? w.ToHitBonus : 0); // average of dex and ev, rounded up
+    int toHit   = (Dex+EV+1)/2 + (w!=null ? w.ToHitBonus : 0); // average of dex and ev, rounded up, plus weapon bonus
     int toEvade = c.EV;
     int wepskill = GetSkill(Skill.Fighting) +
                    (w==null ? GetSkill(item==null ? Skill.UnarmedCombat : Skill.Throwing) : GetSkill((Skill)w.wClass));
-    wepskill = (wepskill+1)/2; // average of fighting and weapon skill
 
-    toHit   += toHit*wepskill*10/100;                    // toHit   +10% per (avg of fighting + weapon) skill level 
+    if(wepskill==0) toHit/=2;
+    else if(wepskill==1) toHit -= toHit/4;
+    else toHit = (int)Math.Round(toHit*SkillCombatMul(wepskill/2.0));
+
     toEvade += toEvade*c.GetSkill(Skill.Dodge)*10/100;   // toEvade +10% per dodge level
 
     toHit   -= (toHit  *((int)  HungerLevel*10)+99)/100; // effects of hunger -10% per hunger level (rounded up)

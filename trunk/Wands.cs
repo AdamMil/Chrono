@@ -23,11 +23,10 @@ public abstract class Wand : Chargeable
   public override string GetFullName(Entity e, bool forceSingular)
   { string suffix = Identified ? string.Format(" ({0}:{1})", Charges, Recharged) : "";
     if(e==null || e.KnowsAbout(this)) return base.GetFullName(e, forceSingular) + suffix;
-    string tn = GetType().ToString(), rn = (string)namemap[tn], status = StatusString;
+    int i = (int)namemap[GetType().ToString()];
+    string status = status = StatusString;
     if(status!="") status += ' ';
-    if(rn==null) namemap[tn] = rn = names[namei++];
-
-    rn = status + rn + " wand" + suffix;
+    string rn = status + names[i] + " wand" + suffix;
     if(Title!=null) rn += " named "+Title;
     return rn;
   }

@@ -6,6 +6,7 @@ namespace Chrono
 public abstract class Ring : Wearable
 { public Ring()
   { Class=ItemClass.Ring; Slot=Slot.Ring; Prefix="a ring of "; PluralSuffix=""; PluralPrefix="rings of "; Weight=1;
+    Durability=95;
   }
 }
 

@@ -176,14 +176,16 @@ public sealed class ConsoleIO : InputOutput
           case '+':
             if(mons.Length>0)
             { monsi = (monsi+1)%mons.Length;
-              pos = MapToDisplay(mons[monsi].Position, viewer.Position);
+              lastTarget = mons[monsi];
+              pos = MapToDisplay(lastTarget.Position, viewer.Position);
             }
             else goto nextChar;
             break;
           case '-':
             if(mons.Length>0)
             { monsi = (monsi+mons.Length-1)%mons.Length;
-              pos = MapToDisplay(mons[monsi].Position, viewer.Position);
+              lastTarget = mons[monsi];
+              pos = MapToDisplay(lastTarget.Position, viewer.Position);
             }
             else goto nextChar;
             break;
@@ -543,6 +545,7 @@ public sealed class ConsoleIO : InputOutput
         case 'r': inp.Action = Action.Read; break;
         case 'R': inp.Action = Action.Remove; break;
         case 'S': inp.Action = Action.ManageSkills; break;
+        case 't': inp.Action = Action.Throw; break;
         case 'v': inp.Action = Action.ViewItem; break;
         case 'w': inp.Action = Action.Wield; break;
         case 'W': inp.Action = Action.Wear; break;
@@ -677,7 +680,7 @@ public sealed class ConsoleIO : InputOutput
   }
 
   void DescribeTile(Entity viewer, Point pos, Point[] vpts)
-  { bool visible=false, dfloor=true;
+  { bool visible=false;
     for(int i=0; i<vpts.Length; i++) if(vpts[i]==pos) { visible=true; break; }
     lines.Clear(); uncleared=0;
     if(!visible)
@@ -686,19 +689,19 @@ public sealed class ConsoleIO : InputOutput
     }
     Map map = visible ? viewer.Map : viewer.Memory;
 
+    AddLine(map[pos].Type.ToString()+'.', false);
     Entity e = visible ? map.GetEntity(pos) : map[pos].Entity;
     if(e!=null)
-    { AddLine(string.Format("{0} is here.", e.AName), false);
+    { string prefix = e==viewer ? "You are" : "{0} is";
+      AddLine(string.Format(prefix+" here.", e.AName), false);
       Weapon w = e.Weapon;
-      if(w!=null) AddLine(string.Format("It is wielding {0} {1}.", Global.AorAn(w.Name), w.Name), false);
-      if(e is AI)
+      if(w!=null) AddLine(string.Format(prefix+" wielding {1} {2}.", "It", Global.AorAn(w.Name), w.Name), false);
+      if(e!=viewer && e is AI)
       { AI ai = (AI)e;
         if(ai.State != AIState.Alerted) AddLine("It doesn't appear to have noticed you.", false);
       }
-      dfloor=false;
     }
-    if(viewer.Map.HasItems(pos)) { DisplayTileItems(map[pos].Items, visible); dfloor=false; }
-    if(dfloor) AddLine(map[pos].Type.ToString()+'.', false);
+    if(viewer.Map.HasItems(pos)) DisplayTileItems(map[pos].Items, visible);
     DrawLines();
     uncleared = 0;
   }

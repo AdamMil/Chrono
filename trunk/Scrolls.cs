@@ -6,6 +6,7 @@ namespace Chrono
 public abstract class Scroll : Readable
 { public Scroll()
   { Class=ItemClass.Scroll; Prefix="a scroll of "; PluralSuffix=""; PluralPrefix="scrolls of "; Weight=1;
+    Durability=75;
   }
   protected Scroll(Item item) : base(item) { }
 

@@ -12,13 +12,13 @@ public abstract class Fighter : AI
     base.Generate(level, myClass);
   }
 
-  public override void OnHitBy(Entity hit, Weapon w, int damage)
-  { base.OnHitBy(hit, w, damage);
+  public override void OnHitBy(Entity hit, Item item, int damage)
+  { base.OnHitBy(hit, item, damage);
     Alerted = true; Shout();
   }
 
-  public override void OnMissBy(Entity hit, Weapon w)
-  { base.OnMissBy(hit, w);
+  public override void OnMissBy(Entity hit, Item item)
+  { base.OnMissBy(hit, item);
     if(Global.Coinflip()) { Alerted = true; Shout(); }
   }
 
@@ -39,6 +39,7 @@ public abstract class Fighter : AI
 
   public override void Think()
   { base.Think();
+    if(HP<=0) return;
     bool dontign = Alerted || Global.Rand(100)>=App.Player.Stealth*10-3;
     Direction dir = dontign && HasEyes ? LookAt(App.Player) : Direction.Invalid; // first try vision
 

@@ -45,8 +45,8 @@ public abstract class MapGenerator
   protected Random Rand;
 }
 
-#region RoomyMapGenerator
-public class RoomyMapGenerator : MapGenerator
+#region RoomyDungeonGenerator
+public class RoomyDungeonGenerator : MapGenerator
 { protected override void Generate(Map map, XmlNode root)
   { this.map = map;
     int minRooms, maxRooms;
@@ -75,7 +75,7 @@ public class RoomyMapGenerator : MapGenerator
 
     for(int i=1; i<rooms.Count; i++) Connect((Room)rooms[i-1], (Room)rooms[i]);
 
-    if(map.Index>0) AddStairs(false);
+    AddStairs(false);
     if(map.Index<map.Section.Depth-1) AddStairs(true);
   }
 
@@ -281,10 +281,9 @@ public class MetaCaveGenerator : MapGenerator
         map.SetType(width-1, y, TileType.Wall);
       }
         
-      if(map.Index==0) AddStairs(map, true);
-      else if(map.Index>=map.Section.Depth) AddStairs(map, false);
-      else
-      { Point up=AddStairs(map, false), down=AddStairs(map, true);
+      Point up=AddStairs(map, false);
+      if(map.Index<map.Section.Depth-1)
+      { Point down=AddStairs(map, true);
         if(!path.Plan(map, up, down) || path.GetPathFrom(up).Cost>=1000)
         { map.ClearLinks();
           map.Fill(TileType.SolidRock);

@@ -221,8 +221,7 @@ public abstract class Wearable : Modifying
   { string ret = "";
     if(worn)       ret += (ret!="" ? ", " : "(") + "worn";
     if(Shop!=null) ret += (ret!="" ? ", " : "(") + "unpaid";
-    if(ret!="") ret = GetAName(e) + ' ' + ret + ')';
-    return ret;
+    return GetAName(e) + (ret!="" ? ' '+ret+')' : "");
   }
 
   public override void OnMap() { worn = false; }

@@ -519,7 +519,6 @@ public class Player : Entity
       case Action.Pickup:
       { if(CarryStress==CarryStress.Overtaxed) goto carrytoomuch;
         if(!Map.HasItems(Position)) { App.IO.Print("There are no items here."); return false; }
-        if(Inv.IsFull) { App.IO.Print("Your pack is full."); return false; }
         ItemPile inv = Map[Position].Items;
 
         CarryStress stress=CarryStress, newstress;
@@ -534,6 +533,7 @@ public class Player : Entity
         { if(inv[0].FullWeight+weight<next ||
              App.IO.YesNo("You're having trouble lifting "+inv[0].GetAName(this)+". Continue?", false))
           { Item item = inv[0], newitem = Pickup(inv, 0);
+            if(newitem==null) { App.IO.Print("Your pack is full."); return false; }
             string s = string.Format("{0} - {1}", newitem.Char, item.GetAName(this));
             if(newitem.Count!=item.Count) s += string.Format(" (now {0})", newitem.Count);
             App.IO.Print(s);
@@ -541,13 +541,13 @@ public class Player : Entity
         }
         else
           foreach(MenuItem item in App.IO.Menu(this, inv, MenuFlag.AllowNum|MenuFlag.Multi|MenuFlag.Reletter))
-          { if(Inv.IsFull) { App.IO.Print("Your pack is full!"); return false; }
-            if(weight+item.Item.Weight*item.Count >= next)
+          { if(weight+item.Item.Weight*item.Count >= next)
             { if(App.IO.YesNo("You're having trouble lifting "+inv[0].GetAName(this)+". Continue?", false))
                 next = int.MaxValue;
               else continue;
             }
             Item newItem = item.Count==item.Item.Count ? Pickup(inv, item.Item) : Pickup(item.Item.Split(item.Count));
+            if(newitem==null) { App.IO.Print("Your pack is full."); return false; }
             string s = string.Format("{0} - {1}", newItem.Char, item.Item.GetAName(this));
             if(item.Count!=newItem.Count) s += string.Format(" (now {0})", newItem.Count);
             App.IO.Print(s);

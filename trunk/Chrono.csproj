@@ -300,6 +300,14 @@
                     BuildAction = "Content"
                 />
                 <File
+                    RelPath = "data\map\gtownDungeonCave.xml"
+                    BuildAction = "Content"
+                />
+                <File
+                    RelPath = "data\map\gtownDungeonRoomy.xml"
+                    BuildAction = "Content"
+                />
+                <File
                     RelPath = "data\map\map.xsd"
                     BuildAction = "Content"
                 />

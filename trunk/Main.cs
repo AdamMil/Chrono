@@ -68,7 +68,10 @@ public sealed class App
     }
 
     IO.Render(Player);
-    while(!Quit) Player.Map.Simulate();
+    while(!Quit)
+    { try { Player.Map.Simulate(); }
+      catch(Exception e) { App.IO.Print("{0} occurred: {1}", e.GetType().Name, e.Message); }
+    }
 
     if(Player.HP>0)
     { FileStream f = File.Open("c:/chrono.sav", FileMode.Create);

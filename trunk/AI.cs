@@ -900,7 +900,6 @@ public abstract class AI : Entity
         { string spawn = Xml.Attr(node, "spawn", "maybe");
           Item item=null;
           if(me!=null && spawn!="no") item = me.FindItem(node);
-          XmlElement el;
           if(item==null) item = CreateItem(node);
           bool failed = App.Player.Inv.Add(item)==null;
           if(failed) App.Player.Map.AddItem(App.Player.Position, item);

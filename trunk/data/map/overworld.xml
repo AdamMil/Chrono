@@ -5,7 +5,15 @@
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://www.adammil.net/Chrono/map map.xsd">
   
-  <link location="Grass" to="gtown" type="Town"/>
+  <link id="gtown" location="Grass" to="gtown" type="Town"/>
+
+  <link to="gtownDungeon" type="Portal">
+    <location>
+      <relTo distance="2:6" direction="Up">
+        <location link="gtown"/>
+      </relTo>
+    </location>
+  </link>
 
   <rawMap>
     WWWWWWWwwwSGGGmmmMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM

@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Specialized;
 using System.Drawing;
 using System.IO;
 using System.Reflection;
@@ -339,7 +340,7 @@ public class Map : UniqueObject
   public Link[] Links { get { return links; } }
   public Room[] Rooms { get { return rooms; } }
 
-  public string Name { get { return name; } }
+  public string Name { get { return name!=null ? name : Section.Name; } }
   public int Width  { get { return width; } }
   public int Height { get { return height; } }
 
@@ -447,10 +448,12 @@ public class Map : UniqueObject
     { Map nm = links[index].ToSection[links[index].ToLevel];
       for(int i=0; i<nm.links.Length; i++)
       { Link link = nm.links[i];
-        if(link.ToLevel==Index && link.ToSection==Section &&
+        if((link.ToLevel==Index && link.ToSection==Section || link.ToLevel==-1) &&
            (link.ToPoint.X==-1 || link.ToPoint==links[index].FromPoint))
-        { links[index].ToPoint = link.FromPoint;
-          nm.links[i].ToPoint  = links[index].FromPoint;
+        { links[index].ToPoint  = link.FromPoint;
+          nm.links[i].ToPoint   = links[index].FromPoint;
+          nm.links[i].ToSection = Section;
+          nm.links[i].ToLevel   = Index;
           break;
         }
       }
@@ -864,6 +867,7 @@ public class Map : UniqueObject
     map.mapType = (MapType)Enum.Parse(typeof(MapType), Xml.Attr(root, "type", "Other"));
 
     #region Add links
+    ListDictionary links = new ListDictionary();
     foreach(XmlNode link in root.SelectNodes("link"))
     { string av=link.Attributes["to"].Value, toSection=null, toDungeon=null;
       int toLevel;
@@ -891,19 +895,22 @@ public class Map : UniqueObject
 
       av = link.Attributes["type"].Value;
       TileType type = av=="None" ? TileType.Border : (TileType)Enum.Parse(typeof(TileType), av);
-      Point pt = map.FindXmlLocation(link);
+      Point pt = map.FindXmlLocation(link, links);
       Link  li = new Link(pt, type!=TileType.UpStairs,
                           toSection==null ? section : (toDungeon==null ? section.Dungeon :
                                                                        Dungeon.GetDungeon(toDungeon))[toSection],
                           toLevel);
       if(type!=TileType.Border) map.SetType(pt, type);
       map.AddLink(li);
+      
+      av = Xml.Attr(link, "id");
+      if(av!=null) links[av] = li;
     }
     #endregion
     
     foreach(XmlNode npc in root.SelectNodes("npc"))
     { AI ai = AI.Load(npc);
-      ai.Position = map.FindXmlLocation(npc);
+      ai.Position = map.FindXmlLocation(npc, links);
       map.Entities.Add(ai);
     }
     
@@ -946,18 +953,17 @@ public class Map : UniqueObject
     if(c.Class!=EntityClass.Other) numCreatures--;
   }
   
-  Point FindXmlLocation(XmlNode node) { return FindXmlLocation(node, false); }
-  Point FindXmlLocation(XmlNode node, bool optional)
-  { XmlAttribute attr = node.Attributes["location"];
-    if(attr!=null)
-    { string loc = attr.Value;
-      if(char.IsDigit(loc[0])) // X,Y format
-      { string[] bits = loc.Split(',');
+  Point FindXmlLocation(XmlNode node, ListDictionary links) { return FindXmlLocation(node, links, false); }
+  Point FindXmlLocation(XmlNode node, ListDictionary links, bool optional)
+  { string av = Xml.Attr(node, "location");
+    if(av!=null)
+    { if(char.IsDigit(av[0])) // X,Y format
+      { string[] bits = av.Split(',');
         return new Point(int.Parse(bits[0]), int.Parse(bits[1]));
       }
       
       // assume it's the name of a tile type
-      return RandomTile((TileType)Enum.Parse(typeof(TileType), loc));
+      return RandomTile((TileType)Enum.Parse(typeof(TileType), av));
     }
     else
     { node = node.SelectSingleNode("location");
@@ -968,12 +974,41 @@ public class Map : UniqueObject
 
       Point pt;
       while(true) // TODO: this is not optimal if it has to loop
-      { attr = node.Attributes["tile"];
-        if(attr!=null) pt = RandomTile((TileType)Enum.Parse(typeof(TileType), attr.Value)); // tile type
-        else pt = FreeSpace(GetRoom(node.Attributes["room"].Value).InnerArea); // room id
-        
-        attr = node.Attributes["pathTo"];
-        if(attr!=null) throw new NotImplementedException("'pathTo' attribute not implemented");
+      { if((av=Xml.Attr(node, "room")) != null)
+          pt = FreeSpace(GetRoom(node.Attributes["room"].Value).InnerArea); // room id
+        else if((av=Xml.Attr(node, "tile")) != null)
+          pt = RandomTile((TileType)Enum.Parse(typeof(TileType), av)); // tile type
+        else if((av=Xml.Attr(node, "link")) != null)
+          pt = ((Link)links[av]).FromPoint;
+        else
+        { XmlNode relTo = node.SelectSingleNode("relTo");
+          Point rp = FindXmlLocation(relTo, links);
+
+          int amin, amax, dmin, dmax, tri;
+          Xml.Range(relTo.Attributes["distance"].Value, out dmin, out dmax);
+          av = Xml.Attr(relTo, "direction", "Random");
+          if(av=="Random") { amin=0; amax=360; }
+          else
+          { amin = 45 * (int)(Direction)Enum.Parse(typeof(Direction), av) - 22;
+            amax = amin + 45;
+          }
+          
+          tryagain:
+          for(tri=0; tri<25; tri++)
+          { GameLib.Mathematics.TwoD.Vector v = new GameLib.Mathematics.TwoD.Vector(0, -Global.Rand(dmin, dmax));
+            v.Rotate(Global.Rand(amin, amax) * GameLib.Mathematics.MathConst.DegreesToRadians);
+            pt = v.ToPoint().ToPoint();
+            pt.X += rp.X;
+            pt.Y += rp.Y;
+            if(IsPassable(pt) && !IsDangerous(pt)) goto found;
+          }
+          if(amax-amin < 360) { amin=0; amax=360; goto tryagain; }
+          continue;
+        }
+
+        found:
+        av = Xml.Attr(node, "pathTo");
+        if(av!=null) throw new NotImplementedException("'pathTo' attribute not implemented");
         return pt;
       }
     }

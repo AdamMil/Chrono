@@ -23,7 +23,8 @@
   <xs:sequence>
     <xs:element name="levels" type="levels" maxOccurs="unbounded"/>
   </xs:sequence>
-  <xs:attribute name="name" type="xs:string" use="required"/>
+  <xs:attribute name="id" type="xs:string" use="required"/>
+  <xs:attribute name="name" type="xs:string"/>
   <xs:attribute name="map" type="xs:string"/>
 </xs:complexType>
 

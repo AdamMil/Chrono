@@ -28,7 +28,7 @@ public enum TileType : byte
 public enum Trap : byte { Dart, PoisonDart, Magic, MpDrain, Teleport, Pit }
 
 [Serializable]
-public class Shop
+public class Shop : UniqueObject
 { public Shop(Rectangle area, Shopkeeper shopkeeper, ShopType type)
   { OuterArea=area; Shopkeeper=shopkeeper; Type=type;
   }

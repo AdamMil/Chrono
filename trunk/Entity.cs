@@ -8,12 +8,15 @@ namespace Chrono
 public enum Attr
 { Str, Dex, Int, NumBasics,
   MaxHP=NumBasics, MaxMP, Speed, AC, EV, Stealth, Light, NumModifiable,
-  NumAttributes=NumModifiable
+  NumAttributes=NumModifiable,
+  
+  // not really attributes (only used for Effect)
+  Poison, Sickness, Flags
 }
 
 public enum CarryStress { Normal, Burdened, Stressed, Overtaxed } // states related to how much we're carrying
 
-public enum Death { Starvation, Sickness, Trap, Falling } // causes of death (besides combat)
+public enum Death { Combat, Falling, Poison, Starvation, Sickness, Trap } // causes of death
 
 public enum EntityClass
 { Other=-2, // not a monster (boulder or some other entity)
@@ -42,6 +45,19 @@ public enum Skill
 public enum Slot // where an item can be worn
 { Ring=-2, // either ring finger, only valid for Wearable.Slot. not valid for functions like Wearing(Slot) (yet?)
   Invalid=-1, Head, Cloak, Torso, Legs, Neck, Hands, Feet, LRing, RRing, NumSlots
+}
+
+public struct Effect
+{ public Effect(object source, Attr attr, int value, int timeout)
+  { Source=source; Attr=attr; Value=value; Timeout=timeout;
+  }
+  public Effect(object source, Entity.Flag mods, int timeout)
+  { Source=source; Attr=Attr.Flags; Value=(int)mods; Timeout=timeout;
+  }
+  public object Source;
+  public Attr Attr;
+  public int  Value;
+  public int  Timeout;
 }
 
 public abstract class Entity
@@ -85,6 +101,7 @@ public abstract class Entity
     { Flag flags = RawFlags;
       for(int i=0; i<Slots.Length; i++) if(Slots[i]!=null) flags |= Slots[i].FlagMods;
       for(int i=0; i<Hands.Length; i++) if(Hands[i]!=null) flags |= Hands[i].FlagMods;
+      for(int i=0; i<numEffects; i++) if(effects[i].Attr==Attr.Flags) flags |= (Flag)effects[i].Value;
       return flags;
     }
   }
@@ -131,10 +148,22 @@ public abstract class Entity
                            : level<20 ? 100*Math.Pow(1.3, level+10)-3000 : 100*Math.Pow(1.18, level+25)+50000) - 25;
     }
   }
+  public int Poison
+  { get // only one effect can be Poison
+    { for(int i=0; i<numEffects; i++) if(effects[i].Attr==Attr.Poison) return effects[i].Value;
+      return 0;
+    }
+  }
   public Shield Shield
   { get
     { for(int i=0; i<Hands.Length; i++) if(Hands[i]!=null && Hands[i].Class==ItemClass.Shield) return (Shield)Hands[i];
       return null;
+    }
+  }
+  public int Sickness
+  { get // only one effect can be Sickness
+    { for(int i=0; i<numEffects; i++) if(effects[i].Attr==Attr.Sickness) return effects[i].Value;
+      return 0;
     }
   }
   public int Smell // player smelliness 0 - Map.MaxScentAdd
@@ -178,12 +207,44 @@ public abstract class Entity
   public virtual string TheName { get { return Name==null ? "The "+Race.ToString().ToLower() : Name; } }
   public virtual string theName { get { return Name==null ? "the "+Race.ToString().ToLower() : Name; } }
 
-  // attack in a direction, can be used for attacking locked doors, etc
-  public void Attack(Direction dir)
-  { Attack(dir==Direction.Self ? Position : Global.Move(Position, dir));
+  public void AddEffect(Effect effect)
+  { if(effects==null || numEffects==effects.Length)
+    { Effect[] narr = new Effect[numEffects==0 ? 4 : numEffects*2];
+      if(numEffects>0) Array.Copy(effects, narr, numEffects);
+      effects = narr;
+    }
+    if(effect.Attr==Attr.Sickness || effect.Attr==Attr.Poison) // sickness/poison combines with existing effect
+    { int i;
+      for(i=0; i<numEffects; i++) if(effects[i].Attr==effect.Attr) break;
+      if(i==numEffects) effects[numEffects++] = effect;
+      else
+      { effect.Value += effects[i].Value;
+        effects[i] = effect;
+      }
+    }
+    else effects[numEffects++] = effect;
   }
-  public void Attack(Point pt) // attacks a point on the map // FIXME: make this choose ammo
-  { Attack(Weapon, null, pt, false);
+  public void CancelEffect(int i)
+  { bool cf = effects[i].Attr==Attr.Flags;
+    for(i++; i<numEffects; i++) effects[i-1]=effects[i];
+    numEffects--;
+    if(cf) CheckFlags();
+  }
+  public void CancelEffect(Attr attr)
+  { for(int i=0; i<numEffects; i++) if(effects[i].Attr==attr) CancelEffect(i--);
+  }
+  public void CancelEffect(Flag flag)
+  { flag = ~flag;
+    for(int i=0; i<numEffects; i++)
+      if(effects[i].Attr==Attr.Flags && (effects[i].Value&=(int)flag)==0) CancelEffect(i--);
+  }
+
+  // attack in a direction, can be used for attacking locked doors, etc
+  public void Attack(Direction dir, Weapon weapon, Ammo ammo)
+  { Attack(dir==Direction.Self ? Position : Global.Move(Position, dir), weapon, ammo);
+  }
+  public void Attack(Point pt, Weapon weapon, Ammo ammo) // attacks a point on the map
+  { Attack(weapon, ammo, pt, false);
   }
 
   bool AttackPoint(Point pt, object context)
@@ -192,7 +253,7 @@ public abstract class Entity
     if(e!=null && TryHit(e, (Item)context)) return false;
     return true;
   }
-  public void Attack(Item item, Item ammo, Point pt, bool thrown)
+  public void Attack(Item item, Ammo ammo, Point pt, bool thrown)
   { Weapon w = item as Weapon;
     bool ranged = thrown || pt!=Position && (w!=null && w.Ranged);
     TraceResult res = ranged ? TraceLine(pt, ammo==null ? Math.Max(30, Str*10/item.Weight) : 30, false,
@@ -201,13 +262,13 @@ public abstract class Entity
 
     Entity c = Map.GetEntity(res.Point);
     bool destroy = false;
-    if(c!=null) destroy = Attack(c, item, ranged, thrown); // if ranged, TryHit has already been called
+    if(c!=null) destroy = Attack(c, item, ammo, ranged, thrown); // if ranged, TryHit has already been called
     else if(w!=null)
     { Tile t = Map[res.Point];
       string msg=null;
       byte noise=0;
       if(t.Type==TileType.ClosedDoor)
-      { int damage = w==null ? CalculateDamage(null) : w.CalculateDamage(this, null);
+      { int damage = w==null ? CalculateDamage(null) : w.CalculateDamage(this, ammo, null);
         if(damage>=10)
         { msg = "Crash! You break down the door.";
           Map.SetType(res.Point, TileType.RoomFloor);
@@ -218,13 +279,13 @@ public abstract class Entity
         else { msg = "Thunk!"; noise = 80; }
       }
       else if(!Map.IsPassable(t.Type)) { msg = "Thunk!"; noise = 80; }
-      else if(!thrown && ammo!=null) msg = "You swing at thin air.";
+      else if(!thrown && ammo==null) msg = "You swing at thin air.";
       if(this==App.Player)
       { if(msg!=null) App.IO.Print(msg);
         if(noise>0) Map.MakeNoise(res.Point, this, Noise.Bang, noise);
       }
     }
-    else destroy = item.Hit(this, res.Point);
+    else if(item!=null) destroy = item.Hit(this, res.Point);
 
     if(ranged) // put the item on the ground
     { if(ammo!=null) item=ammo;
@@ -250,8 +311,8 @@ public abstract class Entity
   public bool CanUnequip(int hand) { return true; }
   public bool CanUnequip(Wieldable item) { return true; }
 
-  public abstract void Die(Entity killer, Item impl); // death from item/weapon (impl==null means hand-to-hand combat)
-  public abstract void Die(Death cause); // death
+  public void Die(Death cause) { Die(null, cause); }
+  public abstract void Die(object killer, Death cause);
 
   public void DoDamage(Death cause, int amount)
   { HP =- amount;
@@ -337,6 +398,7 @@ public abstract class Entity
     if(attribute>=Attr.NumModifiable) return val;
     for(int i=0; i<Slots.Length; i++) if(Slots[i]!=null) val += Slots[i].Mods[idx];
     for(int i=0; i<Hands.Length; i++) if(Hands[i]!=null) val += Hands[i].Mods[idx];
+    for(int i=0; i<numEffects; i++) if(effects[i].Attr==attribute) val += effects[i].Value;
     if(attribute==Attr.Stealth) // stealth is from 0 to 10
     { if(val<0) val=0;
       if(val>10) val=10;
@@ -505,6 +567,20 @@ public abstract class Entity
     CheckFlags();
   }
 
+  public Ammo SelectAmmo(Weapon w)
+  { FiringWeapon fw = w as FiringWeapon;
+    if(fw==null) return null;
+    Compatibility cmp = Compatibility.None;
+    Ammo ammo = null;
+    foreach(Item i in Inv)
+      if(i.Class==ItemClass.Ammo)
+      { Ammo ta = (Ammo)i;
+        Compatibility tc = fw.CompatibleWith(ta);
+        if(tc>cmp) { ammo=ta; if(cmp==Compatibility.Perfect) break; cmp=tc; }
+      }
+    return ammo;
+  }
+
   public virtual void Think() // base Think()
   { Age++;
     Timer-=Speed;
@@ -512,23 +588,32 @@ public abstract class Entity
     { if(HP<MaxHP) HP++;
       if(MP<MaxMP) MP++;
     }
-    if(Global.Rand(5) < Sickness)
-    { string msg;
-      if(Sickness>10 && Global.Rand(Sickness)>=8)
-      { HP -= 10;
-        msg = "extremely sick.";
+
+    for(int i=0; i<numEffects; i++)
+    { Effect e = effects[i];
+      if(e.Attr==Attr.Poison || e.Attr==Attr.Sickness)
+      { if(Global.Rand(5) < e.Value)
+        { string msg;
+          if(e.Value>10 && Global.Rand(e.Value)>=8)
+          { HP -= 10;
+            msg = "extremely sick.";
+          }
+          else if(e.Value>5 && Global.Coinflip())
+          { HP -= Global.Coinflip() ? 3 : 2;
+            msg = "very sick.";
+          }
+          else
+          { HP--;
+            msg = "sick";
+          }
+          OnSick(msg);
+          if(HP<=0) Die(e.Source, e.Attr==Attr.Poison ? Death.Poison : Death.Sickness);
+          else if(Global.OneIn(HP==1 ? 3 : 8))
+          { if(--effects[i].Value<=0) CancelEffect(i--);
+          }
+        }
       }
-      else if(Sickness>5 && Global.Coinflip())
-      { HP -= Global.Coinflip() ? 3 : 2;
-        msg = "very sick.";
-      }
-      else
-      { HP--;
-        msg = "sick";
-      }
-      OnSick(msg);
-      if(HP<=0) Die(Death.Sickness);
-      else if(Global.OneIn(HP==1 ? 3 : 8)) Sickness--;
+      else if(--effects[i].Timeout<=0) CancelEffect(i--);
     }
   }
   
@@ -553,7 +638,8 @@ public abstract class Entity
   public bool TryEquip(Wieldable item)
   { if(item==null) // unequip all items
     { bool success=true;
-      for(int i=0; i<Hands.Length; i++) if(!TryUnequip(i)) success=false;
+      for(int i=0; i<Hands.Length; i++)
+        if(Hands[i]!=null && Hands[i].Class==ItemClass.Weapon && !TryUnequip(i)) success=false;
       return success;
     }
     if(item.AllHandWield) // unequip all items so we can equip new one
@@ -694,7 +780,7 @@ public abstract class Entity
   public Race   Race;        // our race
   public Color  Color=Color.Dire; // our general color
   public EntityClass Class;  // our class/job
-  public int Age, ExpPool, Hunger, Sickness;
+  public int Age, ExpPool, Hunger;
 
   // generates a creature, creates it and calls the creature's Generate() method. class is RandomClass if not passed
   static public Entity Generate(Type type, int level) { return Generate(type, level, EntityClass.RandomClass); }
@@ -738,13 +824,13 @@ public abstract class Entity
   }
   protected delegate bool LinePoint(Point point, object context);
 
-  protected bool Attack(Entity c, Item item, bool hit, bool thrown)
+  protected bool Attack(Entity c, Item item, Ammo ammo, bool hit, bool thrown)
   { Weapon w = item as Weapon;
-    int noise = Math.Max(w!=null ? w.Noise*15-Stealth*8 : item==null ? (10-Stealth)*15 : item.Weight+30, 255);
+    int noise = Math.Min(w!=null ? w.Noise*15-Stealth*8 : item==null ? (10-Stealth)*15 : item.Weight+30, 255);
     bool destroyed = false;
     hit = hit || c==this || TryHit(c, item);
 
-    if(hit) destroyed = TryDamage(c, item);
+    if(hit) destroyed = TryDamage(c, item, ammo);
     else
     { c.Exercise(Attr.EV);
       c.OnMissBy(this, item);
@@ -808,7 +894,6 @@ public abstract class Entity
       }
     }
   }
-  
 
   protected void UpdateMemory() // updates Memory using the visible area
   { if(Memory==null) return;
@@ -855,7 +940,7 @@ public abstract class Entity
     return title;
   }
 
-  bool TryDamage(Entity c, Item item) // returns true if 'item' should be destroyed
+  bool TryDamage(Entity c, Item item, Ammo ammo) // returns true if 'item' should be destroyed
   { Weapon w = item as Weapon;
     Shield shield = c.Shield;
     int blockchance=0, n;
@@ -870,28 +955,25 @@ public abstract class Entity
     }
     else n=0;
     if(n*2>=blockchance)        // shield blocks 100% damage half the time that it comes into effect
-    { if(item==null || w!=null) // real weapon (possibly our fists)
-      { int damage=(w==null ? CalculateDamage(c) : w.CalculateDamage(this, c)), ac=c.AC;
-        damage += damage * wepskill*10/100; // damage up 10% per skill level
-        int odam=damage;
-        if(n<blockchance) damage /= 2;      // shield blocks 50% damage the other half of the time
-        if(ac>5) c.Exercise(Skill.Armor);   // if wearing substantial armor, exercise it
-        if(ac>0) n = Global.Rand(ac)+1;     // block 1 to AC damage
-        damage -= n + n*c.GetSkill(Skill.Armor)*10/100; // armor absorbs damage (+10% per skill level)
-        if(damage<0) damage = 0;            // normalize damage
-        App.IO.Print(Color.DarkGrey, "DAMAGE: {0} -> {1}, HP: {2} -> {3}", odam, damage, c.HP, c.HP-damage);
-        c.HP -= damage;
-        c.OnHitBy(this, w, damage);
-        OnHit(c, w, damage);
-        if(w!=null && w.Hit(this, c)) destroyed=true;
-      }
-      else // an item
-      { c.OnHitBy(this, item, 0);
-        OnHit(c, item, 0);
-        if(item.Hit(this, c)) destroyed=true;
-      }
+    { int damage;
+      if(item==null || w!=null) damage=(w==null ? CalculateDamage(c) : w.CalculateDamage(this, ammo, c)); // real weapon (possibly our fists)
+      else damage = (item.Weight+4)/5; // regular item, one damage per pound (rounded up)
+
+      int odam=damage, ac=c.AC;
+      if(n<blockchance) damage /= 2;      // shield blocks 50% damage the other half of the time
+      if(ac>5) c.Exercise(Skill.Armor);   // if wearing substantial armor, exercise it
+      if(ac>0) n = Global.Rand(ac)+1;     // block 1 to AC damage
+      damage -= n + n*c.GetSkill(Skill.Armor)*10/100; // armor absorbs damage (+10% per skill level)
+      if(damage<0) damage = 0;            // normalize damage
+      App.IO.Print(Color.DarkGrey, "DAMAGE: {0} -> {1}, HP: {2} -> {3}", odam, damage, c.HP, c.HP-damage);
+      damage += damage * wepskill*10/100; // damage up 10% per skill level
+      c.HP -= damage;
+      c.OnHitBy(this, item, damage);
+      OnHit(c, item, damage);
+      if(item!=null) if(item.Hit(this, c)) destroyed=true;
+
       if(c.HP<=0)
-      { c.Die(this, w);
+      { c.Die(this, Death.Combat);
         if(c.HP<=0) // check health again because amulet of saving, etc could have taken effect
         { OnKill(c);
           Exp += c.KillExp;
@@ -965,7 +1047,8 @@ public abstract class Entity
 
   int[] attr = new int[(int)Attr.NumAttributes], attrExp = new int[(int)Attr.NumAttributes];
   bool[] skillEnable; // are we training these skills?
-  int exp, expLevel, hp, mp, smell;
+  Effect[] effects;
+  int exp, expLevel, hp, mp, smell, numEffects;
 
   static ArrayList list = new ArrayList(); // an arraylist used in some places (ie VisibleCreatures)
   static int[] vis = new int[128]; // vis point buffer

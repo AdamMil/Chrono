@@ -7,8 +7,39 @@ namespace Chrono
 public class Player : Entity
 { public Player() { Color=Color.White; Timer=50; /*we get a headstart*/ }
 
-  public override void Die(Entity killer, Item impl) { Die(killer.aName); }
-  public override void Die(Death cause) { Die(cause.ToString().ToLower()); }
+  public override void Die(object killer, Death cause)
+  { switch(cause)
+    { case Death.Combat:
+        if(killer is Entity) Die(((Entity)killer).aName);
+        else Die(killer.ToString());
+        break;
+      case Death.Falling:
+        if(killer is TileType)
+        { TileType tile = (TileType)killer;
+          if(tile==TileType.DownStairs) Die("falling down stairs");
+          else if(tile==TileType.Pit) Die("falling into a pit");
+          else Die("falling");
+        }
+        else Die("falling");
+        break;
+      case Death.Poison: case Death.Sickness:
+      { string prefix = cause==Death.Poison ? "poisoned by " : "sickened by ";
+        if(killer is Entity) Die(prefix + ((Entity)killer).aName);
+        else if(killer is Food)
+        { Food food = (Food)killer;
+          if((food.Flags&Food.Flag.Rotten)!=0) prefix += "rotten ";
+          if((food.Flags&Food.Flag.Tainted)!=0) prefix += "tainted ";
+          Die(prefix+"food");
+        }
+        else if(killer is Item) Die(prefix + ((Item)killer).FullName);
+        else Die(cause==Death.Poison ? "poison" : "sickness");
+        break;
+      }
+      case Death.Starvation: Die("starvation"); break;
+      case Death.Trap: Die("TRAP - finish me"); break;
+      default: Die("unknown"); break;
+    }
+  }
 
   public override void Generate(int level, EntityClass myClass)
   { base.Generate(level, myClass);
@@ -121,17 +152,22 @@ public class Player : Entity
       case Action.Fire:
       { if(CarryStress==CarryStress.Overtaxed) goto carrytoomuch;
         Weapon w = Weapon;
-        if(w==null) { App.IO.Print("You have no weapon equipped!"); goto next; }
-        else if(w.Ranged)
-        { RangeTarget rt = App.IO.ChooseTarget(this, true);
-          if(rt.Dir!=Direction.Invalid) Attack(rt.Dir);
-          else if(rt.Point.X!=-1) Attack(rt.Point);
+        if(w!=null && w.Ranged)
+        { Ammo ammo;
+          if(w.wClass==WeaponClass.Thrown) ammo=null;
+          else
+          { ammo = SelectAmmo(w);
+            if(ammo==null) { App.IO.Print("You have no suitable ammunition!"); goto next; }
+          }
+          RangeTarget rt = App.IO.ChooseTarget(this, true);
+          if(rt.Dir!=Direction.Invalid) Attack(rt.Dir, w, ammo);
+          else if(rt.Point.X!=-1) Attack(rt.Point, w, ammo);
           else goto nevermind;
         }
         else
         { Direction d = App.IO.ChooseDirection(false, false);
           if(d==Direction.Invalid) goto nevermind;
-          Attack(d);
+          Attack(d, w, null);
         }
         break;
       }
@@ -185,7 +221,10 @@ public class Player : Entity
       { if(CarryStress==CarryStress.Overtaxed) goto carrytoomuch;
         Point np = Global.Move(Position, inp.Direction);
         Entity c = Map.GetEntity(np);
-        if(c!=null) Attack(np); // FIXME: this sucks
+        if(c!=null)
+        { Weapon w = Weapon;
+          Attack(np, w, SelectAmmo(w)); // FIXME: this sucks
+        }
         else if(Map.IsPassable(np))
         { Position = np;
           int noise = (10-Stealth)*12; // stealth = 0 to 10
@@ -340,10 +379,13 @@ public class Player : Entity
       { if(CarryStress>=CarryStress.Stressed) goto carrytoomuch;
         Inventory inv = new Inventory();
         for(int i=0; i<Slots.Length; i++) if(Slots[i]!=null) inv.Add(Slots[i]);
+        for(int i=0; i<Hands.Length; i++) if(Hands[i]!=null && Hands[i].Class==ItemClass.Shield) inv.Add(Hands[i]);
         if(inv.Count==0) { App.IO.Print("You're not wearing anything!"); goto next; }
         MenuItem[] items = App.IO.ChooseItem("Remove what?", inv, MenuFlag.Multi, ItemClass.Any);
         if(items.Length==0) goto nevermind;
-        foreach(MenuItem i in items) TryRemove(i.Item);
+        foreach(MenuItem i in items)
+          if(i.Item.Class==ItemClass.Shield) TryUnequip(i.Item);
+          else TryRemove(i.Item);
         break;
       }
 
@@ -426,26 +468,33 @@ public class Player : Entity
       { if(CarryStress>=CarryStress.Stressed) goto carrytoomuch;
         MenuItem[] items = App.IO.ChooseItem("Wear what?", Inv, MenuFlag.None, wearableClasses);
         if(items.Length==0) goto nevermind;
-        Wearable item = items[0].Item as Wearable;
-        if(item==null) { App.IO.Print("You can't wear that!"); goto next; }
-        if(Wearing(item)) { App.IO.Print("You're already wearing that!"); goto next; }
-        if(item.Slot==Slot.Ring)
-        { if(Wearing(Slot.LRing) && Wearing(Slot.RRing))
-          { App.IO.Print("You're already wearing two rings!"); goto next;
-          }
+        if(items[0].Item.Class==ItemClass.Shield)
+        { Shield shield = (Shield)items[0].Item;
+          if(Equipped(shield)) { App.IO.Print("That shield is already equipped!"); goto next; }
+          TryEquip(shield);
         }
-        else if(Wearing(item.Slot) && !TryRemove(item.Slot)) goto next;
-        Wear(item);
+        else
+        { Wearable item = items[0].Item as Wearable;
+          if(item==null) { App.IO.Print("You can't wear that!"); goto next; }
+          if(Wearing(item)) { App.IO.Print("You're already wearing that!"); goto next; }
+          if(item.Slot==Slot.Ring)
+          { if(Wearing(Slot.LRing) && Wearing(Slot.RRing))
+            { App.IO.Print("You're already wearing two rings!"); goto next;
+            }
+          }
+          else if(Wearing(item.Slot) && !TryRemove(item.Slot)) goto next;
+          Wear(item);
+        }
         break;
       }
 
       case Action.Wield:
       { if(CarryStress>=CarryStress.Stressed) goto carrytoomuch;
-        MenuItem[] items = App.IO.ChooseItem("Wield what?", Inv, MenuFlag.AllowNothing, ItemClass.Weapon, ItemClass.Shield);
+        MenuItem[] items = App.IO.ChooseItem("Wield what?", Inv, MenuFlag.AllowNothing, ItemClass.Weapon);
         if(items.Length==0) goto nevermind;
         if(items[0].Item==null) TryEquip(null);
         else
-        { Wieldable item = items[0].Item as Wieldable;
+        { Weapon item = items[0].Item as Weapon;
           if(item==null) { App.IO.Print("You can't wield that!"); goto next; }
           if(Equipped(item)) { App.IO.Print("You're already wielding that!"); goto next; }
           TryEquip(item);
@@ -496,7 +545,7 @@ public class Player : Entity
     if(HungerLevel>oldHungerLevel)
     { if(HungerLevel==HungerLevel.Starved)
       { App.IO.Print("The world grows dim and you faint from starvation. You don't wake up.");
-        Die("starvation");
+        Die(Death.Starvation);
       }
       else if(HungerLevel==HungerLevel.Starving) App.IO.Print(Color.Dire, "You're starving!");
       else if(HungerLevel==HungerLevel.Hungry)   App.IO.Print(Color.Warning, "You're getting hungry.");
@@ -606,7 +655,7 @@ public class Player : Entity
   }
   
   protected static readonly ItemClass[] wearableClasses =  new ItemClass[]
-  { ItemClass.Amulet, ItemClass.Armor, ItemClass.Ring
+  { ItemClass.Amulet, ItemClass.Armor, ItemClass.Ring, ItemClass.Shield
   };
 
   Input inp;

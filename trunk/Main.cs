@@ -28,10 +28,13 @@ public sealed class App
     Player.SetRawAttr(Attr.AC, 7);
     Player.SetRawAttr(Attr.EV, 6);
     Player.SetRawAttr(Attr.Stealth, 10);
-    Player.Pickup(new Dart()).Count = 20;
+    Player.Pickup(new Bow());
     Player.Pickup(new ShortSword());
+    Player.Pickup(new Dart()).Count = 20;
     Player.Pickup(new Buckler());
     Player.Pickup(new PaperBag());
+    Player.Pickup(new BadArrow()).Count = 10;
+    Player.Pickup(new GoodArrow()).Count = 10;
     Player.Pickup(new Hamburger());
     Player.Pickup(new InvisibilityRing());
     Player.Pickup(new SeeInvisibleRing());

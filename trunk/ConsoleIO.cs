@@ -728,7 +728,7 @@ r - read scroll or book     R - remove a worn item
 s - search adjacent tiles   S - manage skills
 t - throw an item
 v - view item description   V - version info
-w - wield an item           W - wear an item
+w - wield a weapon          W - wear an item
 x - examine surroundings    X - examine level map
 z - zap a wand              Z - cast a spell
 ! - shout or command allies ' - wield item a/b
@@ -736,7 +736,7 @@ z - zap a wand              Z - cast a spell
 : - examine occupied tile   \ - check knowledge
 < - ascend staircase        > - descend staircase
 = - reassign item letters   ^ - describe religion
-b, h, j, k, l, n, u, y        - nethack-like movement
+b, h, j, k, l, n, u, y - nethack-like movement
 / .    - rest 100 turns     / DIR  - long walk
 Ctrl-A - toggle autopickup  Ctrl-Q - quit
 Ctrl-P - see old messages   Ctrl-X - quit + save";

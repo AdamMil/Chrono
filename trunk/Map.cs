@@ -52,7 +52,8 @@ public struct Link
 
 public sealed class Map
 { 
-  public const int MaxScent=1200, MaxSound=255;
+  // maximum scent on a tile, maximum scent add on a single call (maximum entity smelliness), maximum sound on a tile
+  public const int MaxScent=1200, MaxScentAdd=800, MaxSound=255;
   
   #region EntityCollection
   public class EntityCollection : ArrayList
@@ -133,7 +134,9 @@ public sealed class Map
     links = narr;
   }
 
-  public void AddScent(int x, int y) { map[y,x].Scent = (ushort)Math.Min(map[y,x].Scent+800, MaxScent); }
+  public void AddScent(int x, int y, int amount)
+  { map[y,x].Scent = (ushort)Math.Min(map[y,x].Scent+Math.Min(amount, MaxScentAdd), MaxScent);
+  }
 
   public bool Contains(int x, int y) { return y>=0 && y<height && x>=0 && x<width; }
 
@@ -306,7 +309,7 @@ public sealed class Map
               if(items!=null) for(int i=0; i<items.Count; i++) items[i].Think(null);
             }
           age++;
-          if(entities.Count<50 && (Index==App.CurrentLevel && age%75==0 || Index!=App.CurrentLevel && age%150==0))
+          if(numCreatures<50 && (Index==App.CurrentLevel && age%75==0 || Index!=App.CurrentLevel && age%150==0))
             SpawnMonster();
         }
         if(entities.Count==0) return;
@@ -354,11 +357,13 @@ public sealed class Map
   void Added(Entity c)
   { c.Map=this;
     c.OnMapChanged();
+    if(c.Class!=EntityClass.Other) numCreatures++;
   }
   void Removed(Entity c)
   { c.Map=null;
     c.OnMapChanged();
     if(thinking>0) removedEntities[c]=true;
+    if(c.Class!=EntityClass.Other) numCreatures--;
   }
 
   Tile[,] map;
@@ -367,7 +372,7 @@ public sealed class Map
   EntityCollection entities;
   PriorityQueue thinkQueue = new PriorityQueue(new EntityComparer());
   Hashtable removedEntities = new Hashtable();
-  int width, height, thinking, timer, age;
+  int width, height, thinking, timer, age, numCreatures;
 
   static ushort[] scentbuf;
   static Point[] soundStack;

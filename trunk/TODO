@@ -5,7 +5,7 @@ gods, religion
 praying
 spells
 spellbooks
-searching & hidden tiles
+searching & hidden tiles, searching reveals monsters (in memory)
 examine level map
 examine tile, examine surroundings
 autopickup, config file
@@ -13,10 +13,15 @@ knowledge/identification
 saving/loading
 status effects
 
-increase damage with weapon skill
 penalty for fighting unarmed with something in your hands?
 make monsters fill in around the player (if i'm next to player and an empty space that's also next to player, and around
   me is a monster that's not next to player, move into the empty space)
 Check all the Global.Rand(100)'s for correctness
-add flags to modifier item and OR flags with them on read
 document interfaces!
+implement Gold item
+consider moving some things out of attributes and into simple variables (gold, exp, exppool, explevel, sickness, etc)
+make visibility checks stop at boulders, etc (once we have them)
+make LevelDown decrease stats
+make ConsoleIO display invisible entities if viewer can see invisible
+make an OnFlagsChanged event and use to drive flag-related output
+make carry weight affect smell gain

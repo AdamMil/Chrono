@@ -32,7 +32,6 @@ public struct Tile
   public ItemPile  Items;
   public Entity    Entity;   // for memory (creature on tile), or owner of trap
   public PathNode  Node;     // for pathfinding
-  public Point     Dest;     // destination on prev/next level
   public ushort    Scent;    // strength of player smell
   public TileType  Type;
   public byte      Subtype;  // subtype of tile (ie, type of trap/altar/etc)
@@ -73,11 +72,11 @@ public sealed class PathFinder
 { public Point Goal { get { return goal; } }
 
   public bool Blocked(PathNode node)
-  { if(node.Type==PathNode.State.Closed) Insert(node, node.PathCost);
+  { if(node.Parent.Type==PathNode.State.Closed) Insert(node.Parent, node.Parent.PathCost);
 
     int kmin;
-    do kmin=ProcessState(); while(kmin!=-1 && node.MinCost<node.PathCost);
-    return kmin!=-1 && node.Parent!=null;
+    do kmin=ProcessState(); while(node.MinCost<node.PathCost && kmin!=-1);
+    return kmin!=-1;
   }
 
   public PathNode GetPathFrom(Point pt) { return map[pt].Node; }
@@ -89,7 +88,11 @@ public sealed class PathFinder
 
     for(int y=0; y<map.Height; y++)
       for(int x=0; x<map.Width; x++)
-        if(map[x, y].Node==null) map.SetNode(x, y, new PathNode(x, y));
+      { PathNode n = map[x, y].Node;
+if(true||n==null) map.SetNode(x, y, new PathNode(x, y));
+        else n.Type=PathNode.State.New;
+      }
+
     this.map  = map;
     this.goal = goal;
     if(map[start].Node==null || map[goal].Node==null) return false;
@@ -97,8 +100,8 @@ public sealed class PathFinder
 
     PathNode startnode = map[start].Node;
     int kmin;
-    do kmin=ProcessState(); while(kmin!=-1 && startnode.Type!=PathNode.State.Closed);
-    return kmin!=-1 && startnode.Parent!=null;
+    do kmin=ProcessState(); while(startnode.Type!=PathNode.State.Closed && kmin!=-1);
+    return startnode.Type!=PathNode.State.New;
   }
 
   void Clear(Map map)
@@ -109,14 +112,8 @@ public sealed class PathFinder
   void Insert(PathNode node, int cost)
   { switch(node.Type)
     { case PathNode.State.New: node.MinCost=cost; break;
-      case PathNode.State.Open:
-        queue.Remove(node);
-        if(cost<node.MinCost) node.MinCost=cost;
-        break;
-      case PathNode.State.Closed:
-        queue.Remove(node);
-        if(cost<node.MinCost) node.MinCost=cost;
-        break;
+      case PathNode.State.Open: queue.Remove(node); if(cost<node.MinCost) node.MinCost=cost; break;
+      case PathNode.State.Closed: node.MinCost = Math.Min(cost, node.PathCost); break;
     }
     node.PathCost = cost;
     node.Type=PathNode.State.Open;
@@ -125,25 +122,26 @@ public sealed class PathFinder
 
   int TileCost(Point pt) 
   { TileType type = map[pt].Type;
-    return Map.IsDangerous(type) ? 1000 : Map.IsPassable(type) ? 1 : Map.IsDoor(type) ? 3 :
-            map.GetFlag(pt, Tile.Flag.Seen) ? 10000 : 4;
+    return Map.IsDangerous(type) ? 1000 : Map.IsPassable(type) ? 1 :
+            Map.IsDoor(type) && !map.GetFlag(pt, Tile.Flag.Locked) ? 3 : map.GetFlag(pt, Tile.Flag.Seen) ? 10000 : 4;
   }
 
   int MoveCost(PathNode from, PathNode to)
-  { return TileCost(from.Point)+TileCost(to.Point);
-    /*+ Math.Sign(Math.Max(Math.Abs(to.Point.X-goal.X), Math.Abs(to.Point.Y-goal.Y)) -
-                            Math.Max(Math.Abs(from.Point.X-goal.X), Math.Abs(from.Point.Y-goal.Y)));*/;
+  { return Math.Max(TileCost(to.Point), TileCost(from.Point));
+    /* + Math.Sign(Math.Max(Math.Abs(to.Point.X-goal.X), Math.Abs(to.Point.Y-goal.Y)) -
+                                          Math.Max(Math.Abs(from.Point.X-goal.X), Math.Abs(from.Point.Y-goal.Y)));*/
   }
 
   int ProcessState()
   { if(queue.Count==0) return -1;
     PathNode x = (PathNode)queue.RemoveMinimum();
-    int kold = x.MinCost, knew, mc;
+    int kold = x.MinCost, knew;
     x.Type = PathNode.State.Closed;
     if(kold<x.PathCost)
       for(int yi=-1; yi<=1; yi++)
         for(int xi=-1; xi<=1; xi++)
-        { PathNode y = map[x.Point.X+xi, x.Point.Y+yi].Node;
+        { if(yi==0 && xi==0) continue;
+          PathNode y = map[x.Point.X+xi, x.Point.Y+yi].Node;
           if(y==null) continue;
           if(y.PathCost<=kold)
           { knew=y.PathCost+MoveCost(y, x);
@@ -154,7 +152,8 @@ public sealed class PathFinder
     if(kold==x.PathCost) 
       for(int yi=-1; yi<=1; yi++)
         for(int xi=-1; xi<=1; xi++)
-        { PathNode y = map[x.Point.X+xi, x.Point.Y+yi].Node;
+        { if(yi==0 && xi==0) continue;
+          PathNode y = map[x.Point.X+xi, x.Point.Y+yi].Node;
           if(y==null) continue;
           knew = x.PathCost+MoveCost(x, y);
           if(y.Type==PathNode.State.New || y.Parent==x && y.PathCost!=knew || y.Parent!=x && y.PathCost>knew)
@@ -165,13 +164,15 @@ public sealed class PathFinder
     else
       for(int yi=-1; yi<=1; yi++)
         for(int xi=-1; xi<=1; xi++)
-        { PathNode y = map[x.Point.X+xi, x.Point.Y+yi].Node;
+        { if(yi==0 && xi==0) continue;
+          PathNode y = map[x.Point.X+xi, x.Point.Y+yi].Node;
           if(y==null) continue;
-          mc=MoveCost(x, y); knew=x.PathCost+mc;
-          if(y.Type==PathNode.State.New || y.Parent!=x && y.PathCost!=knew) { y.Parent=x; Insert(y, knew); }
+          knew=x.PathCost+MoveCost(x, y);
+          if(y.Type==PathNode.State.New || y.Parent==x && y.PathCost!=knew) { y.Parent=x; Insert(y, knew); }
           else if(y.Parent!=x)
-          { if(y.PathCost>knew) Insert(x, x.PathCost);
-            else if(y.Type==PathNode.State.Closed && y.PathCost>kold && x.PathCost>y.PathCost+mc) Insert(y,y.PathCost);
+          { if(y.PathCost>knew && x.Type==PathNode.State.Closed) Insert(x, x.PathCost);
+            else if(y.Type==PathNode.State.Closed && y.PathCost>kold && x.PathCost>y.PathCost+MoveCost(y, x))
+              Insert(y, y.PathCost);
           }
         }
     return queue.Count==0 ? -1 : ((PathNode)queue.GetMinimum()).MinCost;

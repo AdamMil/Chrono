@@ -91,8 +91,8 @@ public sealed class ConsoleIO : InputOutput
     TextInput = true;
     while(true)
     { int num=-1;
-      if(doRebuke) AddLine(Color.Normal, "Invalid selection!", false);
-      AddLine(Color.Normal, sprompt);
+      if(doRebuke) AddLine("Invalid selection!", false);
+      AddLine(sprompt);
       SetCursorAtEOBL();
       char c = ReadChar(true);
       if(c=='\r' || c=='\n' || rec.Key.VirtualKey==NTConsole.Key.Escape) return new MenuItem[0];
@@ -102,7 +102,7 @@ public sealed class ConsoleIO : InputOutput
         while(char.IsDigit(c=ReadChar(true))) num = c-'0' + num*10;
       }
       if(num<-1 || num==0 || chars.IndexOf(c)==-1) { doRebuke=true; continue; }
-      if(char.IsLetter(c) && num>items[c].Count) { AddLine(Color.Normal, "You don't have that many!"); continue; }
+      if(char.IsLetter(c) && num>items[c].Count) { AddLine("You don't have that many!"); continue; }
       TextInput = false;
       if(c=='-') return new MenuItem[1] { new MenuItem(null, 0) };
       if(c=='?') return Menu(items, flags, classes);
@@ -127,7 +127,7 @@ public sealed class ConsoleIO : InputOutput
           PutString(NTConsole.Attribute.White, 0, yi, head.ToString());
         }
         else
-        { PutString(0, yi, "{0} - {1}", menu[mc].Char, menu[mc].Item.FullName);
+        { PutString(0, yi, "{0} - {1}", menu[mc].Char, menu[mc].Item.InvName);
           mc++;
         }
       }
@@ -136,7 +136,8 @@ public sealed class ConsoleIO : InputOutput
       while(true)
       { char c = ReadChar();
         if(c=='\r' || c=='\n') goto done;
-        if(c==' ') rec.Key.VirtualKey = NTConsole.Key.Next;
+        if(c==' '  || c=='k') rec.Key.VirtualKey = NTConsole.Key.Next;
+        if(c=='j') rec.Key.VirtualKey = NTConsole.Key.Prior;
         switch(rec.Key.VirtualKey)
         { case NTConsole.Key.Prior: case NTConsole.Key.Up: case NTConsole.Key.Numpad8:
             if(cs>0) // page up
@@ -159,8 +160,56 @@ public sealed class ConsoleIO : InputOutput
     done:
     RestoreScreen();
   }
-  
-  public override void DisplayMap(Creature viewer) { }
+
+  public override void DisplayTileItems(IInventory items)
+  { if(items.Count==0) return;
+    if(items.Count==1) AddLine("You see here: "+items[0]);
+    else
+    { int nitems=items.Count+1, space=LineSpace-uncleared;
+      bool other=false;
+      if(nitems>space)
+      { nitems = space;
+        if(nitems<=1) AddLine("There are several items here.");
+        else if(nitems==2) { AddLine("You see here: "+items[0]); other=true; }
+      }
+      if(nitems<=space || nitems>2)
+      { AddLine("You see here:"); nitems--;
+        for(int i=0; i<nitems; i++) AddLine(items[i].ToString());
+        if(nitems<items.Count) other=true;
+      }
+      if(other) AddLine("There are other items here as well.");
+    }
+  }
+
+  public override void DisplayMap(Creature viewer)
+  { ClearScreen();
+    mapW = console.Width-1; mapH = console.Height-1;
+    SetCursorToPlayer();
+    Point[] vpts = viewer.VisibleTiles();
+    Point pos = viewer.Position;
+    while(true)
+    { RenderMap(viewer, pos, vpts);
+      nextChar:
+      ReadChar();
+      if(rec.Key.VirtualKey==NTConsole.Key.Escape) break;
+      switch(char.ToLower(NormalizeDirChar()))
+      { case 'b': pos.Offset(-1, 1); break;
+        case 'j': pos.Y++; break;
+        case 'n': pos.Offset(1, 1); break;
+        case 'h': pos.X--; break;
+        case 'l': pos.X++; break;
+        case 'y': pos.Offset(-1, -1); break;
+        case 'k': pos.Y--; break;
+        case 'u': pos.Offset(1, -1); break;
+        case '@': pos = viewer.Position; break;
+        case ' ': case '\r': case '\n': goto done;
+        default: goto nextChar;
+      }
+    }
+    done:
+    RestoreScreen();
+    renderStats=true;
+  }
 
   public override MenuItem[] Menu(System.Collections.ICollection items, MenuFlag flags, params ItemClass[] classes)
   { SetupMenu(items, flags, classes);
@@ -192,7 +241,7 @@ public sealed class ConsoleIO : InputOutput
       while(true) // key handling
       { int num=-1;
         c = ReadChar();
-        
+
         if(allownum && char.IsDigit(c)) // read the number of items if allowed
         { num = c-'0';
           while(char.IsDigit(c=ReadChar())) num = c-'0' + num*10;
@@ -221,7 +270,12 @@ public sealed class ConsoleIO : InputOutput
         }
         else
         { switch(c)
-          { case '+': for(int i=0; i<menu.Length; i++) menu[i].Count = menu[i].Item.Count; goto redraw;
+          { case ',':
+              bool select=false;
+              for(int i=0; i<menu.Length; i++) if(menu[i].Count!=menu[i].Item.Count) { select=true; break; }
+              for(int i=0; i<menu.Length; i++) menu[i].Count = select ? menu[i].Item.Count : 0;
+              goto redraw;
+            case '+': for(int i=0; i<menu.Length; i++) menu[i].Count = menu[i].Item.Count; goto redraw;
             case '-': for(int i=0; i<menu.Length; i++) menu[i].Count = 0; goto redraw;
             case '\r': case '\n': goto done;
             case ' ': rec.Key.VirtualKey=NTConsole.Key.Next; break;
@@ -264,6 +318,7 @@ public sealed class ConsoleIO : InputOutput
   public override Input GetNextInput()
   { while(true)
     { Input inp = new Input();
+      int count = 1;
       ReadChar();
       char c = NormalizeDirChar();
 
@@ -293,6 +348,7 @@ public sealed class ConsoleIO : InputOutput
         case 'R': inp.Action = Action.Remove; break;
         case 'w': inp.Action = Action.Wield; break;
         case 'W': inp.Action = Action.Wear; break;
+        case 'X': inp.Action = Action.ShowMap; break;
         case '<': inp.Action = Action.GoUp; break;
         case '>': inp.Action = Action.GoDown; break;
         case '/':
@@ -304,44 +360,14 @@ public sealed class ConsoleIO : InputOutput
       }
       if(inp.Action != Action.None)
       { inp.Count = count;
-        count = 0;
         return inp;
       }
     }
   }
 
   public override void Render(Creature viewer)
-  { Map map = viewer.Memory==null ? viewer.Map : viewer.Memory;
-
-    mapW = Math.Min(console.Width, MapWidth); mapH = Math.Min(console.Height, MapHeight);
-    Rectangle rect = new Rectangle(viewer.Position.X-mapW/2, viewer.Position.Y-mapH/2, mapW, mapH);
-    int size = rect.Width*rect.Height;
-    if(buf==null || buf.Length<size) buf = new NTConsole.CharInfo[size];
-    if(vis==null || vis.Length<size) vis = new bool[size];
-
-    Array.Clear(vis, 0, size);
-    Point[] vpts = viewer.VisibleTiles();
-    for(int i=0; i<vpts.Length; i++)
-      if(rect.Contains(vpts[i])) vis[(vpts[i].Y-rect.Y)*rect.Width+vpts[i].X-rect.X] = true;
-
-    if(map==viewer.Map)
-    { for(int i=0,y=rect.Top; y<rect.Bottom; y++)
-        for(int x=rect.Left; x<rect.Right; i++,x++) buf[i] = TileToChar(map[x,y], vis[i]);
-      RenderMonsters(map.Creatures, vpts, rect, true);
-    }
-    else
-    { for(int i=0,y=rect.Top; y<rect.Bottom; y++)
-        for(int x=rect.Left; x<rect.Right; i++,x++)
-        { Tile tile = map[x,y];
-          buf[i] = tile.Creature==null ? TileToChar(tile, vis[i]) : CreatureToChar(tile.Creature, vis[i]);
-        }
-      map = viewer.Map;
-      for(int i=0,y=rect.Top; y<rect.Bottom; y++)
-        for(int x=rect.Left; x<rect.Right; i++,x++) if(vis[i]) buf[i] = TileToChar(map[x,y], vis[i]);
-      RenderMonsters(map.Creatures, vpts, rect, true);
-    }
-
-    console.PutBlock(new Rectangle(0, 0, rect.Width, rect.Height), buf);
+  { mapW = Math.Min(console.Width, MapWidth); mapH = Math.Min(console.Height, MapHeight);
+    RenderMap(viewer, viewer.Position, viewer.VisibleTiles());
     RenderStats(viewer);
     SetCursorToPlayer();
     uncleared = 0;
@@ -376,10 +402,13 @@ public sealed class ConsoleIO : InputOutput
       console.InputMode = value ? NTConsole.InputModes.LineBuffered|NTConsole.InputModes.Echo
                                 : NTConsole.InputModes.None;
       DrawLines();
+      uncleared = 0;
       inputMode = value;
     }
   }
 
+  void AddLine(string line) { AddLine(Color.Normal, line, true); }
+  void AddLine(string line, bool redraw) { AddLine(Color.Normal, line, redraw); }
   void AddLine(Color color, string line) { AddLine(color, line, true); }
   void AddLine(Color color, string line, bool redraw)
   { uncleared += LineHeight(line);
@@ -398,7 +427,7 @@ public sealed class ConsoleIO : InputOutput
     while(lines.Count>maxLines) lines.Remove(lines.Head);
     if(redraw) DrawLines();
   }
-  
+
   void AddWrapped(int i, string line)
   { if(wrapped.Length<i)
     { string[] narr = new string[wrapped.Length*2];
@@ -444,9 +473,9 @@ public sealed class ConsoleIO : InputOutput
     console.Fill(0, mheight, console.Width, height-mheight); // clear message area
   }
 
-  bool Diff(Creature player, Attr attr) { return player.GetAttr(attr)!=stats[(int)attr]; }
+  bool Diff(Creature player, Attr attr) { return renderStats || player.GetAttr(attr)!=stats[(int)attr]; }
   bool Diff(Creature player, Attr attr1, Attr attr2) { return Diff(player, attr1) || Diff(player, attr2); }
-  
+
   void DrawLines()
   { Line[] arr;
     { LinkedList.Node node = lines.Tail;
@@ -477,7 +506,7 @@ public sealed class ConsoleIO : InputOutput
               (flags&MenuFlag.AllowNum)==0 ?
                 item.Count==0 ? "-" : "+" :
                 item.Count==0 ? " - " : item.Count==item.Item.Count ? " + " : item.Count.ToString("d3"),
-              item.Char, item.Item.FullName);
+              item.Char, item.Item.InvName);
   }
 
   int LineHeight(string line) { return WordWrap(line); }
@@ -541,6 +570,37 @@ public sealed class ConsoleIO : InputOutput
     return rec.Key.Char;
   }
 
+  void RenderMap(Creature viewer, Point pos, Point[] vpts)
+  { Rectangle rect = new Rectangle(pos.X-mapW/2, pos.Y-mapH/2, mapW, mapH);
+    int size = mapW*mapH;
+    if(buf==null || buf.Length<size) buf = new NTConsole.CharInfo[size];
+    if(vis==null || vis.Length<size) vis = new bool[size];
+
+    Array.Clear(vis, 0, size);
+    for(int i=0; i<vpts.Length; i++)
+      if(rect.Contains(vpts[i])) vis[(vpts[i].Y-rect.Y)*rect.Width+vpts[i].X-rect.X] = true;
+
+    Map map = viewer.Memory==null ? viewer.Map : viewer.Memory;
+    if(map==viewer.Map)
+    { for(int i=0,y=rect.Top; y<rect.Bottom; y++)
+        for(int x=rect.Left; x<rect.Right; i++,x++) buf[i] = TileToChar(map[x,y], vis[i]);
+      RenderMonsters(map.Creatures, vpts, rect, true);
+    }
+    else
+    { for(int i=0,y=rect.Top; y<rect.Bottom; y++)
+        for(int x=rect.Left; x<rect.Right; i++,x++)
+        { Tile tile = map[x,y];
+          buf[i] = tile.Type==TileType.UpStairs || tile.Type==TileType.DownStairs || tile.Creature==null ?
+                    TileToChar(tile, vis[i]) : CreatureToChar(tile.Creature, vis[i]);
+        }
+      map = viewer.Map;
+      for(int i=0,y=rect.Top; y<rect.Bottom; y++)
+        for(int x=rect.Left; x<rect.Right; i++,x++) if(vis[i]) buf[i] = TileToChar(map[x,y], vis[i]);
+      RenderMonsters(map.Creatures, vpts, rect, true);
+    }
+    console.PutBlock(new Rectangle(0, 0, rect.Width, rect.Height), buf);
+  }
+
   void RenderMonsters(System.Collections.ICollection coll, Point[] vpts, Rectangle rect, bool wantvis)
   { foreach(Creature c in coll)
     { Point cp = c.Position;
@@ -550,11 +610,10 @@ public sealed class ConsoleIO : InputOutput
         if(vpts[i]==cp) { buf[bi] = CreatureToChar(c, vis[bi]); break; }
     }
   }
-  
+
   void RenderStats(Creature player)
   { int x=MapWidth+2, y=0, xlines=0, width=console.Width-x;
-    if(Diff(player, Attr.ExpLevel))
-      PutStringP(width, x, y, "{0} the {1} (lv {2})", player.Name, player.Title, player.ExpLevel+1);
+    if(Diff(player, Attr.ExpLevel)) PutStringP(width, x, y, "{0} the {1}", player.Name, player.Title);
     PutStringP(width, x, y+1, "Human");
     if(Diff(player, Attr.HP, Attr.MaxHP))
     { int healthpct = player.HP*100/player.MaxHP;
@@ -572,7 +631,8 @@ public sealed class ConsoleIO : InputOutput
     if(Diff(player, Attr.Int)) PutStringP(width, x, y+7, "Int:  {0}", player.Int);
     if(Diff(player, Attr.Dex)) PutStringP(width, x, y+8, "Dex:  {0}", player.Dex);
     if(Diff(player, Attr.Gold)) PutStringP(width, x, y+9, "Gold: {0}", player.Gold);
-    if(Diff(player, Attr.Exp)) PutStringP(width, x, y+10, "Exp:  {0}/{0}", player.Exp, player.NextExp);
+    if(Diff(player, Attr.Exp))
+      PutStringP(width, x, y+10, "Exp:  {0}/{1} (lv {2})", player.Exp, player.NextExp, player.ExpLevel+1);
     if(Diff(player, Attr.Age))
     { PutStringP(width, x, y+11, "Turn: {0}", player.Age);
       PutStringP(width, x, y+12, "Dungeon level {0}", App.CurrentLevel+1);
@@ -582,10 +642,10 @@ public sealed class ConsoleIO : InputOutput
     { if(player.HungerLevel==Hunger.Hungry) { PutStringP(Color.Warning, width, x, y++, "Hungry"); xlines++; }
       else if(player.HungerLevel==Hunger.Starving) { PutStringP(Color.Dire, width, x, y++, "Starving"); xlines++; }
       if(xlines<statLines) console.Fill(x, y, width, statLines-xlines);
+      statLines=xlines;
     }
     UpdateStats(player);
-
-    statLines=xlines;
+    renderStats=false;
   }
 
   void RestoreScreen()
@@ -595,7 +655,7 @@ public sealed class ConsoleIO : InputOutput
 
   void SetCursorAtEOBL() { console.SetCursorPosition(blX, blY); }
   void SetCursorToPlayer() { console.SetCursorPosition(mapW/2, mapH/2); }
-  
+
   void SetupMenu(System.Collections.ICollection items, MenuFlag flags, ItemClass[] classes)
   { if(items.Count==0) throw new ArgumentException("No items in the collection.", "items");
     if(items.Count>52 && (flags&MenuFlag.Reletter)==0)
@@ -604,7 +664,7 @@ public sealed class ConsoleIO : InputOutput
     Item[] itemarr = new Item[items.Count]; // first sort by character
     items.CopyTo(itemarr, 0);
     Array.Sort(itemarr, ItemComparer.Default);
-    
+
     if(Array.IndexOf(classes, ItemClass.Any)!=-1)
     { menu = new MenuItem[items.Count];
       for(int i=0,mi=0; i<(int)ItemClass.NumClasses; i++) // then group by item class
@@ -617,7 +677,7 @@ public sealed class ConsoleIO : InputOutput
       menu = (MenuItem[])list.ToArray(typeof(MenuItem));
     }
   }
-  
+
   void ShowHelp()
   { ClearScreen();
     string helptext =
@@ -628,7 +688,7 @@ d - drop item(s)
 e - eat food                E - evoke item power
 f - fire weapon/attack
 i - inventory listing
-o - open door               O - dungeon overview
+o - open door
 p - pray
 q - quaff a potion
 r - read scroll or book     R - remove a worn item
@@ -656,7 +716,7 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
     console.OutputMode = mode;
     RestoreScreen();
   }
-  
+
   void UpdateStats(Creature player)
   { for(int i=0; i<(int)Attr.NumAttributes; i++) stats[i] = player.GetAttr((Attr)i);
     playerFlags = player.Flags;
@@ -666,7 +726,7 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
   int WordWrap(string line)
   { int width=console.Width, s=0, e=line.Length, height=0;
     if(e==0) { AddWrapped(0, ""); return 1; }
-    
+
     while(e-s>width)
     { for(int i=Math.Min(s+width, e)-1; i>=s; i--)
         if(char.IsWhiteSpace(line[i]))
@@ -694,8 +754,8 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
   NTConsole console = new NTConsole();
   LinkedList lines = new LinkedList(); // a circular array would be more efficient...
   NTConsole.InputRecord rec;
-  int  uncleared, maxLines=200, blX, blY, mapW, mapH, count, statLines;
-  bool inputMode;
+  int  uncleared, maxLines=200, blX, blY, mapW, mapH, statLines;
+  bool inputMode, renderStats;
 
   static NTConsole.Attribute ColorToAttr(Color color)
   { NTConsole.Attribute attr = NTConsole.Attribute.Black;
@@ -709,32 +769,40 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
   static NTConsole.CharInfo CreatureToChar(Creature c, bool visible)
   { return new NTConsole.CharInfo(raceMap[(int)c.Race], visible ? ColorToAttr(c.Color) : NTConsole.Attribute.DarkGrey);
   }
-  
+
   static NTConsole.CharInfo ItemToChar(Item item)
-  { return new NTConsole.CharInfo('%', ColorToAttr(item.Color));
+  { return new NTConsole.CharInfo(itemMap[(int)item.Class], ColorToAttr(item.Color));
   }
 
   static NTConsole.CharInfo TileToChar(Tile tile, bool visible)
   { NTConsole.CharInfo ci;
-    if(tile.Items!=null && tile.Items.Count>0) ci = ItemToChar(tile.Items[0]);
+    if((visible || tile.Type!=TileType.UpStairs && tile.Type!=TileType.DownStairs) &&
+       tile.Items!=null && tile.Items.Count>0)
+      ci = ItemToChar(tile.Items[0]);
     else switch(tile.Type)
     { case TileType.Wall:       ci = new NTConsole.CharInfo('#', NTConsole.Attribute.Brown); break;
       case TileType.ClosedDoor: ci = new NTConsole.CharInfo('+', NTConsole.Attribute.Yellow); break;
       case TileType.OpenDoor:   ci = new NTConsole.CharInfo((char)254, NTConsole.Attribute.Yellow); break;
       case TileType.RoomFloor:  ci = new NTConsole.CharInfo((char)250, NTConsole.Attribute.Grey); break;
       case TileType.Corridor:   ci = new NTConsole.CharInfo((char)176, NTConsole.Attribute.Grey); break;
-      case TileType.UpStairs:   ci = new NTConsole.CharInfo('<', NTConsole.Attribute.Grey); break;
-      case TileType.DownStairs: ci = new NTConsole.CharInfo('>', NTConsole.Attribute.Grey); break;
+      case TileType.UpStairs:
+        return new NTConsole.CharInfo('<', visible ? NTConsole.Attribute.Grey : NTConsole.Attribute.LightBlue);
+      case TileType.DownStairs:
+        return new NTConsole.CharInfo('>', visible ? NTConsole.Attribute.Grey : NTConsole.Attribute.Red);
       default: ci = new NTConsole.CharInfo(' ', NTConsole.Attribute.Black); break;
     }
-    if(!visible) ci.Attributes = NTConsole.Attribute.DarkGrey;
+    if(!visible && tile.Type!=TileType.ClosedDoor) ci.Attributes = NTConsole.Attribute.DarkGrey;
     return ci;
   }
 
+  // Amulet, Weapon, Armor, Ammo, Food, Corpse, Scroll, Ring, Potion, Wand, Tool, Spellbook, Container, Treasure,
+  static readonly char[] itemMap = new char[(int)ItemClass.NumClasses]
+  { '"', ')', '[', '(', '%', '&', '?', '=', '!', '/', ']', '+', ']', '*',
+  };
   static readonly char[] raceMap = new char[(int)Race.NumRaces]
   { '@', 'o'
   };
-  
+
   static readonly char[] dirLets = new char[9] { 'b', 'j', 'n', 'h', '.', 'l', 'y', 'k', 'u' };
 }
 

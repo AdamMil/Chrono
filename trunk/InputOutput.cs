@@ -6,7 +6,7 @@ namespace Chrono
 
 public enum Action
 { None, Quit, Rest, Move, MoveToInteresting, MoveToDanger, MoveAFAP, OpenDoor, CloseDoor, Pickup, Drop, DropType,
-  GoUp, GoDown, Eat, Wear, Remove, Wield, Inventory,
+  GoUp, GoDown, Eat, Wear, Remove, Wield, Inventory, ShowMap,
 }
 
 public struct Input
@@ -22,7 +22,7 @@ public enum Color
   Cyan=Green|Blue, Purple=Red|Blue, Brown=Red|Green, Grey=Red|Green|Blue,
   DarkGrey=Black|Bright, LightRed=Red|Bright, LightGreen=Green|Bright, LightBlue=Blue|Bright,
   LightCyan=Cyan|Bright, Magenta=Purple|Bright, Yellow=Brown|Bright, White=Grey|Bright,
-  
+
   Normal=Grey, Warning=Brown, Dire=LightRed
 }
 
@@ -38,7 +38,7 @@ public struct MenuItem
 
 public abstract class InputOutput
 { public abstract int ScrollBack { get; set; }
-  
+
   public void Alert(string message) { Alert(Color.Warning, message); }
   public abstract void Alert(Color color, string message);
 
@@ -70,7 +70,7 @@ public abstract class InputOutput
   }
   public abstract char CharChoice(Color color, string prompt, string chars, char defaultChar, bool caseInsensitive,
                                   string rebuke);
-  
+
   public Direction ChooseDirection() { return ChooseDirection(true, true); }
   public abstract Direction ChooseDirection(bool allowSelf, bool allowVertical);
 
@@ -79,11 +79,11 @@ public abstract class InputOutput
 
   public void DisplayInventory(IKeyedInventory items) { DisplayInventory(items, ItemClass.Any); }
   public abstract void DisplayInventory(IKeyedInventory items, params ItemClass[] classes);
-  
+  public abstract void DisplayTileItems(IInventory items);
   public abstract void DisplayMap(Creature viewer);
 
   public abstract Input GetNextInput();
-  
+
   public MenuItem[] Menu(IInventory items, MenuFlag flags)
   { return Menu(items, flags, ItemClass.Any);
   }

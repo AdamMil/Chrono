@@ -26,7 +26,7 @@ public class RoomyMapGenerator : MapGenerator
     rooms.Clear();
     while(rooms.Count<minrooms) if(!AddRoom()) throw new UnableToGenerateException("Couldn't add enough rooms.");
     while(rooms.Count<maxrooms) if(!AddRoom()) break;
-    
+
     foreach(Room r in rooms)
     { if(Rand.Next(darkChance)!=0)
       { for(int y=r.Area.Y+1; y<r.Area.Bottom; y++)
@@ -41,7 +41,7 @@ public class RoomyMapGenerator : MapGenerator
     AddStairs(false);
     return map;
   }
-  
+
   struct Room
   { public Rectangle Area;
     public bool Connected;
@@ -53,7 +53,8 @@ public class RoomyMapGenerator : MapGenerator
     for(tri=0; tri<50; tri++)
     { room.Area = new Rectangle(Rand.Next(map.Width-4), Rand.Next(map.Height-4),
                                 Rand.Next(4, maxRoomSize.Width), Rand.Next(4, maxRoomSize.Height));
-      if(room.Area.Right>map.Width || room.Area.Bottom>map.Height) continue;
+      if(room.Area.Right>map.Width || room.Area.Bottom>map.Height) continue; // size
+      if(room.Area.Height*3<=room.Area.Width || room.Area.Width*3<=room.Area.Height) continue; // aspect ratio
       Rectangle bounds = room.Area; bounds.Offset(-2, -2); bounds.Inflate(4, 4);
       for(r=0; r<rooms.Count; r++) if(bounds.IntersectsWith(((Room)rooms[r]).Area)) break;
       if(r==rooms.Count) break;
@@ -72,7 +73,7 @@ public class RoomyMapGenerator : MapGenerator
     rooms.Add(room);
     return true;
   }
-  
+
   bool Connect(Room r1, Room r2)
   { Point  p1 = RectCenter(r1.Area), p2 = RectCenter(r2.Area), save = new Point();
     int  fail = 0;
@@ -98,7 +99,7 @@ public class RoomyMapGenerator : MapGenerator
     r1.Connected = r2.Connected = true;
     return true;
   }
-  
+
   bool TryDig(ref Point p1, Point p2, Direction dir)
   { int x = p1.X+Global.DirMap[(int)dir].X, y = p1.Y+Global.DirMap[(int)dir].Y;
     if(!map.Contains(x, y)) return false;
@@ -145,7 +146,7 @@ public class RoomyMapGenerator : MapGenerator
     p1.X=x; p1.Y=y;
     return true;
   }
-  
+
   bool CanDig(int x, int y)
   { if(map.IsPassable(x, y)) return true;
     return !map.IsWall(x, y) || !IsWallJunction(x, y) && !HasAdjacentDoor(x, y, true);
@@ -155,7 +156,7 @@ public class RoomyMapGenerator : MapGenerator
   { if(map.IsPassable(x, y) || map.IsDoor(x, y)) return;
     if(map.IsWall(x, y))
     { map.SetType(x, y, TileType.ClosedDoor);
-      if(Rand.Next(100)<10) map.SetFlag(x, y, Tile.Flag.Locked, true);
+      if(Rand.Next(100)<8) map.SetFlag(x, y, Tile.Flag.Locked, true);
     }
     else map.SetType(x, y, TileType.Corridor);
   }
@@ -179,9 +180,9 @@ public class RoomyMapGenerator : MapGenerator
           if(map.IsDoor(x2, y2) && (x2!=x || y2!=y)) return true;
     return false;
   }
-  
+
   static Point RectCenter(Rectangle rect) { return new Point(rect.X+rect.Width/2, rect.Y+rect.Height/2); }
-  
+
   Map map;
   ArrayList rooms = new ArrayList();
   Size maxRoomSize;

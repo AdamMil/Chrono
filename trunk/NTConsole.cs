@@ -15,7 +15,7 @@ public class NTConsole
     Cyan=Green|Blue, Purple=Red|Blue, Brown=Red|Green, Grey=Red|Green|Blue,
     DarkGrey=Black|Bright, LightRed=Red|Bright, LightGreen=Green|Bright, LightBlue=Blue|Bright,
     LightCyan=Cyan|Bright, Magenta=Purple|Bright, Yellow=Brown|Bright, White=Grey|Bright,
-    
+
     GridTop=0x400, GridLeft=0x800, GridRight=0x1000, GridBottom=0x8000,
     Underlined=GridBottom, ReverseVideo=0x4000
   };
@@ -131,7 +131,7 @@ public class NTConsole
       SyncOutputMode();
     }
   }
-  
+
   public string Title
   { get
     { if(ascii)
@@ -149,7 +149,7 @@ public class NTConsole
     { Check(SetConsoleTitleA(Encoding.ASCII.GetBytes(value)));
     }
   }
-  
+
   public Attribute Attributes
   { get
     { ScreenBufferInfo si = new ScreenBufferInfo();
@@ -160,12 +160,12 @@ public class NTConsole
     { Check(SetConsoleTextAttribute(hWrite, (ushort)value));
     }
   }
-  
+
   public Point CursorPosition
   { get { return GetCursorPosition(); }
     set { SetCursorPosition(value); }
   }
-  
+
   public DisplayModes DisplayMode
   { get
     { uint mode;
@@ -173,7 +173,7 @@ public class NTConsole
       return (DisplayModes)mode;
     }
   }
-  
+
   public bool InputWaiting
   { get
     { InputRecord rec;
@@ -187,7 +187,7 @@ public class NTConsole
       return false;
     }
   }
-  
+
   public int Width
   { get
     { ScreenBufferInfo si = new ScreenBufferInfo();
@@ -209,7 +209,7 @@ public class NTConsole
   }
 
   public Attribute ForeToBack(Attribute fore) { return (Attribute)((byte)fore<<4); }
-  
+
   public void SetCursorVisibility(bool visible, int fillPct)
   { if(fillPct<0 || fillPct>100)
       throw new ArgumentOutOfRangeException("fillPct", fillPct, "Must be percent from 0 to 100");
@@ -217,7 +217,7 @@ public class NTConsole
     CursorInfo ci = new CursorInfo((uint)fillPct, visible);
     Check(SetConsoleCursorInfo(hWrite, ref ci));
   }
-  
+
   public void SetCursorPosition(Point pt) { SetCursorPosition(pt.X, pt.Y); }
   public void SetCursorPosition(int x, int y)
   { Check(SetConsoleCursorPosition(hWrite, new Coord(x, y)));
@@ -228,7 +228,7 @@ public class NTConsole
     Check(GetConsoleScreenBufferInfo(hWrite, out si));
     return new Point(si.Cursor.X, si.Cursor.Y);
   }
-  
+
   public void SetSize(int width, int height)
   { SmallRect rect = new SmallRect();
     rect.Right  = (short)(width-1);
@@ -237,7 +237,7 @@ public class NTConsole
     Check(SetConsoleScreenBufferSize(hWrite, new Coord(width, height)));
     Check(SetConsoleWindowInfo(hWrite, true, ref rect));
   }
-  
+
   public char ReadChar()
   { InputModes old = inMode;
     if((inMode&InputModes.LineBuffered)!=0) InputMode = inMode & ~(InputModes.LineBuffered|InputModes.Echo);
@@ -255,7 +255,7 @@ public class NTConsole
     if((old&InputModes.Echo)!=0) WriteChar(c);
     return c;
   }
-  
+
   public InputRecord ReadInput()
   { InputRecord rec;
     ReadInput(out rec);
@@ -272,7 +272,7 @@ public class NTConsole
       else Check(ReadConsoleInputW(hRead, out rec, 1, out read));
     } while(rec.Type>InputType.BufferResize);
   }
-  
+
   public string ReadLine()
   { InputModes old = inMode;
     if((inMode&InputModes.LineBuffered)==0) InputMode = inMode|InputModes.LineBuffered;
@@ -302,7 +302,7 @@ public class NTConsole
     WriteChar('\n');
     return ret;
   }
-  
+
   public void WriteChar(char c)
   { uint count;
     unsafe
@@ -354,7 +354,7 @@ public class NTConsole
     }
     return c;
   }
-  
+
   public void PutChar(Point pt, char c) { PutChar(pt.X, pt.Y, c); }
   public void PutChar(int x, int y, char c)
   { uint written;
@@ -366,7 +366,7 @@ public class NTConsole
       else Check(WriteConsoleOutputCharacterW(hWrite, &c, 1, new Coord(x, y), out written));
     }
   }
-  
+
   public Attribute GetAttribute(Point pt) { return GetAttribute(pt.X, pt.Y); }
   public Attribute GetAttribute(int x, int y)
   { uint   read;
@@ -384,7 +384,7 @@ public class NTConsole
     { Check(WriteConsoleOutputAttribute(hWrite, (ushort*)&attr, 1, new Coord(x, y), out written));
     }
   }
-  
+
   public CharInfo GetCharInfo(Point pt) { return GetCharInfo(pt.X, pt.Y); }
   public CharInfo GetCharInfo(int x, int y)
   { Coord pos = new Coord(x, y);
@@ -402,7 +402,7 @@ public class NTConsole
     }
     return new CharInfo(c, (Attribute)attr);
   }
-  
+
   public void PutCharInfo(Point pt, CharInfo c) { PutCharInfo(pt.X, pt.Y, c); }
   public void PutCharInfo(int x, int y, CharInfo c)
   { Coord pos = new Coord(x, y);
@@ -442,7 +442,7 @@ public class NTConsole
       FillConsoleOutputAttribute(hWrite, (ushort)c.Attributes, (uint)width, start, out written);
     }
   }
-  
+
   public void GetBlock(Point dest, Point src, int width, int height, CharInfo[] buf) { GetBlock(dest.X, dest.Y, src.X, src.Y, width, height, buf); }
   public void GetBlock(Rectangle rect, CharInfo[] buf) { GetBlock(rect.X, rect.Y, 0, 0, rect.Width, rect.Height, buf); }
   public void GetBlock(int dx, int dy, int sx, int sy, int width, int height, CharInfo[] buf)
@@ -463,7 +463,7 @@ public class NTConsole
   protected void Check(bool test)
   { if(!test) throw new ApplicationException("System call failed: error code "+GetLastError());
   }
-  
+
   protected string BufferToString(char[] buf, uint length)
   { if(length==0) return "";
     StringBuilder sb = new StringBuilder();
@@ -475,7 +475,7 @@ public class NTConsole
   { if(length==0) return "";
     return Encoding.ASCII.GetString(buf, 0, (int)length);
   }
-  
+
   protected void SyncInputMode()
   { uint mode;
     GetConsoleMode(hRead, out mode);

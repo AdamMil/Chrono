@@ -65,18 +65,18 @@ public class Xml
 
     System.Text.StringBuilder sb = new System.Text.StringBuilder(block.Length);
     int pos, oldPos=0;
-    bool nl=false;
+    bool nl=true;
     do
     { pos = block.IndexOf('\n', oldPos);
 
       if(pos==oldPos)
-      { sb.Append('\n');
-        nl=true;
+      { if(!nl) { sb.Append('\n'); nl=true; }
+        sb.Append('\n');
       }
       else
-      { if(nl) sb.Append('\n');
+      { if(!nl) sb.Append(' ');
+        else nl=false;
         sb.Append(trim.Replace(pos==-1 ? block.Substring(oldPos) : block.Substring(oldPos, pos-oldPos), ""));
-        nl=false;
       }
       oldPos = pos+1;
     } while(pos!=-1);

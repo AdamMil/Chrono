@@ -3,6 +3,7 @@ using System.Collections;
 using System.Drawing;
 using System.Reflection;
 using System.Runtime.Serialization;
+using System.Text.RegularExpressions;
 using System.Xml;
 
 namespace Chrono
@@ -716,6 +717,8 @@ public abstract class AI : Entity
     return 0;
   }
 
+  protected bool TryOnSpeak() { return ai!=null && ai.TryExecute("onSpeak", this); }
+
   protected bool TrySmartMove(Direction d) { return TrySmartMove(Global.Move(Position, d)); }
   protected bool TrySmartMove(Point pt)
   { if(TryMove(pt)) return true;
@@ -822,6 +825,7 @@ public abstract class AI : Entity
             { XmlElement var = node.OwnerDocument.CreateElement("var");
               var.SetAttribute("name", vname);
               var.SetAttribute("value", value);
+              ai.PrependChild(var);
             }
           }
           else throw new ArgumentException("Unknown declaration: "+n.LocalName);
@@ -853,6 +857,14 @@ public abstract class AI : Entity
     { throw new NotImplementedException("expression evaluation");
     }
 
+    protected string GetText(string name, XmlNode local, Entity me)
+    { string selector = "text[@id='"+name+"']";
+      XmlNode node = local==null ? null : local.SelectSingleNode(selector);
+      if(node==null) node = ai.SelectSingleNode(selector);
+      if(node==null) throw new ArgumentException("No such text node: "+name);
+      return repRe.Replace(Xml.BlockToString(node.InnerText), new MatchEvaluator(TextReplacer));
+    }
+
     protected string GetVar(string name, AI me)
     { string type;
       ParseVarName(ref name, out type);
@@ -871,12 +883,12 @@ public abstract class AI : Entity
       ParseVarName(ref name, out type);
       
       if(type=="script") ai.SelectSingleNode("var[@name='"+name+"']/@value").Value = value;
-      if(type=="global") Global.SetVar(name, value);
-
-      // assuming "local" here
-      if(me==null) throw new InvalidOperationException("Can't use a local variable outside an AI context");
-      if(me.vars.Contains(name)) me.vars[name]=value;
-      throw new ArgumentException("variable "+name+" not declared");
+      else if(type=="global") Global.SetVar(name, value);
+      else // assuming "local" here
+      { if(me==null) throw new InvalidOperationException("Can't use a local variable outside an AI context");
+        if(me.vars.Contains(name)) me.vars[name]=value;
+        else throw new ArgumentException("variable "+name+" not declared");
+      }
     }
 
     protected bool TryAction(XmlNode node, AI me)
@@ -899,9 +911,11 @@ public abstract class AI : Entity
         }
         
         case "giveQuest":
-        { bool has = App.Player.HasQuest(Xml.Attr(node, "name"));
-          App.Player.GiveQuest(Xml.Attr(node, "name"), Xml.Attr(node, "state", "during"));
-          if(!has) App.IO.Print("You have been given a new quest!");
+        { Player.Quest quest = App.Player.GetQuest(Xml.Attr(node, "name"));
+          bool has = quest.Received;
+          quest.StateName = Xml.Attr(node, "state", "during");
+          quest.Received  = true;
+          if(!has) App.IO.Print("You have been given a new quest! ({0})", quest.Title);
           return true;
         }
 
@@ -922,7 +936,6 @@ public abstract class AI : Entity
         case "say":
         { if(me==null) throw new InvalidOperationException("'say' not valid outside of an AI context");
           string dialog = Xml.Attr(node, "dialog");
-          if(me==null) 
           if(dialog!=null) return TryDialog(ai.SelectSingleNode("dialog[@id='"+dialog+"']"), me);
           else me.Say(Xml.BlockToString(node.InnerText));
           return true;
@@ -949,8 +962,39 @@ public abstract class AI : Entity
       return didSomething;
     }
 
-    protected bool TryDialog(XmlNode node, AI me)
-    { return false;
+    protected bool TryDialog(XmlNode dialog, AI me)
+    { dialogOver = false;
+      nextDialogNode = "Start";
+      
+      XmlNode node = dialog.SelectSingleNode("onInit");
+      if(node!=null)
+      { TryActionBlock(node, me);
+        if(dialogOver) return false;
+      }
+
+      do
+      { node = dialog.SelectSingleNode("simpleNode[@name='"+nextDialogNode+"']");
+        if(node!=null)
+        { string[] options = node.Attributes["options"].Value.Split(',');
+          string[] choices = new string[options.Length];
+          for(int i=0; i<options.Length; i++)
+            choices[i] = GetText(options[i].Substring(0, options[i].IndexOf(':')), dialog, me);
+          int choice = App.IO.ConversationChoice(me, GetText(node.Attributes["text"].Value, dialog, me), choices);
+          nextDialogNode = options[choice].Substring(options[choice].IndexOf(':')+1);
+          if(nextDialogNode=="*END*") dialogOver=true;
+        }
+        else
+        { node = dialog.SelectSingleNode("node[@name='"+nextDialogNode+"']");
+          XmlNodeList options = node.SelectNodes("option");
+          string[] choices = new string[options.Count];
+          for(int i=0; i<choices.Length; i++) choices[i] = GetText(options[i].Attributes["text"].Value, dialog, me);
+          int choice = App.IO.ConversationChoice(me, GetText(node.Attributes["text"].Value, dialog, me), choices);
+          TryActionBlock(options[choice], me);
+        }        
+      } while(!dialogOver);
+      App.IO.EndConversation();
+
+      return true;
     }
 
     protected bool TryIf(XmlNode node, AI me)
@@ -959,12 +1003,12 @@ public abstract class AI : Entity
       bool isTrue;
       
       if((av=Xml.Attr(node, "var"))            != null)  lhs=GetVar(av, me);
-      else if((av=Xml.Attr(node, "haveQuest")) != null)  lhs=App.Player.HasQuest(av) ? "1" : "";
-      else if((av=Xml.Attr(node, "quest"))     != null)  lhs=App.Player.QuestState(av);
-      else if((av=Xml.Attr(node, "questDone")) != null)  lhs=App.Player.QuestDone(av) ? "1" : "";
-      else if((av=Xml.Attr(node, "questNotDone"))!=null) lhs=App.Player.QuestDone(av) ? "" : "1";
-      else if((av=Xml.Attr(node, "questSuccess")) !=null) lhs=App.Player.QuestSucceeded(av) ? "1" : "";
-      else if((av=Xml.Attr(node, "questFailed")) !=null) lhs=App.Player.QuestFailed(av) ? "1" : "";
+      else if((av=Xml.Attr(node, "haveQuest")) != null)  lhs=App.Player.GetQuest(av).Received ? "1" : "";
+      else if((av=Xml.Attr(node, "quest"))     != null)  lhs=App.Player.GetQuest(av).StateName;
+      else if((av=Xml.Attr(node, "questDone")) != null)  lhs=App.Player.GetQuest(av).Done ? "1" : "";
+      else if((av=Xml.Attr(node, "questNotDone"))!=null) lhs=App.Player.GetQuest(av).Done ? "" : "1";
+      else if((av=Xml.Attr(node, "questSuccess")) !=null) lhs=App.Player.GetQuest(av).Succeeded ? "1" : "";
+      else if((av=Xml.Attr(node, "questFailed")) !=null) lhs=App.Player.GetQuest(av).Failed ? "1" : "";
       else if((av=Xml.Attr(node, "lhs")) != null) lhs=av;
       else if((child=node.SelectSingleNode("lhs")) != null) lhs=Evaluate(child, me);
       else throw new ArgumentException("conditional: left hand side is not defined");
@@ -996,6 +1040,15 @@ public abstract class AI : Entity
       }
     }
     
+    string TextReplacer(Match m)
+    { switch(m.Groups[1].Value)
+      { case "name": return App.Player.Name;
+        case "man/woman": return App.Player.Male ? "man" : "woman";
+        default: return m.Value;
+      }
+    }
+    
+    Regex repRe = new Regex(@"{([^}]+)}", RegexOptions.Singleline);
     XmlElement ai;
     string nextDialogNode;
     bool   dialogOver;

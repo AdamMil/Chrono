@@ -64,8 +64,8 @@ public sealed class ConsoleIO : InputOutput
     }
   }
 
-  public override Direction ChooseDirection(bool allowSelf, bool allowVertical)
-  { string prompt = "Choose a direction";
+  public override Direction ChooseDirection(string prompt, bool allowSelf, bool allowVertical)
+  { if(prompt==null) prompt = "Choose a direction";
     if(allowSelf || allowVertical)
     { prompt += " [dir, ";
       if(allowSelf) prompt += '5';

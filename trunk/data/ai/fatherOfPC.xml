@@ -11,7 +11,9 @@
   </charData>
 
   <declare>
-    <quest id="FindJohn">
+    <var name="asked"/>
+
+    <quest id="FindJohn" title="Find Uncle John">
       <qs:during>
       Your uncle John has gone missing in the hills around Grass Town.
       Your father, always something of a coward, has asked you to go look for him.
@@ -31,8 +33,11 @@
       Hello, son. I have grave news. John, my beloved brother, has gone missing in the hills around the town.
       Will you go look for him?
     </text>
+    <text id="AskAgain">Have you reconsidered? This is urgent!</text>
     <text id="WillLook">Yes father, I will look for him.</text>
+    <text id="UmmNo">Umm, let me think. No.</text>
     <text id="WontLook">But I'm just a young {man/woman}! Why don't you go?</text>
+    <text id="GaveUp">Nah, that guy's hard to find. I give up.</text>
     <text id="Accept">
       Thank you son. I'd been saving this for your education, but you'll need to equip yourself.
       Take it and visit the shops in town, and come back to me when you find John.
@@ -45,6 +50,7 @@
 
     <!--don't have quest yet-->
     <simpleNode name="Ask" text="Intro" options="WillLook:Accept,WontLook:Reject"/>
+    <simpleNode name="AskAgain" text="AskAgain" options="WillLook:Accept,UmmNo:Reject"/>
     <node name="Accept" text="Accept">
       <option text="Okay">
         <give class="Gold" count="1000"/>
@@ -61,7 +67,15 @@
     <onInit>
       <if haveQuest="FindJohn">
         <goto name="FoundYet"/>
-        <else><goto name="Ask"/></else>
+        <else>
+          <if var="asked">
+            <goto name="AskAgain"/>
+            <else>
+              <set var="asked" value="true"/>
+              <goto name="Ask"/>
+            </else>
+          </if>
+        </else>
       </if>
     </onInit>
   </dialog>

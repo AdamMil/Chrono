@@ -142,7 +142,8 @@ public class Townsperson : AI
   }
 
   public override void TalkTo()
-  { if(HostileTowards(App.Player)) Say(GetQuip(IsAdult ? Quips.Attacking : Quips.KidAttacking));
+  { if(TryOnSpeak()) return;
+    if(HostileTowards(App.Player)) Say(GetQuip(IsAdult ? Quips.Attacking : Quips.KidAttacking));
     else if(!IsAdult) Say(GetQuip(Quips.Kid));
     else switch(baseName)
     { case "hunter": Say(GetQuip(Quips.Fighter)); break;

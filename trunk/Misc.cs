@@ -168,6 +168,16 @@ public sealed class Global
 
   public static bool Coinflip() { return Random.Next(100)<50; }
 
+  public static void DeclareVar(string name, string value)
+  { if(vars.Contains(name)) throw new ArgumentException("global variable "+name+" declared twice");
+    vars[name] = value;
+  }
+
+  public static string GetVar(string name)
+  { if(vars.Contains(name)) return (string)vars[name];
+    throw new ArgumentException("variable "+name+" not declared");
+  }
+
   public static System.IO.Stream LoadData(string path)
   { return System.IO.File.Open("../../data/"+path, System.IO.FileMode.Open, System.IO.FileAccess.Read);
   }
@@ -226,6 +236,11 @@ public sealed class Global
       string n = names[i]; names[i] = names[j]; names[j] = n;
       Color  c = colors[i]; colors[i] = colors[j]; colors[j] = c;
     }
+  }
+
+  public static string SetVar(string name, string value)
+  { if(vars.Contains(name)) vars[name]=value;
+    throw new ArgumentException("variable "+name+" not declared");
   }
 
   public static Item SpawnItem(SpawnInfo s)
@@ -334,6 +349,7 @@ public sealed class Global
   
   public static Hashtable ObjHash;
 
+  static Hashtable vars = new Hashtable();
   static SpawnInfo[] objSpawns;
   static SocialGroup[] socialGroups;
   static Random Random = new Random();

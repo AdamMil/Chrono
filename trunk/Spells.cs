@@ -318,11 +318,9 @@ public class FireSpell : BeamSpell
   bool AffectItem(IInventory inv, Item i, bool print)
   { if(i.Class==ItemClass.Scroll || i.Class==ItemClass.Potion || i.Class==ItemClass.Spellbook)
     { if(print)
-      { string plural = i.Count>1 ? "" : "s";
         App.IO.Print(i.Class==ItemClass.Potion ? "{0} heat{1} up and burst{1}!" : "{0} burn{1} up!",
                      (inv==App.Player.Inv ? "Your "+i.GetFullName(App.Player) : Global.Cap1(i.GetAName(App.Player))),
-                     plural);
-      }
+                     i.VerbS);
       inv.Remove(i);
       return true;
     }

@@ -28,9 +28,7 @@ public sealed class App
       App.IO.Print("Welcome back to Chrono, {0}!", Player.Name);
     }
     else
-    { Map map = World[World.StartSection][0];
-
-      char c = IO.CharChoice("(w)izard or (f)ighter?", "wf");
+    { char c = IO.CharChoice("(w)izard or (f)ighter?", "wf");
       Player = Player.Generate(c=='w' ? EntityClass.Wizard : EntityClass.Fighter, Race.Human);
       Player.Name = IO.Ask("Enter your name:", false, "I need to know what to call you!");
 
@@ -57,6 +55,7 @@ public sealed class App
       Player.Pickup(new Gold()).Count = 100;
       foreach(Item i in Player.Inv) Player.AddKnowledge(i);
 
+      Map map = World[World.StartSection][0];
       map.Entities.Add(Player);
       Player.Position = map.FreeSpaceNear(map.GetEntity("fatherOfPC").Position);
 

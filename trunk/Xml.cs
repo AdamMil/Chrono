@@ -45,7 +45,7 @@ public class Xml
       else
       { temp = trim.Replace(pos==-1 ? block.Substring(oldPos) : block.Substring(oldPos, pos-oldPos), "");
         if(last==null) list.Add(last=temp);
-        else list[list.Count-1] = (last += temp);
+        else list[list.Count-1] = last = last+' '+temp;
       }
       oldPos = pos+1;
     } while(pos!=-1);
@@ -53,9 +53,43 @@ public class Xml
     return (string[])list.ToArray(typeof(string));
   }
 
+  public static string BlockToString(string block) { return BlockToString(block, true); }
+  public static string BlockToString(string block, bool collapseLines)
+  { if(block==null || block=="") return "";
+
+    block = ltbl.Replace(block.Replace("\r", ""), ""); // remove CRs, and leading and trailing blank lines
+    Match m = lspc.Match(block); // TODO: this should be the amount that can be removed uniformly from nonblank lines
+    Regex trim = new Regex(@"^\s{0,"+m.Length+@"}|\s+$",
+                           collapseLines ? RegexOptions.Singleline : RegexOptions.Multiline);
+    if(!collapseLines) return trim.Replace(block, "");
+
+    System.Text.StringBuilder sb = new System.Text.StringBuilder(block.Length);
+    int pos, oldPos=0;
+    bool nl=false;
+    do
+    { pos = block.IndexOf('\n', oldPos);
+
+      if(pos==oldPos)
+      { sb.Append('\n');
+        nl=true;
+      }
+      else
+      { if(nl) sb.Append('\n');
+        sb.Append(trim.Replace(pos==-1 ? block.Substring(oldPos) : block.Substring(oldPos, pos-oldPos), ""));
+        nl=false;
+      }
+      oldPos = pos+1;
+    } while(pos!=-1);
+
+    return sb.ToString();
+  }
+
   public static int IntValue(XmlAttribute attr, int defaultValue)
   { return attr==null ? defaultValue : int.Parse(attr.Value);
   }
+
+  public static bool IsTrue(XmlAttribute attr) { return attr!=null && IsTrue(attr.Value); }
+  public static bool IsTrue(string str) { return str!=null && str!="" && str!="0" && str.ToLower()!="false"; }
 
   public static int RangeInt(string range)
   { int pos = range.IndexOf(':');

@@ -24,6 +24,7 @@
 <!-- linkType -->
 <xs:simpleType name="linkType">
   <xs:restriction base="xs:string">
+    <xs:enumeration value="None"/>
     <xs:enumeration value="UpStairs"/>
     <xs:enumeration value="DownStairs"/>
     <xs:enumeration value="Town"/>

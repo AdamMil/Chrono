@@ -321,8 +321,7 @@ public class Shopkeeper : AI
 
   public void PlayerTook(Item item)
   { if(item.Class!=ItemClass.Gold)
-      Say("{0} cost{1} {2} gold.", Global.Cap1(item.GetThatName(App.Player)),
-          item.Count>1 ? "" : "s",  SellCost(item));
+      Say("{0} cost{1} {2} gold.", Global.Cap1(item.GetThatName(App.Player)), item.VerbS, SellCost(item));
   }
 
   public void PlayerUsed(Item item, bool standardMessage)

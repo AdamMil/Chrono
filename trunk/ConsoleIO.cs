@@ -988,7 +988,7 @@ i - inventory listing       I - invoke a wielded item's power
 o - open door
 m - use special ability     M - list special abilities/mutations
 p - pray
-q - quaff a potion
+q - quaff a potion          Q - display quests
 r - read a scroll or book   R - remove a worn item
 s - search adjacent tiles   S - manage skills
 t - throw an item           T - talk to somebody

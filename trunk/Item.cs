@@ -55,8 +55,11 @@ public abstract class Item : UniqueObject, ICloneable
 
   public virtual string Name { get { return name; } }
 
-  public string ItOne { get { return Count>1 ? "one" : "it"; } }
+  public string ItOne  { get { return Count>1 ? "one"  : "it"; } }
   public string ItThem { get { return Count>1 ? "them" : "it"; } }
+  public string ItThey { get { return Count>1 ? "they" : "it"; } }
+  public string ThatThose { get { return Count>1 ? "those" : "that"; } }
+  public string VerbS  { get { return Count>1 ? "" : "s"; } }
   
   public string StatusString
   { get
@@ -119,7 +122,7 @@ public abstract class Item : UniqueObject, ICloneable
     if(Shop!=null) s += " (unpaid)";
     return s;
   }
-  public string GetThatName(Entity e) { return (Count>1 ? "those " : "that ") + GetFullName(e); }
+  public string GetThatName(Entity e) { return ThatThose + ' ' + GetFullName(e); }
 
   public byte GetNoise(Entity e) { return (byte)Math.Max(Math.Min(Noise*15-e.Stealth*8, 255), 0); }
 
@@ -239,8 +242,7 @@ public abstract class Wieldable : Modifying
   { string ret = "";
     if(equipped)   ret += (ret!="" ? ", " : "(") + "equipped";
     if(Shop!=null) ret += (ret!="" ? ", " : "(") + "unpaid";
-    if(ret!="") ret = GetAName(e) + ' ' + ret + ')';
-    return ret;
+    return GetAName(e) + (ret!="" ? ' '+ret+')' : "");
   }
 
   public virtual void OnEquip  (Entity equipper) { equipped=true;  }

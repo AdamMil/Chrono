@@ -443,16 +443,18 @@ public class Map : UniqueObject
   }
   public Link GetLink(int index) { return GetLink(index, true); }
   public Link GetLink(int index, bool autoGenerate)
-  { /*if(autoGenerate && links[index].ToPoint.X==-1) // if the link hasn't been initialized yet
-    { Map nm = links[index].ToDungeon[links[index].ToLevel];
-      for(int ml=0,ol=0; ml<links.Length; ml++)    // initialize all links going to the same level
-      { if(links[ml].ToLevel!=nm.Index || links[ml].ToDungeon!=nm.Dungeon) continue; // skip ones going elsewhere
-        while(ol<nm.links.Length && nm.links[ol].ToLevel!=Index) ol++;
-        if(ol==nm.Links.Length) { links[ml].ToPoint = new Point(); continue; }
-        links[ml].ToPoint = nm.links[ol].FromPoint;
-        nm.links[ol].ToPoint = links[ml].FromPoint;
+  { if(autoGenerate && links[index].ToPoint.X==-1) // if the link hasn't been initialized yet
+    { Map nm = links[index].ToSection[links[index].ToLevel];
+      for(int i=0; i<nm.links.Length; i++)
+      { Link link = nm.links[i];
+        if(link.ToLevel==Index && link.ToSection==Section &&
+           (link.ToPoint.X==-1 || link.ToPoint==links[index].FromPoint))
+        { links[index].ToPoint = link.FromPoint;
+          nm.links[i].ToPoint  = links[index].FromPoint;
+          break;
+        }
       }
-    }*/
+    }
     return links[index];
   }
 
@@ -806,9 +808,7 @@ public class Map : UniqueObject
   }
 
   public static Map Load(XmlDocument doc, Dungeon.Section section, int index)
-  { XmlNamespaceManager xmlns = new XmlNamespaceManager(doc.NameTable);
-    xmlns.AddNamespace("map", "http://www.adammil.net/Chrono/map");
-    XmlNode root = doc.SelectSingleNode("map:map", xmlns);
+  { XmlElement root = doc.DocumentElement;
     Map map;
 
     XmlNode node = root.SelectSingleNode("rawMap");
@@ -865,37 +865,38 @@ public class Map : UniqueObject
 
     #region Add links
     foreach(XmlNode link in root.SelectNodes("link"))
-    { string to = link.Attributes["to"].Value, toSection=null, toDungeon=null;
+    { string av=link.Attributes["to"].Value, toSection=null, toDungeon=null;
       int toLevel;
 
-      if(to=="PREV")
+      if(av=="PREV")
       { if(index==0) continue;
         toLevel = index-1;
       }
-      else if(to=="NEXT")
+      else if(av=="NEXT")
       { if(index==section.Depth-1) continue;
         toLevel = index+1;
       }
-      else if(char.IsDigit(to[0])) toLevel = int.Parse(to);
+      else if(char.IsDigit(av[0])) toLevel = int.Parse(av);
       else
-      { int pos = to.IndexOf(':');
+      { int pos = av.IndexOf(':');
         if(pos!=-1)
-        { toLevel = int.Parse(to.Substring(pos+1));
-          to = to.Substring(0, pos);
+        { toLevel = int.Parse(av.Substring(pos+1));
+          av = av.Substring(0, pos);
         }
         else toLevel = 0;
-        pos = to.IndexOf('/');
-        if(pos==-1) toSection=to;
-        else { toSection=to.Substring(pos+1); toDungeon=to.Substring(0, pos); }
+        pos = av.IndexOf('/');
+        if(pos==-1) toSection=av;
+        else { toSection=av.Substring(pos+1); toDungeon=av.Substring(0, pos); }
       }
 
-      TileType type = (TileType)Enum.Parse(typeof(TileType), link.Attributes["type"].Value);
+      av = link.Attributes["type"].Value;
+      TileType type = av=="None" ? TileType.Border : (TileType)Enum.Parse(typeof(TileType), av);
       Point pt = map.FindXmlLocation(link);
       Link  li = new Link(pt, type!=TileType.UpStairs,
                           toSection==null ? section : (toDungeon==null ? section.Dungeon :
                                                                        Dungeon.GetDungeon(toDungeon))[toSection],
                           toLevel);
-      map.SetType(pt, type);
+      if(type!=TileType.Border) map.SetType(pt, type);
       map.AddLink(li);
     }
     #endregion
@@ -945,7 +946,8 @@ public class Map : UniqueObject
     if(c.Class!=EntityClass.Other) numCreatures--;
   }
   
-  Point FindXmlLocation(XmlNode node)
+  Point FindXmlLocation(XmlNode node) { return FindXmlLocation(node, false); }
+  Point FindXmlLocation(XmlNode node, bool optional)
   { XmlAttribute attr = node.Attributes["location"];
     if(attr!=null)
     { string loc = attr.Value;
@@ -959,6 +961,11 @@ public class Map : UniqueObject
     }
     else
     { node = node.SelectSingleNode("location");
+      if(node==null)
+      { if(optional) return new Point(-1, -1);
+        throw new ArgumentException("This node contains no location data");
+      }
+
       Point pt;
       while(true) // TODO: this is not optimal if it has to loop
       { attr = node.Attributes["tile"];

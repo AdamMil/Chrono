@@ -468,6 +468,7 @@ public sealed class ConsoleIO : InputOutput
 
     if(player.HungerLevel==Hunger.Hungry) { PutStringP(Color.Warning, width, x, y++, "Hungry"); xlines++; }
     else if(player.HungerLevel==Hunger.Starving) { PutStringP(Color.Dire, width, x, y++, "Starving"); xlines++; }
+
     if(xlines<statLines) console.Fill(x, y, width, statLines-xlines);
     statLines=xlines;
   }

@@ -100,7 +100,10 @@ public sealed class ConsoleIO : InputOutput
       else AppendToBL(c);
       if(char.IsDigit(c) && (flags&MenuFlag.AllowNum)!=0)
       { num = c-'0';
-        while(char.IsDigit(c=ReadChar(true))) num = c-'0' + num*10;
+        while(char.IsDigit(c=ReadChar(true)) || c=='\b')
+        { if(c=='\b') num /= 10;
+          else num = c-'0' + num*10;
+        }
       }
       if(num<-1 || num==0 || chars.IndexOf(c)==-1) { doRebuke=true; continue; }
       if(char.IsLetter(c) && num>items[c].Count) { AddLine("You don't have that many!", true); continue; }
@@ -607,7 +610,7 @@ public sealed class ConsoleIO : InputOutput
       { bool enabled = player.Training(skills[i]);
         Write(enabled ? Color.Normal : Color.DarkGrey, "{0} {1} {2} Skill {3} ",
               c++, enabled ? '+' : '-', skills[i].ToString().PadRight(18), player.GetSkill(skills[i]));
-        WriteLine(Color.LightBlue, "({0})", player.SkillExp[(int)skills[i]]*9/skillTable[(int)skills[i]]+1);
+        WriteLine(Color.LightBlue, "({0})", player.SkillExp[(int)skills[i]]*9/player.NextSkillLevel(skills[i])+1);
       }
 
       nextChar:

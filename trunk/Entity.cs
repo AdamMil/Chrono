@@ -490,8 +490,7 @@ public abstract class Entity : UniqueObject
     int points = Math.Min(Global.Rand(11), ExpPool);
     if(points==0) return;
     if(Global.Rand(100)<33) // 33% chance of exercise
-    { int need = RaceSkills[(int)Race][(int)skill];
-      need += (int)Math.Round(Math.Pow(1.1, GetSkill(skill)) * need); // it takes more XP to gain higher skills
+    { int need = NextSkillLevel(skill);
       ExpPool -= points;
       if((SkillExp[(int)skill] += points) >= need)
       { SkillExp[(int)skill] -= need;
@@ -644,6 +643,12 @@ public abstract class Entity : UniqueObject
     spell = (Spell)type.GetConstructor(Type.EmptyTypes).Invoke(null);
     spell.Memory = memory;
     Spells.Add(spell);
+  }
+
+  public int NextSkillLevel(Skill skill)
+  { int need = RaceSkills[(int)Race][(int)skill];
+    need += (int)Math.Round(Math.Pow(1.1, GetSkill(skill)) * need); // it takes more XP to gain higher skills
+    return need;
   }
 
   // event handlers (for output, etc)
@@ -1306,7 +1311,7 @@ public abstract class Entity : UniqueObject
         effect = true;
         
         Shop shop = Map.GetShop(pt);
-        if(shop.Shopkeeper!=null) shop.Shopkeeper.PlayerDamagedShop(this);
+        if(shop!=null && shop.Shopkeeper!=null) shop.Shopkeeper.PlayerDamagedShop(this);
       }
     }
     if(!effect) return false;

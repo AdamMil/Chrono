@@ -45,3 +45,4 @@ add ability to jump to monsters in DisplayMap (like in ChooseTarget)
 store gender and use it to change messages about "it" to "he" or "she" (eg, when examining creatures)
 add random encounters
 when using ',' to switch between weapons, remember both hands (eg, shield) and restore them
+make '$' a valid item that means "gold"

@@ -42,17 +42,19 @@ public class Dungeon
       }
     }
     
+    public string Name { get { return Xml.Attr(node, "name", Dungeon.Name); } }
+
     public Section Next
     { get
       { XmlNode next = node.NextSibling;
-        return next!=null && next.LocalName=="section" ? dungeon[next.Attributes["name"].Value] : null;
+        return next!=null && next.LocalName=="section" ? dungeon[next.Attributes["id"].Value] : null;
       }
     }
 
     public Section Previous
     { get
       { XmlNode prev = node.PreviousSibling;
-        return prev!=null && prev.LocalName=="section" ? dungeon[prev.Attributes["name"].Value] : null;
+        return prev!=null && prev.LocalName=="section" ? dungeon[prev.Attributes["id"].Value] : null;
       }
     }
 
@@ -70,7 +72,7 @@ public class Dungeon
 
       XmlAttribute attr = levels.Attributes["map"];
       if(attr==null) attr = node.Attributes["map"];
-      if(attr==null) attr = node.Attributes["name"];
+      if(attr==null) attr = node.Attributes["id"];
       string mapName = attr.Value;
       
       Map map = Map.Load(mapName, this, index);
@@ -88,7 +90,7 @@ public class Dungeon
   { get
     { Section section = (Section)sections[name];
       if(section==null)
-        sections[name] = section = new Section(node.SelectSingleNode("section[@name='"+name+"']"), this);
+        sections[name] = section = new Section(node.SelectSingleNode("section[@id='"+name+"']"), this);
       return section;
     }
   }
@@ -98,7 +100,7 @@ public class Dungeon
   public string StartSection
   { get
     { XmlAttribute start = node.Attributes["start"];
-      return (start==null ? node.SelectSingleNode("section").Attributes["name"] : start).Value;
+      return (start==null ? node.SelectSingleNode("section").Attributes["id"] : start).Value;
     }
   }
 

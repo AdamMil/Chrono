@@ -12,10 +12,25 @@
 
 <!--xs:include schemaLocation="../common.xsd"/--> <!-- above definitions should go in common.xsd -->
 
+<!-- direction -->
+<xs:simpleType name="direction">
+  <xs:restriction base="xs:string">
+    <xs:enumeration value="Random"/>
+    <xs:enumeration value="Up"/>
+    <xs:enumeration value="UpRight"/>
+    <xs:enumeration value="Right"/>
+    <xs:enumeration value="DownRight"/>
+    <xs:enumeration value="Down"/>
+    <xs:enumeration value="DownLeft"/>
+    <xs:enumeration value="Left"/>
+    <xs:enumeration value="UpLeft"/>
+  </xs:restriction>
+</xs:simpleType>
+
 <!-- generator -->
 <xs:simpleType name="generator">
   <xs:restriction base="xs:string">
-    <xs:enumeration value="RoomyMapGenerator"/>
+    <xs:enumeration value="RoomyDungeonGenerator"/>
     <xs:enumeration value="MetaCaveGenerator"/>
     <xs:enumeration value="TownGenerator"/>
   </xs:restriction>
@@ -119,8 +134,23 @@
   </xs:restriction>
 </xs:simpleType>
 
+<!-- relTo -->
+<xs:complexType name="relTo">
+  <xs:sequence>
+    <xs:element name="location" type="location" minOccurs="0"/>
+  </xs:sequence>
+  <xs:attribute name="location" type="locationString"/>
+  <xs:attribute name="distance" type="intRange" use="required"/>
+  <xs:attribute name="direction" type="direction" default="Random"/>
+</xs:complexType>
+
 <!-- location -->
 <xs:complexType name="location">
+  <xs:sequence>
+    <xs:element name="relTo" type="relTo" minOccurs="0"/>
+  </xs:sequence>
+
+  <xs:attribute name="link" type="xs:IDREF"/>
   <xs:attribute name="room" type="xs:IDREF"/>
   <xs:attribute name="tile" type="tileType"/>
   <xs:attribute name="pathTo" type="linkType"/>
@@ -153,6 +183,7 @@
   <xs:attribute name="location" type="locationString"/>
   <xs:attribute name="to" type="linkString"/>
   <xs:attribute name="type" type="linkType" use="required"/>
+  <xs:attribute name="id" type="xs:ID"/>
 </xs:complexType>
 
 <!-- npc -->
@@ -179,7 +210,7 @@
 
   <xs:attribute name="id" type="xs:ID" use="required"/>
   <xs:attribute name="name" type="xs:string"/>
-  <xs:attribute name="type">
+  <xs:attribute name="type" default="Other">
     <xs:simpleType>
       <xs:restriction base="xs:string">
         <xs:enumeration value="Overworld"/>

@@ -1,23 +1,33 @@
 <?xml version="1.0" encoding="utf-8" ?> 
 
-<dg:dungeon id="overworld" name="Overworld" start="gtown"
+<dg:dungeon name="Overworld" start="gtown"
   xmlns:dg="http://www.adammil.net/Chrono/dungeon"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://www.adammil.net/Chrono/dungeon dungeon.xsd">
 
-  <section name="overworld"> <!--the overworld map must be first, with a depth of 1-->
+  <section id="overworld"> <!--the overworld map must be first, with a depth of 1-->
     <levels depth="1"/>
   </section>
-  <section name="gtown">
+
+  <!-- towns -->
+  <section id="gtown">
     <levels depth="1"/>
   </section>
-  <section name="ftown">
+  <section id="ftown">
     <levels depth="1"/>
   </section>
-  <section name="itown">
+  <section id="itown">
     <levels depth="1"/>
   </section>
-  <section name="mtown">
+  <section id="mtown">
     <levels depth="1"/>
+  </section>
+  
+  <!-- dungeons -->
+  <section id="gtownDungeon" name="Grass Town Dungeon">
+    <levels depth="4:6" map="gtownDungeonRoomy"/>
+    <levels depth="1:2" map="gtownDungeonCave"/>
+    <levels depth="2:3" map="gtownDungeonRoomy"/>
+    <levels depth="1" map="gtownBottom"/>
   </section>
 </dg:dungeon>

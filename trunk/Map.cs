@@ -4,6 +4,7 @@ using System.Drawing;
 using System.IO;
 using System.Reflection;
 using System.Runtime.Serialization;
+using System.Xml;
 using GameLib.Collections;
 
 namespace Chrono
@@ -28,23 +29,19 @@ public enum TileType : byte
 public enum Trap : byte { Dart, PoisonDart, Magic, MpDrain, Teleport, Pit }
 
 [Serializable]
-public class Shop : UniqueObject
-{ public Shop(Rectangle area, Shopkeeper shopkeeper, ShopType type)
-  { OuterArea=area; Shopkeeper=shopkeeper; Type=type;
-  }
-
+public class Room : UniqueObject
+{ public Room(Rectangle area, string name) { OuterArea=area; Name=name; }
+  
   public Rectangle InnerArea { get { Rectangle r = OuterArea; r.Inflate(-1, -1); return r; } }
-  public Rectangle ItemArea
-  { get
-    { Rectangle ret = InnerArea;
-      switch(DoorSide)
-      { case Direction.Up:    ret.Y++; ret.Height--; break;
-        case Direction.Down:  ret.Height--; break;
-        case Direction.Left:  ret.X++; ret.Width--; break;
-        case Direction.Right: ret.Width--; break;
-      }
-      return ret;
-    }
+  
+  public Rectangle OuterArea;
+  public string Name;
+}
+
+[Serializable]
+public class Shop : Room
+{ public Shop(Rectangle area, Shopkeeper shopkeeper, ShopType type) : base(area, null)
+  { Shopkeeper=shopkeeper; Type=type;
   }
 
   public Point FrontOfDoor
@@ -55,6 +52,19 @@ public class Shop : UniqueObject
         case Direction.Down:  ret.Y--; break;
         case Direction.Left:  ret.X++; break;
         case Direction.Right: ret.X--; break;
+      }
+      return ret;
+    }
+  }
+
+  public Rectangle ItemArea
+  { get
+    { Rectangle ret = InnerArea;
+      switch(DoorSide)
+      { case Direction.Up:    ret.Y++; ret.Height--; break;
+        case Direction.Down:  ret.Height--; break;
+        case Direction.Left:  ret.X++; ret.Width--; break;
+        case Direction.Right: ret.Width--; break;
       }
       return ret;
     }
@@ -77,7 +87,6 @@ public class Shop : UniqueObject
     }
   }
 
-  public Rectangle  OuterArea;
   public Point      Door;
   public Direction  DoorSide;
   public Shopkeeper Shopkeeper;
@@ -104,19 +113,15 @@ public struct Tile
 
 [Serializable]
 public struct Link
-{ public Link(Point from, bool down)
-  { FromPoint=from; ToPoint=new Point(-1, -1); ToDungeon=null; ToLevel=-1; Down=down;
+{ public Link(Point from, bool down, Dungeon.Section toSection, int toLevel)
+  { ToPoint=new Point(-1, -1);
+    FromPoint=from; ToSection=toSection; ToLevel=toLevel; Down=down;
   }
-  public Link(Point from, MapCollection to, bool down)
-  { FromPoint=from; ToPoint=new Point(-1, -1); ToDungeon=to; ToLevel=0; Down=down;
-  }
-  public Link(Point from, MapCollection to, int level, bool down)
-  { FromPoint=from; ToPoint=new Point(-1, -1); ToDungeon=to; ToLevel=level; Down=down;
-  }
+
   public Point FromPoint, ToPoint;
-  public MapCollection ToDungeon;
+  public Dungeon.Section  ToSection;
   public int  ToLevel;
-  public bool Down;
+  public bool Down; // TODO: consider getting rid of this field
 }
 #endregion
 
@@ -330,9 +335,12 @@ public class Map : UniqueObject
 
   public EntityCollection Entities { get { return entities; } }
   public Link[] Links { get { return links; } }
-  public Shop[] Shops { get { return shops; } }
+  public Room[] Rooms { get { return rooms; } }
+
+  public string Name { get { return name; } }
   public int Width  { get { return width; } }
   public int Height { get { return height; } }
+
   public Tile this[int x, int y]
   { get { return x<0 || y<0 || x>=width || y>=height ? Tile.Border : map[y, x]; }
     set { map[y, x] = value; }
@@ -341,6 +349,8 @@ public class Map : UniqueObject
   { get { return this[pt.X, pt.Y]; }
     set { map[pt.Y, pt.X] = value; }
   }
+
+  public bool IsOverworld { get { return mapID=="overworld"; } }
 
   public Item AddItem(Point pt, Item item) { return AddItem(pt.X, pt.Y, item); }
   public Item AddItem(int x, int y, Item item)
@@ -358,16 +368,20 @@ public class Map : UniqueObject
     links = narr;
   }
 
+  public void AddRoom(Rectangle rect) { AddRoom(new Room(rect, null)); }
+  public void AddRoom(Rectangle rect, string name) { AddRoom(new Room(rect, name)); }
+  public void AddRoom(Room room)
+  { Room[] narr = new Room[rooms.Length+1];
+    if(narr.Length!=1) Array.Copy(rooms, narr, narr.Length-1);
+    rooms = narr;
+  }
+
   public void AddShop(Rectangle rect, ShopType type) { AddShop(rect, type, true); }
   public void AddShop(Rectangle rect, ShopType type, bool stock)
   { AddShop(rect, type, (Shopkeeper)Entity.Generate(typeof(Shopkeeper), Global.Rand(3), EntityClass.Fighter), stock);
   }
   public void AddShop(Rectangle rect, ShopType type, Shopkeeper shopkeeper, bool stock)
-  { Shop[] narr = new Shop[shops.Length+1];
-    if(narr.Length!=1) Array.Copy(shops, narr, narr.Length-1);
-    shops = narr;
-
-    Shop shop = narr[narr.Length-1] = new Shop(rect, shopkeeper, type);
+  { Shop shop = new Shop(rect, shopkeeper, type);
     for(int y=shop.OuterArea.Y; y<shop.OuterArea.Bottom; y++)
       for(int x=shop.OuterArea.X; x<shop.OuterArea.Right; x++)
         if(IsDoor(x, y))
@@ -386,10 +400,12 @@ public class Map : UniqueObject
     shop.Shopkeeper.Position    = shop.FrontOfDoor;
     shop.Shopkeeper.SocialGroup = GroupID;
     if(stock) while(RestockShop(shop));
+    
+    AddRoom(shop);
   }
   
   public void AddScent(int x, int y, int amount)
-  { if(Index==(int)Overworld.Place.Overworld && Dungeon is Overworld) return;
+  { if(IsOverworld) return;
     scentmap[y,x] = (ushort)Math.Min(scentmap[y,x]+Math.Min(amount, MaxScentAdd), MaxScent);
   }
 
@@ -399,13 +415,17 @@ public class Map : UniqueObject
 
   public void Fill(TileType type) { for(int y=0; y<height; y++) for(int x=0; x<width; x++) map[y,x].Type=type; }
 
+  public Entity GetEntity(int x, int y) { return GetEntity(new Point(x, y)); }
   public Entity GetEntity(Point pt)
   { Tile t = this[pt];
     if(t.Entity!=null) return t.Entity;
     for(int i=0; i<entities.Count; i++) if(entities[i].Position==pt) return entities[i];
     return null;
   }
-  public Entity GetEntity(int x, int y) { return GetEntity(new Point(x, y)); }
+  public Entity GetEntity(string id)
+  { for(int i=0; i<entities.Count; i++) if(entities[i].EntityID==id) return entities[i];
+    return null;
+  }
 
   public bool GetFlag(Point pt, Tile.Flag flag) { return this[pt.X,pt.Y].GetFlag(flag); }
   public bool GetFlag(int x, int y, Tile.Flag flag) { return this[x,y].GetFlag(flag); }
@@ -438,12 +458,18 @@ public class Map : UniqueObject
     return scentmap[y,x];
   }
 
-  public Shop GetShop(int x, int y) { return GetShop(new Point(x, y)); }
-  public Shop GetShop(Point pt)
-  { if(shops==null) return null;
-    for(int i=0; i<shops.Length; i++) if(shops[i].OuterArea.Contains(pt)) return shops[i];
+  public Room GetRoom(int x, int y) { return GetRoom(new Point(x, y)); }
+  public Room GetRoom(Point pt)
+  { for(int i=0; i<rooms.Length; i++) if(rooms[i].OuterArea.Contains(pt)) return rooms[i];
     return null;
   }
+  public Room GetRoom(string id)
+  { for(int i=0; i<rooms.Length; i++) if(rooms[i].Name==id) return rooms[i];
+    return null;
+  }
+
+  public Shop GetShop(int x, int y) { return GetRoom(new Point(x, y)) as Shop; }
+  public Shop GetShop(Point pt) { return GetRoom(pt) as Shop; }
 
   public bool HasItems(Point pt) { return HasItems(pt.X, pt.Y); }
   public bool HasItems(int x, int y) { return this[x,y].Items!=null && map[y,x].Items.Count>0; }
@@ -488,7 +514,7 @@ public class Map : UniqueObject
         if(IsFreeSpace(x, y, allow)) return new Point(x, y);
     throw new ArgumentException("No free space found!");
   }
-
+  
   public bool IsFreeSpace(Point pt, Space allow) { return IsFreeSpace(pt.X, pt.Y, allow); }
   public bool IsFreeSpace(int x, int y, Space allow)
   { Tile tile = this[x, y];
@@ -501,7 +527,7 @@ public class Map : UniqueObject
   }
 
   public void MakeNoise(Point pt, Entity source, Noise type, byte volume)
-  { if(Index==(int)Overworld.Place.Overworld && Dungeon is Overworld) return;
+  { if(IsOverworld) return;
     for(int y=0; y<height; y++) for(int x=0; x<width; x++) map[y,x].Sound=0;
     if(soundStack==null) soundStack=new Point[256];
     int slen, nslen=1;
@@ -616,7 +642,7 @@ public class Map : UniqueObject
 
   #region SpreadScent
   public unsafe void SpreadScent()
-  { if(Index==(int)Overworld.Place.Overworld && Dungeon is Overworld || width==1 || height==1) return;
+  { if(IsOverworld || width==1 || height==1) return;
     if(scentbuf==null || scentbuf.Length<width*height) scentbuf=new ushort[width*height];
     int wid=width-1, hei=height-1, ye=hei*width, val, n, to;
 
@@ -740,55 +766,109 @@ public class Map : UniqueObject
   public static bool IsWall(TileType type) { return (tileFlag[(int)type]&TileFlag.Wall) != TileFlag.None; }
   public static bool IsDoor(TileType type) { return (tileFlag[(int)type]&TileFlag.Door) != TileFlag.None; }
   
-  public static Map Load(Stream stream)
-  { StreamReader sr = new StreamReader(stream, System.Text.Encoding.ASCII);
-    ArrayList lines = new ArrayList();
-    string line;
-    while((line=sr.ReadLine())!=null && line!="--BEGIN MAP--");
-    while((line=sr.ReadLine())!=null && line!="--END MAP--") lines.Add(line);
+  public static Map Load(string name, Dungeon.Section section, int index)
+  { if(name.IndexOf('/')==-1) name = "map/"+name;
+    if(name.IndexOf('.')==-1) name += ".xml";
+    return Load(Global.LoadXml(name), section, index);
+  }
 
-    Map map = new Map(((string)lines[0]).Length, lines.Count);
-    for(int y=0; y<map.Height; y++)
-    { line = (string)lines[y];
-      for(int x=0; x<map.Width; x++)
-      { TileType type;
-        switch(line[x])
-        { case '*': type=TileType.Border; break;
-          case ' ': type=TileType.SolidRock; break;
-          case '#': type=TileType.Wall; break;
-          case '+': type=TileType.ClosedDoor; break;
-          case '-': type=TileType.OpenDoor; break;
-          case '.': type=TileType.RoomFloor; break;
-          case 'c': type=TileType.Corridor; break;
-          case '<': type=TileType.UpStairs; break;
-          case '>': type=TileType.DownStairs; break;
-          case 'w': type=TileType.ShallowWater; break;
-          case 'W': type=TileType.DeepWater; break;
-          case 'I': type=TileType.Ice; break;
-          case 'L': type=TileType.Lava; break;
-          case 'P': type=TileType.Pit; break;
-          case 'H': type=TileType.Hole; break;
-          case '^': type=TileType.Trap; break;
-          case '_': type=TileType.Altar; break;
-          case 'T': type=TileType.Tree; break;
-          case 'F': type=TileType.Forest; break;
-          case 'S': type=TileType.DirtSand; break;
-          case 'G': type=TileType.Grass; break;
-          case 'm': type=TileType.Hill; break;
-          case 'M': type=TileType.Mountain; break;
-          case 'R': type=TileType.Road; break;
-          case 'o': type=TileType.Town; break;
-          case '\\': type=TileType.Portal; break;
-          default: throw new ArgumentException(string.Format("Unknown tile type {0} at {1},{2}", line[x], x, y));
+  public static Map Load(XmlDocument doc, Dungeon.Section section, int index)
+  { XmlNode root = doc.SelectSingleNode("map");
+    Map map;
+
+    XmlNode node = root.SelectSingleNode("rawMap");
+    if(node!=null) // if we have raw map data
+    { string[] lines = Xml.BlockToArray(node.Value);
+      map = new Map(((string)lines[0]).Length, lines.Length);
+      for(int y=0; y<map.Height; y++)
+      { string line = (string)lines[y];
+        for(int x=0; x<map.Width; x++)
+        { TileType type;
+          #region Select tile type
+          switch(line[x])
+          { case '*': type=TileType.Border; break;
+            case ' ': type=TileType.SolidRock; break;
+            case '#': type=TileType.Wall; break;
+            case '+': type=TileType.ClosedDoor; break;
+            case '-': type=TileType.OpenDoor; break;
+            case '.': type=TileType.RoomFloor; break;
+            case 'c': type=TileType.Corridor; break;
+            case '<': type=TileType.UpStairs; break;
+            case '>': type=TileType.DownStairs; break;
+            case 'w': type=TileType.ShallowWater; break;
+            case 'W': type=TileType.DeepWater; break;
+            case 'I': type=TileType.Ice; break;
+            case 'L': type=TileType.Lava; break;
+            case 'P': type=TileType.Pit; break;
+            case 'H': type=TileType.Hole; break;
+            case '^': type=TileType.Trap; break;
+            case '_': type=TileType.Altar; break;
+            case 'T': type=TileType.Tree; break;
+            case 'F': type=TileType.Forest; break;
+            case 'S': type=TileType.DirtSand; break;
+            case 'G': type=TileType.Grass; break;
+            case 'm': type=TileType.Hill; break;
+            case 'M': type=TileType.Mountain; break;
+            case 'R': type=TileType.Road; break;
+            case 'o': type=TileType.Town; break;
+            case '\\': type=TileType.Portal; break;
+            default: throw new ArgumentException(string.Format("Unknown tile type {0} at {1},{2}", line[x], x, y));
+          }
+          #endregion
+          map.SetType(x, y, type);
         }
-        map.SetType(x, y, type);
       }
+
+      map.Section = section;
+      map.Index   = index;
     }
+    else map = MapGenerator.Generate(root, section, index);
+
+    map.mapID = root.Attributes["id"].Value;
+    map.name  = Xml.Attr(root, "name");
+
+    #region Add links
+    foreach(XmlNode link in root.SelectNodes("link"))
+    { string to = link.Attributes["to"].Value, toSection=null, toDungeon=null;
+      int toLevel;
+
+      if(to=="PREV")
+      { if(index==0) continue;
+        toLevel = index-1;
+      }
+      else if(to=="NEXT")
+      { if(index==section.Depth-1) continue;
+        toLevel = index+1;
+      }
+      else if(char.IsDigit(to[0])) toLevel = int.Parse(to);
+      else
+      { int pos = to.IndexOf(':');
+        if(pos!=-1)
+        { toLevel = int.Parse(to.Substring(pos+1));
+          to = to.Substring(0, pos);
+        }
+        pos = to.IndexOf('/');
+        if(pos==-1) toSection=to;
+        else { toSection=to.Substring(pos+1); toDungeon=to.Substring(0, pos); }
+      }
+
+      TileType type = (TileType)Enum.Parse(typeof(TileType), link.Attributes["type"].Value);
+      Point pt = map.FindXmlLocation(link);
+      Link  li = new Link(pt, type!=TileType.UpStairs,
+                          toSection==null ? section : (toDungeon==null ? section.Dungeon :
+                                                                       Dungeon.GetDungeon(toDungeon))[toSection],
+                          toLevel);
+      map.SetType(pt, type);
+      map.AddLink(li);
+    }
+    #endregion
+    
+    map.OnInit();
     return map;
   }
 
   public Map Memory;
-  public MapCollection Dungeon;
+  public Dungeon.Section Section;
   public int Index, GroupID=-1;
 
   protected int Age { get { return age; } }
@@ -808,26 +888,55 @@ public class Map : UniqueObject
   class EntityComparer : IComparer
   { public int Compare(object x, object y) { return ((Entity)x).Timer - ((Entity)y).Timer; }
   }
-
+  
   void Added(Entity c)
   { c.Map=this;
     c.OnMapChanged();
     if(c.Class!=EntityClass.Other) numCreatures++;
   }
+
   void Removed(Entity c)
   { c.Map=null;
     c.OnMapChanged();
     if(thinking>0) removedEntities[c]=true;
     if(c.Class!=EntityClass.Other) numCreatures--;
   }
+  
+  Point FindXmlLocation(XmlNode node)
+  { XmlAttribute attr = node.Attributes["location"];
+    if(attr!=null)
+    { string loc = attr.Value;
+      if(char.IsDigit(loc[0])) // X,Y format
+      { string[] bits = loc.Split(',');
+        return new Point(int.Parse(bits[0]), int.Parse(bits[1]));
+      }
+      
+      // assume it's the name of a tile type
+      return RandomTile((TileType)Enum.Parse(typeof(TileType), loc));
+    }
+    else
+    { node = node.SelectSingleNode("location");
+      Point pt;
+      while(true) // TODO: this is not optimal if it has to loop
+      { attr = node.Attributes["tile"];
+        if(attr!=null) pt = RandomTile((TileType)Enum.Parse(typeof(TileType), attr.Value)); // tile type
+        else pt = FreeSpace(GetRoom(node.Attributes["room"].Value).InnerArea); // room id
+        
+        attr = node.Attributes["pathTo"];
+        if(attr!=null) throw new NotImplementedException("'pathTo' attribute not implemented");
+        return pt;
+      }
+    }
+  }
 
   Tile[,] map;
   Link[]  links = new Link[0];
-  Shop[]  shops = new Shop[0];
+  Room[]  rooms = new Room[0];
   ushort[,] scentmap;
   EntityCollection entities;
   PriorityQueue thinkQueue = new PriorityQueue(new EntityComparer());
   Hashtable removedEntities = new Hashtable();
+  string mapID, name;
   int width, height, thinking, timer, age, numCreatures;
 
   static ushort[] scentbuf;
@@ -864,45 +973,5 @@ public class Map : UniqueObject
   };
 }
 #endregion
-
-[Serializable]
-public class TestMap : Map
-{ public TestMap(int width, int height) : base(width, height) { }
-  public TestMap(Size size) : base(size) { }
-  public TestMap(SerializationInfo info, StreamingContext context) : base(info, context) { }
-
-  public override void OnInit()
-  { int max = Width*Height/250, min = Width*Height/500;
-    for(int i=0,num=Global.Rand(max-min)+min+2; i<num; i++) SpawnItem();
-    for(int i=0,num=Global.Rand(max-min)+min; i<num; i++) SpawnMonster();
-  }
-
-  protected override void Think()
-  { base.Think();
-    int level = App.Player.Map.Index;
-    if(NumCreatures<50 && (Index==level && Age%75==0 || Index!=level && Age%150==0)) SpawnMonster();
-  }
-
-  Item SpawnItem()
-  { Item item = Global.SpawnItem(Global.NextSpawn());
-    AddItem(FreeSpace(Map.Space.All), item);
-    return item;
-  }
-
-  void SpawnMonster()
-  { int idx = Entities.Add(Entity.Generate(typeof(Orc), Index+1, EntityClass.Fighter));
-    for(int i=0; i<10; i++)
-    { Entities[idx].Position = FreeSpace();
-      if(App.Player==null || !App.Player.CanSee(Entities[idx])) break;
-    }
-  }
-}
-
-[Serializable]
-public class TownMap : Map
-{ public TownMap(int width, int height) : base(width, height) { }
-  public TownMap(Size size) : base(size) { }
-  public TownMap(SerializationInfo info, StreamingContext context) : base(info, context) { }
-}
 
 } // namespace Chrono

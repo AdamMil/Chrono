@@ -379,10 +379,10 @@ public class AmnesiaSpell : Spell
       if(user==App.Player)
       { if((buc&ItemStatus.Cursed)!=0)
         { int index = user.Map.Index;
-          if(index>0 && user.Map.Dungeon[index-1].Memory!=null)
-            user.Map.Dungeon[index-1].Memory = Wipe(user.Map.Dungeon[index-1].Memory, buc);
-          if(index<user.Map.Dungeon.Count-1 && user.Map.Dungeon[index+1].Memory!=null)
-            user.Map.Dungeon[index+1].Memory = Wipe(user.Map.Dungeon[index+1].Memory, buc);
+          if(index>0 && user.Map.Section[index-1].Memory!=null)
+            user.Map.Section[index-1].Memory = Wipe(user.Map.Section[index-1].Memory, buc);
+          if(index<user.Map.Section.Count-1 && user.Map.Section[index+1].Memory!=null)
+            user.Map.Section[index+1].Memory = Wipe(user.Map.Section[index+1].Memory, buc);
         }
         App.IO.Print("You feel your mind being twisted!");
       }

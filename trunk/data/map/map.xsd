@@ -3,152 +3,184 @@
            xmlns="http://www.adammil.net/Chrono/map"
            xmlns:xs="http://www.w3.org/2001/XMLSchema">
 
-  <!-- generator -->
-  <xs:simpleType name="generator">
-    <xs:restriction base="xs:string">
-      <xs:enumeration value="RoomyMapGenerator"/>
-      <xs:enumeration value="MetaCaveGenerator"/>
-      <xs:enumeration value="TownGenerator"/>
-    </xs:restriction>
-  </xs:simpleType>
+<!-- intRange -->
+<xs:simpleType name="intRange">
+  <xs:restriction base="xs:string">
+    <xs:pattern value="\d+(:\d+)?"/>
+  </xs:restriction>
+</xs:simpleType>
 
-  <!-- linkType -->
-  <xs:simpleType name="linkType">
-    <xs:restriction base="xs:string">
-      <xs:enumeration value="UpStairs"/>
-      <xs:enumeration value="DownStairs"/>
-      <xs:enumeration value="Town"/>
-      <xs:enumeration value="Portal"/>
-    </xs:restriction>
-  </xs:simpleType>
+<!--xs:include schemaLocation="../common.xsd"/--> <!-- above definitions should go in common.xsd -->
 
-  <!-- shopType -->
-  <xs:simpleType name="shopType">
-    <xs:restriction base="xs:string">
-      <xs:enumeration value="General"/>
-      <xs:enumeration value="Books"/>
-      <xs:enumeration value="Food"/>
-      <xs:enumeration value="Armor"/>
-      <xs:enumeration value="Weapons"/>
-      <xs:enumeration value="ArmorWeapons"/>
-      <xs:enumeration value="Accessories"/>
-      <xs:enumeration value="Magic"/>
-    </xs:restriction>
-  </xs:simpleType>
-  
-  <!-- tileType -->
-  <xs:simpleType name="tileType">
-    <xs:restriction base="xs:string">
-      <xs:enumeration value="SolidRock"/>
-      <xs:enumeration value="Wall"/>
-      <xs:enumeration value="ClosedDoor"/>
-      <xs:enumeration value="OpenDoor"/>
-      <xs:enumeration value="RoomFloor"/>
-      <xs:enumeration value="Corridor"/>
-      <xs:enumeration value="UpStairs"/>
-      <xs:enumeration value="DownStairs"/>
-      <xs:enumeration value="ShallowWater"/>
-      <xs:enumeration value="DeepWater"/>
-      <xs:enumeration value="Ice"/>
-      <xs:enumeration value="Lava"/>
-      <xs:enumeration value="Pit"/>
-      <xs:enumeration value="Hole"/>
-      <xs:enumeration value="Trap"/>
-      <xs:enumeration value="Altar"/>
-      <xs:enumeration value="Tree"/>
-      <xs:enumeration value="Forest"/>
-      <xs:enumeration value="DirtSand"/>
-      <xs:enumeration value="Grass"/>
-      <xs:enumeration value="Hill"/>
-      <xs:enumeration value="Mountain"/>
-      <xs:enumeration value="Road"/>
-      <xs:enumeration value="Town"/>
-      <xs:enumeration value="Portal"/>
-    </xs:restriction>
-  </xs:simpleType>
-  
-  <!-- trapType -->
-  <xs:simpleType name="trapType">
-    <xs:restriction base="xs:string">
-      <xs:enumeration value="Dart"/>
-      <xs:enumeration value="PoisonDart"/>
-      <xs:enumeration value="Magic"/>
-      <xs:enumeration value="MpDrain"/>
-      <xs:enumeration value="Teleport"/>
-      <xs:enumeration value="Pit"/>
-    </xs:restriction>
-  </xs:simpleType>
+<!-- generator -->
+<xs:simpleType name="generator">
+  <xs:restriction base="xs:string">
+    <xs:enumeration value="RoomyMapGenerator"/>
+    <xs:enumeration value="MetaCaveGenerator"/>
+    <xs:enumeration value="TownGenerator"/>
+  </xs:restriction>
+</xs:simpleType>
 
-  <!-- linkString -->
-  <xs:simpleType name="linkString">
-    <xs:restriction base="xs:string">
-      <xs:pattern value="[\w\.]+(:\d+,\d+|\w+)?"/>
-    </xs:restriction>
-  </xs:simpleType>
+<!-- linkType -->
+<xs:simpleType name="linkType">
+  <xs:restriction base="xs:string">
+    <xs:enumeration value="UpStairs"/>
+    <xs:enumeration value="DownStairs"/>
+    <xs:enumeration value="Town"/>
+    <xs:enumeration value="Portal"/>
+  </xs:restriction>
+</xs:simpleType>
 
-  <!-- locationString -->
-  <xs:simpleType name="locationString">
-    <xs:restriction base="xs:string">
-      <xs:pattern value="\d+,\d+|\w+"/>
-    </xs:restriction>
-  </xs:simpleType>
-  
-  <!-- sizeString -->
-  <xs:simpleType name="sizeString">
-    <xs:restriction base="xs:string">
-      <xs:pattern value="\d+(-\d+)?|-\d+"/>
-    </xs:restriction>
-  </xs:simpleType>
+<!-- shopType -->
+<xs:simpleType name="shopType">
+  <xs:restriction base="xs:string">
+    <xs:enumeration value="General"/>
+    <xs:enumeration value="Books"/>
+    <xs:enumeration value="Food"/>
+    <xs:enumeration value="Armor"/>
+    <xs:enumeration value="Weapons"/>
+    <xs:enumeration value="ArmorWeapons"/>
+    <xs:enumeration value="Accessories"/>
+    <xs:enumeration value="Magic"/>
+  </xs:restriction>
+</xs:simpleType>
 
-  <!-- location -->
-  <xs:complexType name="location">
-    <xs:attribute name="room" type="xs:IDREF"/>
-    <xs:attribute name="tile" type="tileType"/>
-    <xs:attribute name="pathTo" type="linkType"/>
-  </xs:complexType>
+<!-- tileType -->
+<xs:simpleType name="tileType">
+  <xs:restriction base="xs:string">
+    <xs:enumeration value="SolidRock"/>
+    <xs:enumeration value="Wall"/>
+    <xs:enumeration value="ClosedDoor"/>
+    <xs:enumeration value="OpenDoor"/>
+    <xs:enumeration value="RoomFloor"/>
+    <xs:enumeration value="Corridor"/>
+    <xs:enumeration value="UpStairs"/>
+    <xs:enumeration value="DownStairs"/>
+    <xs:enumeration value="ShallowWater"/>
+    <xs:enumeration value="DeepWater"/>
+    <xs:enumeration value="Ice"/>
+    <xs:enumeration value="Lava"/>
+    <xs:enumeration value="Pit"/>
+    <xs:enumeration value="Hole"/>
+    <xs:enumeration value="Trap"/>
+    <xs:enumeration value="Altar"/>
+    <xs:enumeration value="Tree"/>
+    <xs:enumeration value="Forest"/>
+    <xs:enumeration value="DirtSand"/>
+    <xs:enumeration value="Grass"/>
+    <xs:enumeration value="Hill"/>
+    <xs:enumeration value="Mountain"/>
+    <xs:enumeration value="Road"/>
+    <xs:enumeration value="Town"/>
+    <xs:enumeration value="Portal"/>
+  </xs:restriction>
+</xs:simpleType>
 
-  <!-- room -->
-  <xs:complexType name="room">
-    <xs:attribute name="id" type="xs:ID"/>
-    <xs:attribute name="required" type="xs:boolean"/>
-    <xs:attribute name="width" type="sizeString"/>
-    <xs:attribute name="height" type="sizeString"/>
-  </xs:complexType>
+<!-- trapType -->
+<xs:simpleType name="trapType">
+  <xs:restriction base="xs:string">
+    <xs:enumeration value="Dart"/>
+    <xs:enumeration value="PoisonDart"/>
+    <xs:enumeration value="Magic"/>
+    <xs:enumeration value="MpDrain"/>
+    <xs:enumeration value="Teleport"/>
+    <xs:enumeration value="Pit"/>
+  </xs:restriction>
+</xs:simpleType>
 
-  <!-- link -->
-  <xs:complexType name="link">
-    <xs:sequence>
-      <xs:element name="location" type="location" minOccurs="0"/>
-    </xs:sequence>
-    <xs:attribute name="location" type="locationString"/>
-    <xs:attribute name="to" type="linkString"/>
-    <xs:attribute name="type" type="linkType" use="required"/>
-  </xs:complexType>
+<!-- linkString
+  Format:
+    NEXT      Go to next map in section
+    PREV      Go to previous map in section
+    map OR level OR map:level
+  Where "map" is:
+    name      Go to section named "name"
+    dun/name  Go to section named "name" in dungeon "dun"
+  And "level" is an integer
+-->
+<xs:simpleType name="linkString">
+  <xs:restriction base="xs:string">
+    <xs:pattern value="NEXT|PREV|\d+|\w+(/\w+)?(:\d+)?"/>
+  </xs:restriction>
+</xs:simpleType>
 
-  <!-- npc -->
-  <xs:complexType name="npc">
-    <xs:sequence>
-      <xs:element name="location" type="location" minOccurs="0"/>
-    </xs:sequence>
+<!-- locationString -->
+<xs:simpleType name="locationString">
+  <xs:restriction base="xs:string">
+    <xs:pattern value="\d+,\d+|\w+"/>
+  </xs:restriction>
+</xs:simpleType>
 
-    <xs:attribute name="data" type="xs:string" use="required"/>
-    <xs:attribute name="ai" type="xs:string"/>
-    <xs:attribute name="location" type="locationString"/>
-  </xs:complexType>
+<!-- sizeString -->
+<xs:simpleType name="sizeString">
+  <xs:restriction base="xs:string">
+    <xs:pattern value="\d+(-\d+)?|-\d+"/>
+  </xs:restriction>
+</xs:simpleType>
 
-  <!-- map -->
-  <xs:complexType name="map">
-    <xs:sequence>
-      <xs:element name="room" type="room" minOccurs="0" maxOccurs="unbounded"/>
-      <xs:element name="link" type="link" minOccurs="0" maxOccurs="unbounded"/>
-      <xs:element name="npc" type="npc" minOccurs="0" maxOccurs="unbounded"/>
-      <xs:element name="rawMap" type="xs:string" minOccurs="0"/>
-    </xs:sequence>
+<!-- location -->
+<xs:complexType name="location">
+  <xs:attribute name="room" type="xs:IDREF"/>
+  <xs:attribute name="tile" type="tileType"/>
+  <xs:attribute name="pathTo" type="linkType"/>
+</xs:complexType>
 
-    <xs:attribute name="id" type="xs:ID" use="required"/>
-    <xs:attribute name="name" type="xs:string" use="required"/>
-    <xs:attribute name="generator" type="generator"/>
-  </xs:complexType>
-  
-  <xs:element name="map" type="map"/>
+<!-- generatorOptions -->
+<xs:complexType name="generatorOptions">
+  <xs:sequence>
+    <xs:any processContents="skip" minOccurs="0" maxOccurs="unbounded"/>
+  </xs:sequence>
+  <xs:attribute name="seed" type="xs:integer"/>
+  <xs:attribute name="width" type="intRange"/>
+  <xs:attribute name="height" type="intRange"/>
+  <xs:anyAttribute processContents="skip"/>
+</xs:complexType>
+
+<!-- room -->
+<xs:complexType name="room">
+  <xs:attribute name="id" type="xs:ID"/>
+  <xs:attribute name="required" type="xs:boolean"/>
+  <xs:attribute name="width" type="sizeString"/>
+  <xs:attribute name="height" type="sizeString"/>
+</xs:complexType>
+
+<!-- link -->
+<xs:complexType name="link">
+  <xs:sequence>
+    <xs:element name="location" type="location" minOccurs="0"/>
+  </xs:sequence>
+  <xs:attribute name="location" type="locationString"/>
+  <xs:attribute name="to" type="linkString"/>
+  <xs:attribute name="type" type="linkType" use="required"/>
+</xs:complexType>
+
+<!-- npc -->
+<xs:complexType name="npc">
+  <xs:sequence>
+    <xs:element name="location" type="location" minOccurs="0"/>
+  </xs:sequence>
+
+  <xs:attribute name="id" type="xs:ID"/>
+  <xs:attribute name="data" type="xs:string"/>
+  <xs:attribute name="ai" type="xs:string"/>
+  <xs:attribute name="location" type="locationString"/>
+</xs:complexType>
+
+<!-- map -->
+<xs:complexType name="map">
+  <xs:sequence>
+    <xs:element name="generatorOptions" type="generatorOptions" minOccurs="0"/>
+    <xs:element name="room" type="room" minOccurs="0" maxOccurs="unbounded"/>
+    <xs:element name="link" type="link" minOccurs="0" maxOccurs="unbounded"/>
+    <xs:element name="npc" type="npc" minOccurs="0" maxOccurs="unbounded"/>
+    <xs:element name="rawMap" type="xs:string" minOccurs="0"/>
+  </xs:sequence>
+
+  <xs:attribute name="id" type="xs:ID" use="required"/>
+  <xs:attribute name="name" type="xs:string"/>
+
+  <xs:attribute name="generator" type="generator"/>
+</xs:complexType>
+
+<xs:element name="map" type="map"/>
 </xs:schema>

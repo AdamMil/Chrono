@@ -257,7 +257,7 @@ public class Player : Entity
   public override void TalkTo() { App.IO.Print("Talking to yourself again?"); }
 
   public override void Think()
-  { if(OnOverworld) OverworldThink();
+  { if(Map.IsOverworld) OverworldThink();
     else DungeonThink();
   }
 
@@ -281,7 +281,7 @@ public class Player : Entity
   { switch(inp.Action)
     { case Action.Drop: case Action.DropType:
       { if(Inv.Count==0) { App.IO.Print("You're not carrying anything."); return false; }
-        if(OnOverworld)
+        if(Map.IsOverworld)
           App.IO.Print(Color.Warning, "Warning: Items dropped here will disappear if you leave the area.");
         CarryStress stress = CarryStress, newstress;
         MenuItem[] items;
@@ -447,7 +447,7 @@ public class Player : Entity
 
           np = Global.Move(Position, inp.Direction);
           if(Map.IsPassable(np) && !Map.IsDangerous(np))
-          { if(OnOverworld) PassTime(WalkTime(np));
+          { if(Map.IsOverworld) PassTime(WalkTime(np));
             OnMove(np);
             if(noise>0) Map.MakeNoise(np, this, Noise.Walking, (byte)noise);
           }
@@ -658,7 +658,7 @@ public class Player : Entity
         do
         { Point od = node.Parent.Point;
           if(Map.IsPassable(od))
-          { if(OnOverworld)
+          { if(Map.IsOverworld)
             { PassTime(WalkTime(od));
               if(first)
               { if(Map.HasItems(Position)) Map[Position].Items.Clear();
@@ -725,7 +725,7 @@ public class Player : Entity
         if(items.Length==0) goto nevermind;
         Item i = items[0].Item;
         bool consume;
-        if(OnOverworld && i.Usability!=ItemUse.Self) { App.IO.Print("You can't use that here."); return false; }
+        if(Map.IsOverworld && i.Usability!=ItemUse.Self) { App.IO.Print("You can't use that here."); return false; }
         if((i.Usability&ItemUse.UseTarget)!=0)
         { RangeTarget r = App.IO.ChooseTarget(this, (i.Usability&ItemUse.UseDirection)!=0);
           if(r.Dir==Direction.Invalid && r.Point.X==-1) goto nevermind;
@@ -804,19 +804,21 @@ public class Player : Entity
     TileType type = Map[pt].Type;
     if(Map.IsLink(type))
     { Link link = Map.GetLink(pt, false);
-      string name = link.ToDungeon.GetName(link.ToLevel);
-      switch(type)
-      { case TileType.UpStairs: case TileType.DownStairs:
-          App.IO.Print("There are stairs leading {0} here.",
-                       name!=null ? name : type==TileType.UpStairs ? "upwards" : "downwards");
-          break;
-        case TileType.Town: App.IO.Print("There is a road here leading to {0}.", name==null ? "a town" : name); break;
-        case TileType.Portal:
-          App.IO.Print("There is a portal here leading to {0}.", name==null ? "an unknown location" : name);
-          break;
-        default:
-          throw new ApplicationException(string.Format("UNKNOWN LINK TYPE {0} leading to {1}.",
-                                                       type, name==null ? "UNKNOWN LOCATION" : name));
+      if(type==TileType.UpStairs || type==TileType.DownStairs)
+        App.IO.Print("There are stairs leading {0} here.", type==TileType.UpStairs ? "upwards" : "downwards");
+      else
+      { string name = link.ToSection[link.ToLevel].Name;
+        switch(type)
+        { case TileType.Town:
+            App.IO.Print("There is a road here leading to {0}.", name==null ? "a town" : name);
+            break;
+          case TileType.Portal:
+            App.IO.Print("There is a portal here leading to {0}.", name==null ? "an unknown location" : name);
+            break;
+          default:
+            throw new ApplicationException(string.Format("UNKNOWN LINK TYPE {0} leading to {1}.",
+                                                        type, name==null ? "UNKNOWN LOCATION" : name));
+        }
       }
     }
   }
@@ -1213,7 +1215,7 @@ public class Player : Entity
     { if(Map.IsDangerous(type) && Map[Position].Type!=type &&
          !App.IO.YesNo(string.Format("Are you sure you want to move into {0}?", type.ToString().ToLower()), false))
         return false;
-      if(OnOverworld)
+      if(Map.IsOverworld)
       { if(Map.HasItems(Position)) Map[Position].Items.Clear();
         PassTime(WalkTime(pt));
       }
@@ -1222,8 +1224,7 @@ public class Player : Entity
       if(noise>0) Map.MakeNoise(pt, this, Noise.Walking, (byte)noise);
       return true;
     }
-    else if(type==TileType.Border && Map.Dungeon is Overworld && Map.Index!=(int)Overworld.Place.Overworld && // town
-            App.IO.YesNo("Leave the town?", false))
+    else if(type==TileType.Border && Map.IsTown && App.IO.YesNo("Leave the town?", false))
     { OnMove(Map.GetLink(0));
       return true;
     }

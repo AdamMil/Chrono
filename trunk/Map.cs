@@ -1,5 +1,7 @@
 using System;
+using System.Collections;
 using System.Drawing;
+using GameLib.Collections;
 
 namespace Chrono
 {
@@ -28,6 +30,7 @@ public struct Tile
   public void SetFlag(Flag flag, bool on) { if(on) Flags|=(byte)flag; else Flags&=(byte)~flag; }
 
   public Inventory Items;
+  public Creature  Creature;
   public TileType  Type;
   public Point     Dest;    // destination on prev/next level
   public byte      Subtype; // subtype of tile (ie, type of trap/altar/etc)
@@ -37,10 +40,57 @@ public struct Tile
 }
 
 public sealed class Map
-{ public Map(int width, int height)
+{ 
+  #region CreatureCollection
+  public class CreatureCollection : ArrayList
+  { public CreatureCollection(Map map) { this.map = map; }
+  
+    public new Creature this[int index] { get { return (Creature)base[index]; } }
+
+    public new void Add(object o) { Add((Creature)o); }
+    public void Add(Creature c)
+    { base.Add(c);
+      c.Map = map;
+    }
+    public new void AddRange(ICollection creatures)
+    { base.AddRange(creatures);
+      foreach(Creature c in creatures) map.Added(c);
+    }
+    public new void Insert(int index, object o) { Insert(index, (Creature)o); }
+    public void Insert(int index, Creature c)
+    { base.Insert(index, c);
+      map.Added(c);
+    }
+    public void InsertRange(ICollection creatures, int index)
+    { base.InsertRange(index, creatures);
+      foreach(Creature c in creatures) map.Added(c);
+    }
+    public new void Remove(object o) { Remove((Creature)o); }
+    public void Remove(Creature c)
+    { base.Remove(c);
+      map.Removed(c);
+    }
+    public new void RemoveAt(int index)
+    { Creature c = this[index];
+      base.RemoveAt(index);
+      map.Removed(c);
+    }
+    public new void RemoveRange(int index, int count)
+    { if(index<0 || index>=Count || count<0 || index+count>Count)
+        throw new ArgumentOutOfRangeException();
+      for(int i=0; i<count; i++) map.Removed(this[index+i]);
+      base.RemoveRange(index, count);
+    }
+
+    protected Map map;
+  }
+  #endregion
+
+  public Map(int width, int height)
   { this.width  = width;
     this.height = height;
     map = new Tile[height, width];
+    creatures = new CreatureCollection(this);
   }
 
   public int Width  { get { return width; } }
@@ -81,6 +131,55 @@ public sealed class Map
   public static bool IsWall(TileType type) { return (tileFlag[(int)type]&TileFlag.IsWall) != TileFlag.None; }
   public static bool IsDoor(TileType type) { return (tileFlag[(int)type]&TileFlag.IsDoor) != TileFlag.None; }
 
+  public CreatureCollection Creatures { get { return creatures; } }
+
+  public void Simulate() { Simulate(null); }
+  public void Simulate(Player player)
+  { bool addedPlayer = player==null;
+
+    while(thinkQueue.Count==0)
+    { while(thinkQueue.Count==0)
+        for(int i=0; i<creatures.Count; i++)
+        { Creature c = creatures[i];
+          c.Timer += c.Speed;
+          if(c.Timer>=100)
+          { if(c==player) addedPlayer=true;
+            thinkQueue.Enqueue(c);
+          }
+        }
+      if(addedPlayer) break;
+      Simulate(null);
+    }
+
+    thinking++;
+    while(thinkQueue.Count!=0)
+    { Creature c = (Creature)thinkQueue.DequeueMaximum();
+      if(removedCreatures.Contains(c)) continue;
+      if(c==player) { thinking--; return; }
+      c.Think();
+    }
+    if(--thinking==0) removedCreatures.Clear();
+  }
+
+  class CreatureComparer : IComparer
+  { public int Compare(object x, object y) { return ((Creature)x).Timer - ((Creature)y).Timer; }
+  }
+
+  void Added(Creature c)
+  { c.Map=this;
+    if(thinking>0) thinkQueue.Enqueue(c);
+  }
+  void Removed(Creature c)
+  { c.Map=null;
+    if(thinking>0) removedCreatures[c]=true;
+  }
+
+  Tile[,] map;
+  CreatureCollection creatures;
+  PriorityQueue thinkQueue = new PriorityQueue(new CreatureComparer());
+  GameLib.Collections.Map removedCreatures = new GameLib.Collections.Map();
+  int width, height, thinking;
+
   [Flags]
   enum TileFlag : byte { None=0, Passable=1, IsWall=2, IsDoor=4 }
   static readonly TileFlag[] tileFlag = new TileFlag[]
@@ -93,9 +192,6 @@ public sealed class Map
     TileFlag.Passable, TileFlag.Passable, TileFlag.Passable, TileFlag.Passable,
     TileFlag.Passable, TileFlag.Passable, TileFlag.Passable, TileFlag.Passable
   };
-  
-  Tile[,] map;
-  int width, height;
 }
 
 } // namespace Chrono

@@ -965,10 +965,11 @@ public abstract class Entity : UniqueObject
   public Point  Position;     // our position within the map
   public int    Timer;        // when timer >= speed, our turn is up
   public Flag   BaseFlags;    // our flags, not counting modifiers
+  public int Age, ExpPool, Hunger;
   public Race   Race;         // our race
   public EntityClass Class;   // our class/job
   public Color  Color=Color.Dire; // our general color
-  public int Age, ExpPool, Hunger;
+  public bool Male = true;
 
   // generates a creature, creates it and calls the creature's Generate() method. class is RandomClass if not passed
   public static Entity Generate(Type type, int level) { return Generate(type, level, EntityClass.RandomClass); }

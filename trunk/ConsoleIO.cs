@@ -506,10 +506,11 @@ public sealed class ConsoleIO : InputOutput
     int numSkills=0;
 
     for(int i=0; i<(int)Skill.NumSkills; i++) if(player.SkillExp[i]>0) skills[numSkills++]=(Skill)i;
+    console.WriteLine(numSkills==0 ? "You are completely unskilled!" : "Select a skill to toggle training it.");
 
     while(true)
     { char c='a';
-      console.SetCursorPosition(0, 2);
+      console.SetCursorPosition(0, 3);
       for(int i=0; i<numSkills; i++)
       { bool enabled = player.Training(skills[i]);
         Write(enabled ? Color.Normal : Color.DarkGrey, "{0} {1} {2} Skill {3} ",
@@ -654,6 +655,7 @@ public sealed class ConsoleIO : InputOutput
       else if(rec.Key.HasMod(NTConsole.Modifier.Ctrl)) switch(c+64)
       { case 'P': DisplayMessages(false); break;
         case 'Q': inp.Action = Action.Quit; break;
+        case 'X': inp.Action = Action.Save; break;
       }
       else switch(c)
       { case 'b': case 'h': case 'j': case 'k': case 'l': case 'n': case 'u': case 'y':
@@ -1082,7 +1084,7 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
     x = 0; y++;
     console.SetCursorPosition(x, y);
 
-    x += Write(Color.Normal, "Dlvl:{0} $:{1} ", player.Map.Index, player.Gold);
+    x += Write(Color.Normal, "Dlvl:{0} $:{1} ", player.Map.Index+1, player.Gold);
     int healthpct = player.HP*100/player.MaxHP;
     x += Write(healthpct<25 ? Color.Dire : healthpct<50 ? Color.Warning : Color.Normal, "HP:{0}/{1} ",
                player.HP, player.MaxHP);

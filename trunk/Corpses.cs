@@ -1,8 +1,10 @@
 using System;
+using System.Runtime.Serialization;
 
 namespace Chrono
 {
 
+[Serializable]
 public class Corpse : Item
 { [Flags] public enum Flag { Rotting=1, Skeleton=2, Tainted=4 };
 
@@ -12,6 +14,7 @@ public class Corpse : Item
     CorpseOf = of;
     if(of.Sickness+of.Poison>1) Flags |= Flag.Tainted;
   }
+  public Corpse(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override bool Think(Entity holder)
   { base.Think(holder);

@@ -1,17 +1,17 @@
 using System;
+using System.Collections;
+using System.Runtime.Serialization;
 
 namespace Chrono
 {
 
+#region Scroll
 public abstract class Scroll : Readable
 { public Scroll()
   { Class=ItemClass.Scroll; Prefix="scroll of "; PluralSuffix=""; PluralPrefix="scrolls of "; Weight=1;
     Durability=75;
   }
-  protected Scroll(Item item) : base(item)
-  { Scroll scroll = (Scroll)item;
-    Spell=scroll.Spell; FirstUseMsg=scroll.FirstUseMsg; Prompt=scroll.Prompt; AutoIdentify=scroll.AutoIdentify;
-  }
+  protected Scroll(SerializationInfo info, StreamingContext context) : base(info, context) { }
   static Scroll() { Global.RandomizeNames(names); }
 
   public override string Name { get { return Spell.Name; } }
@@ -31,13 +31,11 @@ public abstract class Scroll : Readable
 
   public virtual void Read(Entity user) // only called interactively
   { if(FirstUseMsg!=null && !user.KnowsAbout(this)) App.IO.Print(FirstUseMsg);
-    if(AutoIdentify) user.AddKnowledge(this);
+    if(Spell.AutoIdentify) user.AddKnowledge(this);
     if(!Cast(user)) App.IO.Print("The scroll crumbles into dust.");
   }
 
   public Spell Spell;
-  public string FirstUseMsg, Prompt;
-  public bool AutoIdentify;
 
   protected bool Cast(Entity user)
   { switch(Spell.Target)
@@ -57,28 +55,44 @@ public abstract class Scroll : Readable
     return true;
   }
 
+  protected string FirstUseMsg, Prompt;
+
+  public static void Deserialize(System.IO.Stream stream, IFormatter formatter)
+  { namemap = (Hashtable)formatter.Deserialize(stream);
+    names   = (string[])formatter.Deserialize(stream);
+    namei   = (int)formatter.Deserialize(stream);
+  }
+  public static void Serialize(System.IO.Stream stream, IFormatter formatter)
+  { formatter.Serialize(stream, namemap);
+    formatter.Serialize(stream, names);
+    formatter.Serialize(stream, namei);
+  }
+
   static System.Collections.Hashtable namemap = new System.Collections.Hashtable();
   static string[] names = new string[] { "READ ME", "XGOCL APLFLCH", "DROWSSAP", "EUREKA!" };
   static int namei;
 }
+#endregion
 
+[Serializable]
 public class TeleportScroll : Scroll
 { public TeleportScroll() { name="teleport"; Color=Color.White; Spell=TeleportSpell.Default; }
-  public TeleportScroll(Item item) : base(item) { }
+  public TeleportScroll(SerializationInfo info, StreamingContext context) : base(info, context) { }
 }
 
+[Serializable]
 public class IdentifyScroll : Scroll
 { public IdentifyScroll()
-  { name="identify"; Color=Color.White; Spell=IdentifySpell.Default; AutoIdentify=true;
+  { name="identify"; Color=Color.White; Spell=IdentifySpell.Default;
     FirstUseMsg="This is a scroll of identification."; Prompt="Identify which item?";
   }
-  public IdentifyScroll(Item item) : base(item) { }
+  public IdentifyScroll(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override void Read(Entity user)
   { if(Cursed && Global.Coinflip()) App.IO.Print("Nothing seems to happen.");
     else
     { if(FirstUseMsg!=null && !user.KnowsAbout(this)) App.IO.Print(FirstUseMsg);
-      if(AutoIdentify) user.AddKnowledge(this);
+      if(Spell.AutoIdentify) user.AddKnowledge(this);
       if(!Blessed || Global.Rand(100)<80)
       { int n = Blessed ? Global.Rand(3) + 2 : 1;
         while(n-->0) Cast(user);

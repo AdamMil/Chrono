@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.Serialization;
 
 namespace Chrono
 {
@@ -9,13 +10,10 @@ public enum WeaponClass
 { Dagger, ShortBlade, LongBlade, Axe, MaceFlail, PoleArm, Staff, Bow, Crossbow, Thrown, NumClasses
 }
 
+#region Weapon, FiringWeapon, Ammo
 public abstract class Weapon : Wieldable
 { public Weapon() { Class=ItemClass.Weapon; }
-  protected Weapon(Item item) : base(item)
-  { Weapon ow = (Weapon)item;
-    wClass=ow.wClass; Delay=ow.Delay; Noise=ow.Noise; ToHitBonus=ow.ToHitBonus; baseToHit=ow.baseToHit;
-    baseDamage=ow.baseDamage; damageBonus=ow.damageBonus; Ranged=ow.Ranged;
-  }
+  protected Weapon(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override string FullName
   { get
@@ -42,7 +40,6 @@ public abstract class Weapon : Wieldable
 
   public WeaponClass wClass;
   public int  Delay;  // delay (percentage of speed)
-  public int  Noise;  // noise this weapon makes (0-10)
   public int  ToHitBonus;
   public bool Ranged;
   
@@ -51,6 +48,7 @@ public abstract class Weapon : Wieldable
 
 public abstract class FiringWeapon : Weapon
 { public FiringWeapon() { Ranged=true; }
+  protected FiringWeapon(SerializationInfo info, StreamingContext context) : base(info, context) { }
   public abstract Compatibility CompatibleWith(Ammo ammo);
   
   public string AmmoName;
@@ -58,34 +56,40 @@ public abstract class FiringWeapon : Weapon
 
 public abstract class Ammo : Item
 { public Ammo() { Class=ItemClass.Ammo; }
-  public Ammo(Item item) : base(item) { }
+  protected Ammo(SerializationInfo info, StreamingContext context) : base(info, context) { }
   
   public virtual Damage ModDamage(Damage damage) { return damage; }
 }
+#endregion
 
+#region Arrows
 public abstract class Arrow : Ammo
 { public Arrow() { Weight=3; }
-  public Arrow(Item item) : base(item) { }
+  protected Arrow(SerializationInfo info, StreamingContext context) : base(info, context) { }
 }
 
+[Serializable]
 public class BasicArrow : Arrow
 { public BasicArrow() { name="arrow"; }
-  public BasicArrow(Item item) : base(item) { }
+  public BasicArrow(SerializationInfo info, StreamingContext context) : base(info, context) { }
 }
 
+[Serializable]
 public class FlamingArrow : Arrow
 { public FlamingArrow() { name="flaming arrow"; }
-  public FlamingArrow(Item item) : base(item) { }
-  
+  public FlamingArrow(SerializationInfo info, StreamingContext context) : base(info, context) { }
+
   public override Damage ModDamage(Damage damage)
   { damage.Heat += (ushort)Global.NdN(1, 4);
     return damage;
   }
 }
+#endregion
 
+[Serializable]
 public class Dart : Weapon
 { public Dart() { wClass=WeaponClass.Thrown; Ranged=true; name="poisoned dart"; Weight=2; }
-  public Dart(Item item) : base(item) { }
+  public Dart(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override Damage CalculateDamage(Entity user, Ammo ammo, Entity target)
   { Damage d = new Damage(Global.NdN(1, 3+(int)CompatibleWith(user)) + user.StrBonus/2 + damageBonus);
@@ -94,11 +98,13 @@ public class Dart : Weapon
   }
 }
 
+[Serializable]
 public class Bow : FiringWeapon
 { public Bow()
   { name="recurved bow"; AmmoName="arrows";
     Color=Color.LightCyan; Weight=20; Delay=25; wClass=WeaponClass.Bow; Exercises=Attr.Dex; Noise=2;
   }
+  public Bow(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override Compatibility CompatibleWith(Ammo ammo)
   { return ammo is Arrow ? Compatibility.Okay : Compatibility.None;
@@ -111,11 +117,13 @@ public class Bow : FiringWeapon
   }
 }
 
+[Serializable]
 public class ShortSword : Weapon
 { public ShortSword()
   { name="short sword"; Color=Color.Purple; Weight=35; Delay=5;
     wClass=WeaponClass.ShortBlade; Exercises=Attr.Str; Noise=5;
   }
+  public ShortSword(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override Damage CalculateDamage(Entity user, Ammo ammo, Entity target)
   { return new Damage(Global.NdN(1, 6+(int)CompatibleWith(user)) + user.StrBonus + damageBonus);

@@ -3,6 +3,7 @@ using System;
 namespace Chrono
 {
 
+[Serializable]
 public class Dungeon
 { public Map this[int i]
   { get

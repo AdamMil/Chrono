@@ -1,11 +1,14 @@
 using System;
 using System.Drawing;
+using System.Runtime.Serialization;
 
 namespace Chrono
 {
 
+[Serializable]
 public class Player : Entity
 { public Player() { Color=Color.White; Timer=50; Spells=new System.Collections.ArrayList(); }
+  public Player(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override void Die(object killer, Death cause)
   { switch(cause)
@@ -35,6 +38,7 @@ public class Player : Entity
         else Die(cause==Death.Poison ? "poison" : "sickness");
         break;
       }
+      case Death.Quit: Die("giving up"); break;
       case Death.Starvation: Die("starvation"); break;
       case Death.Trap: Die("TRAP - finish me"); break;
       default: Die("unknown"); break;
@@ -69,6 +73,23 @@ public class Player : Entity
     switch(inp.Action)
     { case Action.Carve:
       { if(CarryStress==CarryStress.Overtaxed) goto carrytoomuch;
+        Weapon w = Weapon;
+        Item si=null;
+        if(IsSharp(w)) si=w;
+        else
+        { foreach(Item i in Inv)
+            if(i.Class==ItemClass.Weapon && !i.KnownCursed && IsSharp((Weapon)i))
+            { if(!TryUnequip(w))
+              { App.IO.Print("You need a sharp object, but you can't unequip {0}.", w.GetFullName(this));
+                goto next;
+              }
+              si = i;
+              Equip((Weapon)i);
+              break;
+            }
+          if(si==null) { App.IO.Print("You can't find a sharp item to use!"); goto next; }
+        }
+
         Item item;
         IInventory inv;
         if(!GroundPackUse(typeof(Corpse), "Butcher", out item, out inv, ItemClass.Corpse)) goto next;
@@ -78,14 +99,13 @@ public class Player : Entity
         { App.IO.Print("You can't find any usable meat on this skeleton."); goto next;
         }
 
-        int turn=1, turns=(corpse.Weight+99)/100;
-        corpse.CarveTurns++;
+        int turn=++corpse.CarveTurns, turns=(corpse.Weight+99)/100;
         if(turns>1) App.IO.Print("You begin carving the {0}.", corpse.Name);
         while(turn<turns)
         { corpse.CarveTurns=++turn;
           if(ThinkUpdate(ref vis)) break;
         }
-        if(turn<turns) { App.IO.Print("You stop carving the {0}.", corpse.Name); goto next; }
+        if(turn<turns) App.IO.Print("You stop carving the {0}.", corpse.Name);
         else
         { inv.Remove(corpse);
           Flesh food = new Flesh(corpse);
@@ -96,9 +116,13 @@ public class Player : Entity
             Map.AddItem(Position, food);
           }
         }
+        if(si!=w)
+        { if(TryUnequip(si)) Equip(w);
+          else App.IO.Print("You can't unequip {0}!", si.GetFullName(this));
+        }
         break;
       }
-      
+
       case Action.CastSpell:
       { if(Spells.Count==0) { App.IO.Print("You don't know any spells!"); break; }
         if(CarryStress==CarryStress.Overtaxed) goto carrytoomuch;
@@ -244,7 +268,8 @@ public class Player : Entity
         if(toEat.Count>1) { toEat = (Food)toEat.Split(1); split=true; }
         if(toEat.FoodLeft>Food.MaxFoodPerTurn) App.IO.Print("You begin to eat {0}.", toEat);
         while(true)
-        { if(toEat.Eat(this)) { consumed=true; break; }
+        { Map.MakeNoise(Position, this, Noise.Item, toEat.GetNoise(this));
+          if(toEat.Eat(this)) { consumed=true; break; }
           if(Hunger<Food.MaxFoodPerTurn) break;
           if(ThinkUpdate(ref vis)) { App.IO.Print("You stop eating."); stopped=true; break; }
         }
@@ -303,7 +328,7 @@ public class Player : Entity
       { if(CarryStress>CarryStress.Stressed) goto carrytoomuch;
         if(Map[Position].Type!=TileType.UpStairs) { App.IO.Print("You can't go up here!"); goto next; }
         if(Map.Index==0)
-        { if(App.IO.YesNo("If you go up here, you will leave the dungeon. Are you sure?", false)) App.Quit=true;
+        { if(App.IO.YesNo("If you go up here, you will leave the dungeon. Are you sure?", false)) Quit();
         }
         else
         { Map.SaveMemory(Memory);
@@ -441,11 +466,15 @@ public class Player : Entity
         if(!GroundPackUse(typeof(Potion), "Drink", out potion, out inv, ItemClass.Potion)) goto next;
         if(potion.Count>1) ((Potion)potion.Split(1)).Drink(this);
         else { inv.Remove(potion); ((Potion)potion).Drink(this); }
+        Map.MakeNoise(Position, this, Noise.Item, potion.GetNoise(this));
         break;
       }
 
       case Action.Quit:
-        if(App.IO.YesNo(Color.Warning, "Do you really want to quit?", false)) App.Quit=true;
+        if(App.IO.YesNo(Color.Warning, "Do you really want to quit?", false))
+        { if(App.IO.YesNo("Do you want to save?", true)) Save();
+          else Quit();
+        }
         break;
 
       case Action.Read:
@@ -462,6 +491,7 @@ public class Player : Entity
           else inv.Remove(scroll);
           OnReadScroll(scroll);
           scroll.Read(this);
+          Map.MakeNoise(Position, this, Noise.Item, scroll.GetNoise(this));
         }
         else // read spellbook
         { Spellbook book = (Spellbook)read;
@@ -563,6 +593,8 @@ public class Player : Entity
         }
         break;
 
+      case Action.Save: Save(); break;
+
       case Action.ShowKnowledge:
         if(Knowledge==null) App.IO.Print("You're still ignorant of everything!");
         else App.IO.DisplayKnowledge(this);
@@ -646,6 +678,7 @@ public class Player : Entity
           consume = i.Use(this, d);
         }
         else consume = i.Use(this, Direction.Self);
+        Map.MakeNoise(Position, this, Noise.Item, i.GetNoise(this));
         if(consume)
         { if(i.Count>1) i.Count--;
           else Inv.Remove(i.Char);
@@ -712,6 +745,7 @@ public class Player : Entity
         }
         else if(rt.Point.X!=-1) destroy=wand.Zap(this, rt.Point);
         else goto nevermind;
+        Map.MakeNoise(Position, this, Noise.Zap, wand.GetNoise(this));
         if(destroy) Inv.Remove(wand);
         break;
       }
@@ -754,6 +788,11 @@ public class Player : Entity
     return true;
   }
   
+  protected bool IsSharp(Weapon w)
+  { return w.wClass==WeaponClass.Axe || w.wClass==WeaponClass.Dagger || w.wClass==WeaponClass.LongBlade ||
+           w.wClass==WeaponClass.ShortBlade;
+  }
+
   protected virtual void OnAge()
   { if(Spells!=null)
       for(int i=0; i<Spells.Count; i++)
@@ -866,12 +905,15 @@ public class Player : Entity
     if(Is(Flag.Asleep)) cause += ", while sleeping";
     App.IO.Print("Goodbye {0} the {1}...", Name, Title);
     App.IO.Print("You were killed by: "+cause);
-    if(!App.IO.YesNo("Die?", false))
+    if(!App.Quit && !App.IO.YesNo("Die?", false))
     { App.IO.Print("Okay, you're alive again.");
       HP = MaxHP;
     }
     else App.Quit = true;
   }
+
+  public void Quit() { HP=0; App.Quit=true; Die(Death.Quit); }
+  public void Save() { App.Quit=true; }
 
   protected bool ThinkUpdate(ref Point[] vis)
   { Map.Simulate(this);
@@ -883,14 +925,14 @@ public class Player : Entity
     if(interrupt) { interrupt=false; return true; }
     return false;
   }
-  
+
   protected static readonly ItemClass[] wearableClasses =  new ItemClass[]
   { ItemClass.Amulet, ItemClass.Armor, ItemClass.Ring, ItemClass.Shield
   };
 
-  Input inp;
+  [NonSerialized] Input inp;
   HungerLevel oldHungerLevel;
-  PathFinder path = new PathFinder();
+  [NonSerialized] PathFinder path = new PathFinder();
 }
 
 } // namespace Chrono

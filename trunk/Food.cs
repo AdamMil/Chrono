@@ -1,14 +1,12 @@
 using System;
+using System.Runtime.Serialization;
 
 namespace Chrono
 {
 
-public class Food : Item
+public abstract class Food : Item
 { public Food() { Class=ItemClass.Food; }
-  public Food(Item item) : base(item)
-  { Food food = (Food)item;
-    Flags=food.Flags; DecayTime=food.DecayTime;
-  }
+  protected Food(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public const int FoodPerWeight=75, MaxFoodPerTurn=150;
 
@@ -67,9 +65,10 @@ public class Food : Item
   }
 }
 
+[Serializable]
 public class FortuneCookie : Food
 { public FortuneCookie() { name="fortune cookie"; Color=Color.Brown; Weight=1; }
-  public FortuneCookie(Item item) : base(item) { }
+  public FortuneCookie(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override bool Eat(Entity user)
   { if((Flags&Flag.Partial)==0) // use Partial to indicate whether or not it's been opened
@@ -81,11 +80,13 @@ public class FortuneCookie : Food
   }
 }
 
+[Serializable]
 public class Hamburger : Food
 { public Hamburger() { name="hamburger"; Color=Color.Red; Weight=5; }
-  public Hamburger(Item item) : base(item) { }
+  public Hamburger(SerializationInfo info, StreamingContext context) : base(info, context) { }
 }
 
+[Serializable]
 public class Flesh : Food
 { public Flesh(Corpse from)
   { Color=from.Color; Weight=2; Prefix="a chunk of "; PluralPrefix="chunks of "; PluralSuffix="";
@@ -94,7 +95,7 @@ public class Flesh : Food
     if((from.Flags&Corpse.Flag.Rotting)!=0) { Rot(null); Age=DecayTime; }
     if((from.Flags&Corpse.Flag.Tainted)!=0) Flags |= Flag.Tainted;
   }
-  public Flesh(Item item) : base(item) { FromCorpse=((Flesh)item).FromCorpse; }
+  public Flesh(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public Corpse FromCorpse;
 }

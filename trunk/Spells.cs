@@ -1,6 +1,8 @@
 using System;
 using System.Collections;
 using System.Drawing;
+using System.Reflection;
+using System.Runtime.Serialization;
 
 namespace Chrono
 {
@@ -11,8 +13,22 @@ public enum SpellClass // remember to add these to the Skill enum as well
   Poison
 }
 
-public abstract class Spell
-{ public void Cast(Entity user) { Cast(user, ItemStatus.None, user.Position, Direction.Self); }
+[Serializable]
+public sealed class DefaultSpellProxy : ISerializable, IObjectReference
+{ public DefaultSpellProxy(SerializationInfo info, StreamingContext context) { typename = info.GetString("Type"); }
+  public void GetObjectData(SerializationInfo info, StreamingContext context) { } // never called
+  public object GetRealObject(StreamingContext context)
+  { return Type.GetType(typename).GetField("Default", BindingFlags.Static|BindingFlags.DeclaredOnly|BindingFlags.Public).GetValue(null);
+  }
+  string typename;
+}
+
+#region Spell
+public abstract class Spell : UniqueObject
+{ public Spell() { ID=Global.NextID; }
+  protected Spell(SerializationInfo info, StreamingContext context) : base(info, context) { }
+
+  public void Cast(Entity user) { Cast(user, ItemStatus.None, user.Position, Direction.Self); }
   public void Cast(Entity user, RangeTarget rt) { Cast(user, ItemStatus.None, rt); }
   public void Cast(Entity user, ItemStatus buc, RangeTarget rt)
   { if(rt.Dir!=Direction.Invalid)
@@ -25,6 +41,14 @@ public abstract class Spell
   public virtual void Cast(Entity user, ItemStatus buc, Item target) { }
   public void Cast(Entity user, Point tile, Direction dir) { Cast(user, ItemStatus.None, tile, dir); }
   public virtual void Cast(Entity user, ItemStatus buc, Point tile, Direction dir) { }
+
+  public override void GetObjectData(SerializationInfo info, StreamingContext context)
+  { if(Global.ObjHash==null && this==GetType().GetField("Default", BindingFlags.Static|BindingFlags.DeclaredOnly|BindingFlags.Public).GetValue(null))
+    { info.AddValue("Type", GetType().FullName);  
+      info.SetType(typeof(DefaultSpellProxy));
+    }
+    else base.GetObjectData(info, context);
+  }
 
   public Skill Exercises { get { return (Skill)((int)Class+(int)Skill.WeaponSkills); } }
   public int Level { get { return (Difficulty+1)/2; } }
@@ -53,15 +77,19 @@ public abstract class Spell
   public int Difficulty; // 1-18, 1,2=level 1, 3,4=level 2, etc
   public int Memory; // memory of this spell, decreased every turn that the spell isn't cast, forgotten at zero
   public int Power;  // MP usage
+  public bool AutoIdentify;
   
   protected int GetSpellSkill(Entity user) { return user.GetSkill((Skill)((int)Class+(int)Skill.WeaponSkills)); }
 
   protected static ArrayList path = new ArrayList();
 }
+#endregion
 
+#region BeamSpell
 public abstract class BeamSpell : Spell
 { protected BeamSpell() { Target=SpellTarget.Tile; }
-  
+  protected BeamSpell(SerializationInfo info, StreamingContext context) : base(info, context) { }
+
   public override void Cast(Entity user, ItemStatus buc, Point tile, Direction dir)
   { FromStatus = buc;
     if((dir==Direction.Above || dir==Direction.Below) && !Affect(user, dir)) return;
@@ -122,12 +150,16 @@ public abstract class BeamSpell : Spell
   Point oldPt;
   int bounces;
 }
+#endregion
 
+#region ForceBolt
+[Serializable]
 public class ForceBolt : BeamSpell
 { public ForceBolt()
   { Name="force bolt"; Class=SpellClass.Telekinesis; Difficulty=1; Power=2;
     Description = "The spell forces stuff. Yeah.";
   }
+  public ForceBolt(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   protected override object Hit(Entity user, Point pt) { return user.Map.GetEntity(pt); }
 
@@ -154,12 +186,16 @@ public class ForceBolt : BeamSpell
 
   public static ForceBolt Default = new ForceBolt();
 }
+#endregion
 
+#region Fire
+[Serializable]
 public class FireSpell : BeamSpell
 { public FireSpell()
-  { Name="fire"; Class=SpellClass.Elemental; Difficulty=10; Power=12;
+  { Name="fire"; Class=SpellClass.Elemental; Difficulty=10; Power=12; AutoIdentify=true;
     Description = "The fire spell hurls a great bolt of flames.";
   }
+  public FireSpell(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public static FireSpell Default = new FireSpell();
 
@@ -226,12 +262,17 @@ public class FireSpell : BeamSpell
     return false;
   }
 }
+#endregion
 
+#region Teleport
+[Serializable]
 public class TeleportSpell : Spell
 { public TeleportSpell()
-  { Name="teleport"; Class=SpellClass.Translocation; Difficulty=6; Power=9; Target=SpellTarget.Self;
+  { Name="teleport"; Class=SpellClass.Translocation; Difficulty=6; Power=9; Target=SpellTarget.Self; AutoIdentify=true;
     Description = "This spell will teleport the caster to a random location.";
   }
+  public TeleportSpell(SerializationInfo info, StreamingContext context) : base(info, context) { }
+
 
   public override void Cast(Entity user, ItemStatus buc, Point tile, Direction dir)
   { user.Position = user.Map.FreeSpace();
@@ -240,12 +281,16 @@ public class TeleportSpell : Spell
 
   public static TeleportSpell Default = new TeleportSpell();
 }
+#endregion
 
+#region Amnesia
+[Serializable]
 public class AmnesiaSpell : Spell
 { public AmnesiaSpell()
   { Name="amnesia"; Class=SpellClass.Divination; Difficulty=2; Power=2; Target=SpellTarget.Self;
     Description = "This spell scrambles the caster's memory.";
   }
+  public AmnesiaSpell(SerializationInfo info, StreamingContext context) : base(info, context) { }
   
   public override void Cast(Entity user, ItemStatus buc, Point tile, Direction dir)
   { if(user.Memory!=null)
@@ -282,12 +327,17 @@ public class AmnesiaSpell : Spell
     return bad;
   }
 }
+#endregion
 
+#region Identify
+[Serializable]
 public class IdentifySpell : Spell
 { public IdentifySpell()
-  { Name="identify"; Class=SpellClass.Divination; Difficulty=5; Power=3; Target=SpellTarget.Item;
+  { Name="identify"; Class=SpellClass.Divination; Difficulty=5; Power=3; Target=SpellTarget.Item; AutoIdentify=true;
     Description = "This spell provides the caster full knowledge of an item.";
   }
+  public IdentifySpell(SerializationInfo info, StreamingContext context) : base(info, context) { }
+
   
   public override void Cast(Entity user, ItemStatus buc, Item target)
   { if(user==App.Player)
@@ -298,5 +348,6 @@ public class IdentifySpell : Spell
 
   public static IdentifySpell Default = new IdentifySpell();
 }
+#endregion
 
 } // namespace Chrono

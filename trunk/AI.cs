@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Runtime.Serialization;
 
 namespace Chrono
 {
@@ -7,7 +8,10 @@ namespace Chrono
 public enum AIState { Idle, Alerted };
 
 public abstract class AI : Entity
-{ public AIState State { get { return state; } }
+{ public AI() { }
+  protected AI(SerializationInfo info, StreamingContext context) : base(info, context) { }
+
+  public AIState State { get { return state; } }
 
   public override void Die(object killer, Death cause)
   { if((cause==Death.Poison || cause==Death.Sickness || cause==Death.Starvation) && App.Player.CanSee(this))

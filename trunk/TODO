@@ -1,7 +1,6 @@
 gods, religion, praying, add ninja guitar-playing god
 searching & hidden tiles, searching reveals monsters (in memory)
 autopickup, config file
-saving/loading
 status effects
 
 penalty for fighting unarmed with something in your hands?
@@ -15,7 +14,6 @@ make character hesitant to eat raw flesh
 alter AI so that ranged weapons can be used
 allow monsters to determine from which direction they were hit
 allow attacking ground/ceiling
-truly copy items when updating memory (so changes to them won't be known)
 implement cloaks
 add the ability to select the default ammo
 add dipping (into potions, water...)
@@ -33,8 +31,9 @@ improve spell target prompting (add custom messages, etc)
 rework skill system so top level is 10
 add critical hits
 require a sharp weapon for carving (and equip it during carving?)
-add help string to Skill management page
 make higher skill levels harder to obtain
 have user identify wand whenever he can see it cast and the effect?
 add ability to view other levels in DisplayMap
 add magic resistance
+add a line giving a monster's general health to DescribeTile
+save when moving between levels, load levels on demand, unload unused levels

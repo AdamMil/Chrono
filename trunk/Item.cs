@@ -1,32 +1,31 @@
 using System;
 using System.Drawing;
+using System.Runtime.Serialization;
 
 namespace Chrono
 {
 
-public enum ItemClass
+#region Enums
+public enum ItemClass : sbyte
 { Invalid=-1, Any=-1,
   Gold, Amulet, Weapon, Shield, Armor, Ammo, Food, Corpse, Scroll, Ring, Potion, Wand, Tool, Spellbook, Container,
   Treasure, NumClasses
 }
+
 [Flags] public enum ItemUse : byte { NoUse=0, Self=1, UseTarget=2, UseDirection=4, UseBoth=UseTarget|UseDirection };
 
 [Flags] public enum ItemStatus : byte
 { None=0, Identified=1, KnowCB=2, Burnt=4, Rotted=8, Rusted=16, Cursed=32, Blessed=64
 };
+#endregion
 
 #region Item
-public abstract class Item : ICloneable
+public abstract class Item : UniqueObject, ICloneable
 { public Item()
   { Prefix=PluralPrefix=string.Empty; PluralSuffix="s"; Count=1; Color=Color.White; Durability=-1;
   }
-  protected Item(Item item)
-  { name=item.name; Title=item.Title; Class=item.Class;
-    Prefix=item.Prefix; PluralPrefix=item.PluralPrefix; PluralSuffix=item.PluralSuffix;
-    Age=item.Age; Count=item.Count; Weight=item.Weight; Color=item.Color; Char=item.Char;
-    Usability=item.Usability; Durability=item.Durability; Status=item.Status;
-  }
-
+  protected Item(SerializationInfo info, StreamingContext context) : base(info, context) { }
+  
   public string AreIs { get { return Count>1 ? "are" : "is"; } }
   
   public bool Blessed { get { return (Status&(ItemStatus.Cursed|ItemStatus.Blessed)) == ItemStatus.Blessed; } }
@@ -80,9 +79,13 @@ public abstract class Item : ICloneable
     }
   }
 
-  #region ICloneable Members
-  public virtual object Clone() { return GetType().GetConstructor(copyCons).Invoke(new object[] { this }); }
-  #endregion
+  public virtual object Clone()
+  { System.Runtime.Serialization.Formatters.Binary.BinaryFormatter f = new System.Runtime.Serialization.Formatters.Binary.BinaryFormatter();
+    buffer.Position = 0;
+    f.Serialize(buffer, this);
+    buffer.Position = 0;
+    return f.Deserialize(buffer);
+  }
 
   public virtual bool CanStackWith(Item item)
   { if(Status!=item.Status || item.Title!=null || Title!=null || item.GetType() != GetType()) return false;
@@ -91,13 +94,14 @@ public abstract class Item : ICloneable
       return true;
     return false;
   }
-  
+
   public void Bless() { Status = Status&~ItemStatus.Cursed|ItemStatus.Blessed; }
   public void Curse() { Status = Status&~ItemStatus.Blessed|ItemStatus.Cursed; }
   public void Uncurse() { Status &= ~(ItemStatus.Blessed|ItemStatus.Cursed); }
 
   public virtual string GetFullName(Entity e) { return FullName; }
   public virtual string GetInvName(Entity e) { return GetFullName(e); }
+  public byte GetNoise(Entity e) { return (byte)Math.Max(Math.Min(Noise*15-e.Stealth*8, 255), 0); }
 
   // item is thrown at or bashed on an entity. returns true if item should be destroyed
   public virtual bool Hit(Entity user, Point pos) { return false; }
@@ -135,24 +139,25 @@ public abstract class Item : ICloneable
 
   public string Title, Prefix, PluralPrefix, PluralSuffix, ShortDesc, LongDesc;
   public int Age, Count, Weight; // age in map ticks, number in the stack, weight (5 = approx. 1 pound)
-  public int Durability;         // 0 - 100 (chance of breaking if thrown), or -1, which uses the default
-  public ItemClass Class;
-  public Color Color;
+  public short Durability;       // 0 - 100 (chance of breaking if thrown), or -1, which uses the default
   public char Char;
+  public ItemClass Class;
+  public byte Noise;             // noise made when using the item (0-10)
+  public Color Color;
   public ItemUse Usability;
   public ItemStatus Status;
 
   protected string name;
 
   static readonly Type[] copyCons = new Type[] { typeof(Item) };
+  static System.IO.MemoryStream buffer = new System.IO.MemoryStream(512);
 }
 #endregion
 
+#region Modifying
 public abstract class Modifying : Item
 { protected Modifying() { }
-  protected Modifying(Item item) : base(item)
-  { Modifying mi = (Modifying)item; Mods=(int[])mi.Mods.Clone(); FlagMods=mi.FlagMods;
-  }
+  protected Modifying(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override bool CanStackWith(Item item) { return false; }
 
@@ -175,9 +180,12 @@ public abstract class Modifying : Item
   public int[] Mods = new int[(int)Attr.NumModifiable];
   public Entity.Flag FlagMods;
 }
+#endregion
 
+#region Wearable, Wieldable, Readable, Chargeable
 public abstract class Wearable : Modifying
 { public Wearable() { Slot=Slot.Invalid; }
+  protected Wearable(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override string GetInvName(Entity e)
   { string ret = GetFullName(e);
@@ -194,9 +202,7 @@ public abstract class Wearable : Modifying
 
 public abstract class Wieldable : Modifying
 { protected Wieldable() { }
-  protected Wieldable(Item item) : base(item)
-  { Wieldable wi = (Wieldable)item; Exercises=wi.Exercises; AllHandWield=wi.AllHandWield;
-  }
+  protected Wieldable(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override string GetInvName(Entity e)
   { string ret = GetFullName(e);
@@ -214,17 +220,21 @@ public abstract class Wieldable : Modifying
 
 public abstract class Readable : Item
 { protected Readable() { }
-  protected Readable(Item item) : base(item) { }
+  protected Readable(SerializationInfo info, StreamingContext context) : base(info, context) { }
 }
 
 public abstract class Chargeable : Item
-{ public int Charges, Recharged;
+{ public Chargeable() { }
+  protected Chargeable(SerializationInfo info, StreamingContext context) : base(info, context) { }
+  public int Charges, Recharged;
 }
+#endregion
 
+[Serializable]
 public class Gold : Item
 { public Gold() { name="gold piece"; Color=Color.Yellow; Class=ItemClass.Gold; }
-  public Gold(Item item) : base(item) { }
-  
+  public Gold(SerializationInfo info, StreamingContext context) : base(info, context) { }
+
   public override bool CanStackWith(Item item) { return item.Class==ItemClass.Gold; }
 }
 

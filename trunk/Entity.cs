@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Drawing;
+using System.Runtime.Serialization;
 
 namespace Chrono
 {
@@ -22,7 +23,7 @@ public struct Damage
   public ushort Direct, Physical, Heat, Cold, Electricity, Poison;
 }
 
-public enum Death { Combat, Falling, Poison, Starvation, Sickness, Trap } // causes of death
+public enum Death { Combat, Falling, Poison, Quit, Starvation, Sickness, Trap } // causes of death
 
 public struct Effect
 { public Effect(object source, Attr attr, int value, int timeout)
@@ -66,9 +67,11 @@ public enum Slot // where an item can be worn
   Invalid=-1, Head, Cloak, Torso, Legs, Neck, Hands, Feet, LRing, RRing, NumSlots
 }
 
-public abstract class Entity
-{ public Entity() { ExpLevel=1; Smell=Map.MaxScentAdd/2; }
-  [Flags] public enum Flag { None=0, Confused=1, Hallucinating=2, Asleep=4, Invisible=8, SeeInvisible=16 }
+public abstract class Entity : UniqueObject
+{ [Flags] public enum Flag { None=0, Confused=1, Hallucinating=2, Asleep=4, Invisible=8, SeeInvisible=16 }
+
+  public Entity() { ExpLevel=1; Smell=Map.MaxScentAdd/2; }
+  protected Entity(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   // all of these apply modifiers from items where applicable
   public int AC { get { return GetAttr(Attr.AC); } }
@@ -912,7 +915,7 @@ public abstract class Entity
 
   protected bool Attack(Entity c, Item item, Ammo ammo, bool hit, bool thrown)
   { Weapon w = item as Weapon;
-    int noise = Math.Min(w!=null ? w.Noise*15-Stealth*8 : item==null ? (10-Stealth)*15 : item.Weight+30, 255);
+    int noise = Math.Min(w!=null ? w.GetNoise(this) : item==null ? (10-Stealth)*15 : item.Weight+30, 255);
     bool destroyed = false;
     hit = hit || c==this || TryHit(c, item);
 

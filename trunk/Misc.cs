@@ -1,5 +1,7 @@
 using System;
 using System.Drawing;
+using System.Reflection;
+using System.Runtime.Serialization;
 
 namespace Chrono
 {
@@ -23,8 +25,49 @@ public struct TraceResult
 }
 public delegate TraceAction LinePoint(Point point, object context);
 
+[Serializable]
+public sealed class ObjectProxy : ISerializable, IObjectReference
+{ public ObjectProxy(SerializationInfo info, StreamingContext context) { ID=info.GetUInt64("ID"); }
+  public void GetObjectData(SerializationInfo info, StreamingContext context) { } // never called
+  public object GetRealObject(StreamingContext context) { return Global.ObjHash[ID]; }
+  ulong ID;
+}
+
+public class UniqueObject : ISerializable
+{ public UniqueObject() { ID=Global.NextID; }
+  protected UniqueObject(SerializationInfo info, StreamingContext context)
+  { Type t = GetType();
+    do // private fields are not inherited, so we traverse the class hierarchy ourselves
+    { foreach(FieldInfo f in t.GetFields(BindingFlags.DeclaredOnly|BindingFlags.Instance|BindingFlags.Public|BindingFlags.NonPublic))
+        if(!f.IsNotSerialized) f.SetValue(this, info.GetValue(f.Name, f.FieldType));
+      t = t.BaseType;
+    } while(t!=null);
+
+    if(Global.ObjHash!=null) Global.ObjHash[ID] = this;
+  }
+  public virtual void GetObjectData(SerializationInfo info, StreamingContext context)
+  { if(Global.ObjHash!=null && Global.ObjHash.Contains(ID))
+    { info.AddValue("ID", ID);
+      info.SetType(typeof(ObjectProxy));
+    }
+    else
+    { if(Global.ObjHash!=null) Global.ObjHash[ID] = this;
+      Type t = GetType();
+      do // private fields are not inherited, so we traverse the class hierarchy ourselves
+      { foreach(FieldInfo f in t.GetFields(BindingFlags.DeclaredOnly|BindingFlags.Instance|BindingFlags.Public|BindingFlags.NonPublic))
+          if(!f.IsNotSerialized) info.AddValue(f.Name, f.GetValue(this));
+        t = t.BaseType;
+      } while(t!=null);
+    }
+  }
+  
+  public ulong ID;
+}
+
 public sealed class Global
 { private Global() { }
+
+  public static ulong NextID { get { return nextID++; } }
 
   public static string AorAn(string s)
   { char fc = char.ToLower(s[0]);
@@ -110,12 +153,22 @@ public sealed class Global
     }
   }
 
+  public static void Deserialize(System.IO.Stream stream, IFormatter formatter)
+  { nextID = (ulong)formatter.Deserialize(stream);
+  }
+  public static void Serialize(System.IO.Stream stream, IFormatter formatter)
+  { formatter.Serialize(stream, nextID);
+  }
+
   public static readonly Point[] DirMap = new Point[8]
   { new Point(0, -1), new Point(1, -1), new Point(1, 0),  new Point(1, 1),
     new Point(0, 1),  new Point(-1, 1), new Point(-1, 0), new Point(-1, -1)
   };
+  
+  public static System.Collections.Hashtable ObjHash;
 
   static Random Random = new Random();
+  static ulong nextID=1;
 }
 
 } // namespace Chrono

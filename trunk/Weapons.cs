@@ -75,6 +75,7 @@ public class BasicArrow : Arrow
   public BasicArrow(SerializationInfo info, StreamingContext context) : base(info, context) { }
   
   public static readonly int SpawnChance=300, SpawnMin=4, SpawnMax=12; // 3% chance, 4-12 arrows
+  public static readonly int ShopValue=8;
 }
 
 [Serializable]
@@ -88,6 +89,7 @@ public class FlamingArrow : Arrow
   }
 
   public static readonly int SpawnChance=300, SpawnMin=3, SpawnMax=8; // 1% chance, 3-8 arrows
+  public static readonly int ShopValue=12;
 }
 #endregion
 
@@ -104,6 +106,7 @@ public class PoisonDart : Weapon
 
   public static readonly int SpawnChance=300; // 3% chance
   public static readonly int SpawnMin=3, SpawnMax=10;
+  public static readonly int ShopValue=10;
 }
 
 [Serializable]
@@ -126,6 +129,7 @@ public class Bow : FiringWeapon
   }
 
   public static readonly int SpawnChance=200; // 2% chance
+  public static readonly int ShopValue=225;
 }
 
 [Serializable]
@@ -141,6 +145,7 @@ public class ShortSword : Weapon
   }
 
   public static readonly int SpawnChance=400; // 4% chance
+  public static readonly int ShopValue=130;
 }
 
 } // namespace Chrono

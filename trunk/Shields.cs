@@ -24,11 +24,12 @@ public abstract class Shield : Wieldable
 public class Buckler : Shield
 { public Buckler()
   { name="buckler"; BlockChance=15; Weight=40; Color=Color.Grey; AC=0; EV=-1;
-    ShortDesc="A small, round shield.";
   }
   public Buckler(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public static readonly int SpawnChance=100; // 1% chance
+  public static readonly int ShopValue=125;
+  public static readonly string ShortDesc="A small, round shield.";
 }
 
 } // namespace Chrono

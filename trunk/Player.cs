@@ -7,7 +7,7 @@ namespace Chrono
 
 [Serializable]
 public class Player : Entity
-{ public Player() { Color=Color.White; Timer=50; Spells=new System.Collections.ArrayList(); }
+{ public Player() { Color=Color.White; Timer=50; SocialGroup = Global.NewSocialGroup(false, true); }
   public Player(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override void Die(object killer, Death cause)
@@ -780,7 +780,7 @@ public class Player : Entity
       }
 
       case Action.CastSpell:
-      { if(Spells.Count==0) { App.IO.Print("You don't know any spells!"); goto next; }
+      { if(Spells==null || Spells.Count==0) { App.IO.Print("You don't know any spells!"); goto next; }
         if(CarryStress==CarryStress.Overtaxed) goto carrytoomuch;
         Spell spell = App.IO.ChooseSpell(this);
         if(spell==null) goto nevermind;
@@ -874,6 +874,8 @@ public class Player : Entity
         Entity c = Map.GetEntity(np);
         if(c!=null)
         { if(CarryStress==CarryStress.Overtaxed) goto carrytoomuch;
+          if(c is AI && !((AI)c).HostileTowards(this) &&
+             !App.IO.YesNo(string.Format("Are you sure you want to attack {0}?", c.theName), false)) goto next;
           Weapon w = Weapon;
           Ammo   a = SelectAmmo(w);
           if(w!=null && a==null && w.Ranged && w.wClass!=WeaponClass.Thrown)
@@ -999,10 +1001,12 @@ public class Player : Entity
   protected virtual void OnAge()
   { if(Spells!=null)
       for(int i=0; i<Spells.Count; i++)
-        if(--((Spell)Spells[i]).Memory<=0)
+      { Spell spell = (Spell)Spells[i];
+        if(spell.Memory!=-1 && --spell.Memory==0)
         { Spells.RemoveAt(i--);
           App.IO.Print("You feel as if you've forgotten something... but decide it's nothing.");
         }
+      }
 
     Hunger++;
     if(HungerLevel>oldHungerLevel)
@@ -1100,7 +1104,7 @@ public class Player : Entity
     base.Think();
     vis = VisibleTiles();
     UpdateMemory(vis);
-    if(IsCreatureVisible(vis)) interrupt=true;
+    if(IsEnemyVisible(vis)) interrupt=true;
     OnAge();
     if(interrupt) { interrupt=false; return true; }
     return false;
@@ -1112,9 +1116,9 @@ public class Player : Entity
     else if(type==TileType.Forest) return 90;
     else if(type==TileType.Ice || type==TileType.DirtSand) return 80;
     else if(type==TileType.Hill) return 100;
-    else if(type==TileType.Mountain) return 200;
-    else if(type==TileType.ShallowWater) return 100;
-    else if(type==TileType.DeepWater) return 200;
+    else if(type==TileType.Mountain) return 200; // TODO: decrease with proper equipment
+    else if(type==TileType.ShallowWater) return 100; // TODO: decrease with proper equipment
+    else if(type==TileType.DeepWater) return 200; // TODO: decrease with proper equipment
     else throw new ApplicationException("Unhandled tile type: "+type);
   }
 

@@ -13,7 +13,7 @@ public abstract class MapCollection : UniqueObject
 
   public Map this[int i]
   { get
-    { if(i>=maps.Count)
+    { if(i>=maps.Count) // FIXME: since dungeons are not all linear now, make this not calculate all the intervening levels
         for(int mi=maps.Count; mi<=i; mi++)
         { Map m = Generate(mi);
           m.Dungeon = this;
@@ -98,7 +98,6 @@ public class TestDungeon : MapCollection
   { MapGenerator lg = (mi/5&1)==0 ? (MapGenerator)new RoomyMapGenerator() : (MapGenerator)new MetaCaveGenerator();
     Map map = new TestMap(lg.DefaultSize);
     lg.Generate(map);
-    map.IsDungeon = true;
     for(int i=0; i<map.Links.Length; i++) map.Links[i].ToLevel = map.Links[i].Down ? mi+1 : mi-1;
     return map;
   }

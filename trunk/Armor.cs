@@ -29,6 +29,7 @@ public class PaperBag : Armor
   public PaperBag(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public static readonly int SpawnChance=100; // 1% chance
+  public static readonly int ShopValue=75;
 }
 
 } // namespace Chrono

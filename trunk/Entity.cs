@@ -184,6 +184,15 @@ public abstract class Entity : UniqueObject
   { get { return smell; }
     set { smell = Math.Max(0, Math.Min(value, Map.MaxScentAdd)); }
   }
+  public int SocialGroup
+  { get { return groupID; }
+    set
+    { if(value==groupID) return;
+      if(groupID!=-1) Global.RemoveFromSocialGroup(groupID, this);
+      Global.AddToSocialGroup(value, this);
+      groupID = value;
+    }
+  }
   public int Speed
   { get
     { int div=1, stress=(int)CarryStress;
@@ -219,7 +228,7 @@ public abstract class Entity : UniqueObject
   public string aName { get { return Name==null ? Prefix+BaseName : Name; } }
   public string TheName { get { return Name==null ? "The "+BaseName : Name; } }
   public string theName { get { return Name==null ? "the "+BaseName : Name; } }
-  public virtual string BaseName { get { return Race.ToString().ToLower(); } }
+  public string BaseName { get { return baseName==null ? Race.ToString().ToLower() : baseName; } }
 
   public void AddEffect(object source, Attr attr, int value, int timeout)
   { AddEffect(new Effect(source, attr, value, timeout));
@@ -360,7 +369,6 @@ public abstract class Entity : UniqueObject
     if(dam.Heat>0) HP -= dam.Heat - (int)Math.Round(dam.Heat*GetAttr(Attr.HeatRes)/100.0);
     if(dam.Cold>0) HP -= dam.Cold - (int)Math.Round(dam.Cold*GetAttr(Attr.ColdRes)/100.0);
     if(dam.Electricity>0) HP -= dam.Electricity - (int)Math.Round(dam.Electricity*GetAttr(Attr.ElectricityRes)/100.0);
-
     if(dam.Physical>0)
     { int ac=AC, n, phys=dam.Physical;
       Shield shield = Shield;
@@ -504,14 +512,10 @@ public abstract class Entity : UniqueObject
   }
 
   public int AlterBaseAttr(Attr attribute, int amount)
-  { int value = GetBaseAttr(attribute)+amount;
-    SetBaseAttr(attribute, value);
-    return value;
+  { return SetBaseAttr(attribute, GetBaseAttr(attribute)+amount);
   }
   public int GetBaseAttr(Attr attribute) { return attr[(int)attribute]; } // gets a raw attribute value (no modifiers)
-  public void SetBaseAttr(Attr attribute, int val) // sets a base attribute value
-  { attr[(int)attribute]=val;
-  }
+  public int SetBaseAttr(Attr attribute, int val) { return attr[(int)attribute]=val; } // sets a base attribute value
 
   public bool GetRawFlag(Flag flag) { return (BaseFlags&flag)!=0; } // gets a raw flag (no modifiers)
   public void SetRawFlag(Flag flag, bool on) // sets a base flag
@@ -532,11 +536,12 @@ public abstract class Entity : UniqueObject
 
   public bool Is(Flag flag) { return (Flags&flag)!=0; } // returns true if we have the given flag
 
-  // returns true if a monster is within the visible area
-  public bool IsCreatureVisible() { return IsCreatureVisible(VisibleTiles()); }
-  public bool IsCreatureVisible(Point[] vis)
+  // returns true if a hostile monster is within the visible area
+  public bool IsEnemyVisible() { return IsEnemyVisible(VisibleTiles()); }
+  public bool IsEnemyVisible(Point[] vis)
   { foreach(Entity e in Map.Entities)
-      if(e.Class!=EntityClass.Other && e!=this && (!e.Is(Flag.Invisible) || Is(Flag.SeeInvisible)))
+      if(e.Class!=EntityClass.Other && e!=this && (!e.Is(Flag.Invisible) || Is(Flag.SeeInvisible)) && e is AI &&
+         ((AI)e).HostileTowards(this))
       { Point cp = e.Position;
         for(int j=0; j<vis.Length; j++) if(vis[j]==cp) return true;
       }
@@ -595,7 +600,7 @@ public abstract class Entity : UniqueObject
     return Global.PointToDir(off);
   }
 
-  public void MemorizeSpell(Spell spell, int memory)
+  public void MemorizeSpell(Spell spell, int memory) // memory==-1 means never forget
   { if(Spells==null) Spells = new ArrayList();
     Type type = spell.GetType();
     foreach(Spell s in Spells) if(s.GetType()==type) { s.Memory = memory; return; }
@@ -842,8 +847,8 @@ public abstract class Entity : UniqueObject
   { int toHit = caster.Int/2*caster.GetSkill(spell.Skill)+1; // product of intelligence/2 and spell skill, plus 1
     int toEvade = Int/2*GetSkill(Skill.MagicResistance)+1;   // product of intelligence/2 and magicresist, plus 1
 
-    toHit   -= (toHit  *((int)caster.HungerLevel*10)+99)/100;  // effects of hunger -10% per hunger level (rounded up)
-    toEvade -= (toEvade*((int)HungerLevel*10)+99)/100;
+    toHit   -= (toHit  *((int)caster.HungerLevel*10)+50)/100;  // effects of hunger -10% per hunger level (rounded)
+    toEvade -= (toEvade*((int)HungerLevel*10)+50)/100;
 
     int n = Global.Rand(toHit+toEvade);
     App.IO.Print(Color.DarkGrey, "SpRES: (toHit: {0}, EV: {1}, roll: {2} = {3})", toHit, toEvade, n, n>=toHit ? "succ" : "fail");
@@ -1082,8 +1087,9 @@ public abstract class Entity : UniqueObject
     }
   }
 
-  protected int baseKillExp;     // the base experience gotten for killing me
-  protected bool interrupt;      // true if we've been interrupted
+  protected string baseName; // if null, the base name is taken from the race
+  protected int baseKillExp; // the base experience gotten for killing me
+  protected bool interrupt;  // true if we've been interrupted
 
   struct AttrMods
   { public AttrMods(params int[] mods) { Mods = mods; }
@@ -1168,6 +1174,9 @@ public abstract class Entity : UniqueObject
     toHit   -= (toHit  *((int)  HungerLevel*10)+99)/100; // effects of hunger -10% per hunger level (rounded up)
     toEvade -= (toEvade*((int)c.HungerLevel*10)+99)/100;
 
+    if(toHit<0) toHit=0;
+    if(toEvade<0) toEvade=0;
+
     int n = Global.Rand(toHit+toEvade);
     App.IO.Print(Color.DarkGrey, "HIT: (toHit: {0}, EV: {1}, roll: {2} = {3})", toHit, toEvade, n, n>=toEvade ? "hit" : "miss");
     if(n<toEvade)
@@ -1222,7 +1231,7 @@ public abstract class Entity : UniqueObject
   int[] attr = new int[(int)Attr.NumAttributes], attrExp = new int[(int)Attr.NumAttributes];
   bool[] skillEnable; // are we training these skills?
   Effect[] effects;
-  int exp, expLevel, hp, mp, smell, numEffects;
+  int exp, expLevel, hp, mp, smell, numEffects, groupID=-1;
   Flag flags;      // cached set of flags
 
   static ArrayList list = new ArrayList(); // an arraylist used in some places (ie VisibleCreatures)

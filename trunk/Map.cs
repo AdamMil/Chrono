@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Drawing;
 using System.IO;
+using System.Reflection;
 using System.Runtime.Serialization;
 using GameLib.Collections;
 
@@ -11,7 +12,7 @@ namespace Chrono
 #region Types and Enums
 public enum Noise { Walking, Bang, Combat, Alert, NeedHelp, Item, Zap }
 
-public enum ShopType { General, Magic, Food, Armor, Weapons, ArmorWeapons };
+public enum ShopType { General, Books, Food, Armor, Weapons, ArmorWeapons, Accessories, Magic, NumTypes };
 
 public enum TileType : byte
 { Border,
@@ -27,6 +28,14 @@ public enum TileType : byte
 public enum Trap : byte { Dart, PoisonDart, Magic, MpDrain, Teleport, Pit }
 
 [Serializable]
+public class Shop
+{ public Shop(Rectangle area, Entity shopkeeper, ShopType type) { Area=area; Shopkeeper=shopkeeper; Type=type; }
+  public Rectangle Area;
+  public Entity Shopkeeper;
+  public ShopType Type;
+}
+
+[Serializable]
 public struct Tile
 { [Flags] public enum Flag : byte { None=0, Hidden=1, Locked=2, Seen=4 };
 
@@ -36,7 +45,6 @@ public struct Tile
   public ItemPile  Items;
   public Entity    Entity;   // for memory (creature on tile), or owner of trap
   [NonSerialized] public PathNode Node; // for pathfinding
-  public ushort    Scent;    // strength of player smell
   public TileType  Type;
   public byte      Subtype;  // subtype of tile (ie, type of trap/altar/etc)
   public byte      Flags;
@@ -223,11 +231,51 @@ public class Map : UniqueObject
   { this.width  = width;
     this.height = height;
     map = new Tile[height, width];
+    scentmap = new ushort[height, width];
     entities = new EntityCollection(this);
     if(fill!=TileType.Border) Fill(fill);
     if(seen) for(int y=0; y<height; y++) for(int x=0; x<width; x++) map[y,x].Flags=(byte)Tile.Flag.Seen;
   }
   public Map(SerializationInfo info, StreamingContext context) : base(info, context) { }
+
+  static Map()
+  { Type[] types = typeof(Item).Assembly.GetTypes();
+    ArrayList[] lists = new ArrayList[(int)ShopType.NumTypes];
+    for(int i=0; i<lists.Length; i++) lists[i] = new ArrayList();
+    foreach(Type t in types)
+    { if(!t.IsAbstract && t.IsSerializable && t.IsSubclassOf(typeof(Item)))
+      { FieldInfo f = t.GetField("ShopValue", BindingFlags.Public|BindingFlags.Static);
+        if(f==null || (int)f.GetValue(null)<=0) continue;
+        SpawnInfo si = new SpawnInfo(t);
+
+        Item i = (Item)t.GetConstructor(Type.EmptyTypes).Invoke(null);
+        lists[(int)ShopType.General].Add(si);
+
+        switch(i.Class)
+        { case ItemClass.Amulet: case ItemClass.Ring:
+            lists[(int)ShopType.Accessories].Add(si);
+            lists[(int)ShopType.Magic].Add(si);
+            break;
+          case ItemClass.Ammo: case ItemClass.Weapon:
+            lists[(int)ShopType.ArmorWeapons].Add(si);
+            lists[(int)ShopType.Weapons].Add(si);
+            break;
+          case ItemClass.Armor: case ItemClass.Shield:
+            lists[(int)ShopType.Armor].Add(si);
+            lists[(int)ShopType.ArmorWeapons].Add(si);
+            break;
+          case ItemClass.Food: lists[(int)ShopType.Food].Add(si); break;
+          case ItemClass.Scroll: case ItemClass.Spellbook:
+            lists[(int)ShopType.Books].Add(si);
+            lists[(int)ShopType.Magic].Add(si);
+            break;
+          case ItemClass.Wand: case ItemClass.Potion: lists[(int)ShopType.Magic].Add(si); break;
+        }
+      }
+    }
+    objSpawns = new SpawnInfo[lists.Length][];
+    for(int i=0; i<lists.Length; i++) objSpawns[i] = (SpawnInfo[])lists[i].ToArray(typeof(SpawnInfo));
+  }
 
   public EntityCollection Entities { get { return entities; } }
   public Link[] Links { get { return links; } }
@@ -256,12 +304,24 @@ public class Map : UniqueObject
     narr[links.Length] = link;
     links = narr;
   }
-  
+
+  public void AddShop(Rectangle rect, ShopType type) { AddShop(rect, type, true); }
+  public void AddShop(Rectangle rect, ShopType type, bool stock)
+  { AddShop(rect, type, Entity.Generate(typeof(Shopkeeper), Global.Rand(3), EntityClass.Fighter), stock);
+  }
+  public void AddShop(Rectangle rect, ShopType type, Entity shopkeeper, bool stock)
+  { Shop[] narr = new Shop[shops==null ? 1 : shops.Length+1];
+    if(narr.Length!=1) Array.Copy(shops, narr, narr.Length-1);
+    shops = narr;
+    narr[narr.Length-1] = new Shop(rect, shopkeeper, type);
+    if(stock) while(RestockShop(narr[narr.Length-1]));
+  }
+
   public void ClearLinks() { links = new Link[0]; }
 
   public void AddScent(int x, int y, int amount)
-  { if(!IsDungeon) return;
-    map[y,x].Scent = (ushort)Math.Min(map[y,x].Scent+Math.Min(amount, MaxScentAdd), MaxScent);
+  { if(Index==(int)Overworld.Place.Overworld && Dungeon is Overworld) return;
+    scentmap[y,x] = (ushort)Math.Min(scentmap[y,x]+Math.Min(amount, MaxScentAdd), MaxScent);
   }
 
   public bool Contains(int x, int y) { return y>=0 && y<height && x>=0 && x<width; }
@@ -299,6 +359,19 @@ public class Map : UniqueObject
     return links[index];
   }
   
+  public int GetScent(Point pt) { return GetScent(pt.X, pt.Y); }
+  public int GetScent(int x, int y)
+  { if(x<0 || x>=width || y<0 || y>=height) return 0;
+    return scentmap[y,x];
+  }
+
+  public Shop GetShop(int x, int y) { return GetShop(new Point(x, y)); }
+  public Shop GetShop(Point pt)
+  { if(shops==null) return null;
+    for(int i=0; i<shops.Length; i++) if(shops[i].Area.Contains(pt)) return shops[i];
+    return null;
+  }
+
   public bool HasItems(Point pt) { return HasItems(pt.X, pt.Y); }
   public bool HasItems(int x, int y) { return this[x,y].Items!=null && map[y,x].Items.Count>0; }
 
@@ -352,14 +425,14 @@ public class Map : UniqueObject
   }
 
   public void MakeNoise(Point pt, Entity source, Noise type, byte volume)
-  { if(!IsDungeon) return;
+  { if(Index==(int)Overworld.Place.Overworld && Dungeon is Overworld) return;
     for(int y=0; y<height; y++) for(int x=0; x<width; x++) map[y,x].Sound=0;
     if(soundStack==null) soundStack=new Point[256];
     int slen, nslen=1;
     bool changed;
 
     map[pt.Y, pt.X].Sound = volume;
-    
+
     if(volume>10)
     { soundStack[0] = pt;
       do
@@ -410,6 +483,20 @@ public class Map : UniqueObject
     throw new ArgumentException("No such tile on this map!");
   }
   
+  public bool RestockShop(Shop shop)
+  { if(shop.Shopkeeper==null) return false;
+    if(shop.Shopkeeper.HP<=0) { shop.Shopkeeper=null; return false; }
+
+    for(int y=shop.Area.Y; y<shop.Area.Bottom; y++)
+      for(int x=shop.Area.X; x<shop.Area.Right; x++)
+        if(!HasItems(x, y))
+        { SpawnInfo[] arr = objSpawns[(int)shop.Type];
+          AddItem(x, y, Global.SpawnItem(arr[Global.Rand(arr.Length)]));
+          return true;
+        }
+    return false;
+  }
+
   public Map RestoreMemory()
   { Map ret = Memory;
     Memory = null;
@@ -452,24 +539,126 @@ public class Map : UniqueObject
     }
     if(--thinking==0) removedEntities.Clear();
   }
-  
-  public void SpreadScent()
-  { if(!IsDungeon) return;
+
+  #region SpreadScent
+  public unsafe void SpreadScent()
+  { if(Index==(int)Overworld.Place.Overworld && Dungeon is Overworld || width==1 || height==1) return;
     if(scentbuf==null || scentbuf.Length<width*height) scentbuf=new ushort[width*height];
-    for(int y=0,i=0; y<height; y++)
-      for(int x=0; x<width; i++,x++)
-      { if(!IsPassable(map[y,x].Type)) continue;
-        int val=0, n=0;
-        for(int yi=-1; yi<=1; yi++)
-          for(int xi=-1; xi<=1; xi++)
-            if(xi!=0 || yi!=0)
-            { Tile t = this[x+xi, y+yi];
-              if(IsPassable(t.Type)) { val += t.Scent; n++; }
-            }
-        if(n>0) scentbuf[i] = (ushort)Math.Max(val/n-3, 0);
+    int wid=width-1, hei=height-1, ye=hei*width, val, n, to;
+
+    fixed(ushort* smap=scentmap) fixed(ushort* sbuf=scentbuf)
+    { for(int y=0,yo=0; y<height; yo+=width,y++)
+        for(int x=0; x<width; x++)
+          if(!IsPassable(map[y,x].Type)) smap[yo+x]=ushort.MaxValue;
+
+      for(int x=1,yo=hei*width; x<wid; x++) // top and bottom edges (excluding corners)
+      { to=x;
+        if(smap[to]==ushort.MaxValue) { sbuf[to]=0; continue; }
+        val=0; n=0;
+        if(smap[to-1]!=ushort.MaxValue) { val += smap[to-1]; n++; }
+        if(smap[to+1]!=ushort.MaxValue) { val += smap[to+1]; n++; }
+        to += width;
+        if(smap[to]!=ushort.MaxValue) { val += smap[to]; n++; }
+        if(smap[to-1]!=ushort.MaxValue) { val += smap[to-1]; n++; }
+        if(smap[to+1]!=ushort.MaxValue) { val += smap[to+1]; n++; }
+        sbuf[x] = val>3 ? (ushort)Math.Max(val/n-3, 0) : (ushort)0;
+
+        to=x+yo;
+        if(smap[to]==ushort.MaxValue) { sbuf[to]=0; continue; }
+        val=0; n=0;
+        if(smap[to-1]!=ushort.MaxValue) { val += smap[to-1]; n++; }
+        if(smap[to+1]!=ushort.MaxValue) { val += smap[to+1]; n++; }
+        to -= width;
+        if(smap[to]!=ushort.MaxValue) { val += smap[to]; n++; }
+        if(smap[to-1]!=ushort.MaxValue) { val += smap[to-1]; n++; }
+        if(smap[to+1]!=ushort.MaxValue) { val += smap[to+1]; n++; }
+        sbuf[x+yo] = val>3 ? (ushort)Math.Max(val/n-3, 0) : (ushort)0;
       }
-    for(int y=0,i=0; y<height; y++) for(int x=0; x<width; x++) map[y,x].Scent=scentbuf[i++];
+
+      for(int y=width; y<ye; y+=width) // left and right edges (excluding corners)
+      { to=y;
+        if(smap[to]==ushort.MaxValue) { sbuf[to]=0; continue; }
+        val=0; n=0;
+        if(smap[to-width]!=ushort.MaxValue) { val += smap[to-width]; n++; }
+        if(smap[to+width]!=ushort.MaxValue) { val += smap[to+width]; n++; }
+        to++;
+        if(smap[to]!=ushort.MaxValue) { val += smap[to]; n++; }
+        if(smap[to-width]!=ushort.MaxValue) { val += smap[to-width]; n++; }
+        if(smap[to+width]!=ushort.MaxValue) { val += smap[to+width]; n++; }
+        sbuf[y] = val>3 ? (ushort)Math.Max(val/n-3, 0) : (ushort)0;
+
+        to=y+wid;
+        if(smap[to]==ushort.MaxValue) { sbuf[to]=0; continue; }
+        val=0; n=0;
+        if(smap[to-width]!=ushort.MaxValue) { val += smap[to-width]; n++; }
+        if(smap[to+width]!=ushort.MaxValue) { val += smap[to+width]; n++; }
+        to--;
+        if(smap[to]!=ushort.MaxValue) { val += smap[to]; n++; }
+        if(smap[to-width]!=ushort.MaxValue) { val += smap[to-width]; n++; }
+        if(smap[to+width]!=ushort.MaxValue) { val += smap[to+width]; n++; }
+        sbuf[y+wid] = val>3 ? (ushort)Math.Max(val/n-3, 0) : (ushort)0;
+      }
+
+      if(smap[0]==ushort.MaxValue) sbuf[0]=0; // top-left corner
+      else
+      { val=0; n=0;
+        if(smap[1]!=ushort.MaxValue) { val += smap[1]; n++; }
+        if(smap[width]!=ushort.MaxValue) { val += smap[width]; n++; }
+        if(smap[width+1]!=ushort.MaxValue) { val += smap[width+1]; n++; }
+        sbuf[0] = val>3 ? (ushort)Math.Max(val/n-3, 0) : (ushort)0;
+      }
+
+      if(smap[wid]==ushort.MaxValue) sbuf[wid]=0; // top-right corner
+      else
+      { val=0; n=0;
+        if(smap[wid-1]!=ushort.MaxValue) { val += smap[wid-1]; n++; }
+        if(smap[wid+width]!=ushort.MaxValue) { val += smap[wid+width]; n++; }
+        if(smap[wid+wid]!=ushort.MaxValue) { val += smap[wid+wid]; n++; }
+        sbuf[wid] = val>3 ? (ushort)Math.Max(val/n-3, 0) : (ushort)0;
+      }
+
+      if(smap[ye]==ushort.MaxValue) sbuf[ye]=0; // bottom-left corner
+      else
+      { val=0; n=0;
+        if(smap[ye+1]!=ushort.MaxValue) { val += smap[ye+1]; n++; }
+        if(smap[ye-width]!=ushort.MaxValue) { val += smap[ye-width]; n++; }
+        if(smap[ye-wid]!=ushort.MaxValue) { val += smap[ye-wid]; n++; }
+        sbuf[ye] = val>3 ? (ushort)Math.Max(val/n-3, 0) : (ushort)0;
+      }
+
+      to = ye+wid;
+      if(smap[to]==ushort.MaxValue) sbuf[to]=0; // bottom-right corner
+      else
+      { val=0; n=0;
+        if(smap[to-1]!=ushort.MaxValue) { val += smap[to-1]; n++; }
+        to -= width;
+        if(smap[to]!=ushort.MaxValue) { val += smap[to]; n++; }
+        if(smap[to-1]!=ushort.MaxValue) { val += smap[to-1]; n++; }
+        sbuf[ye+wid] = val>3 ? (ushort)Math.Max(val/n-3, 0) : (ushort)0;
+      }
+
+      for(int yo=width; yo<ye; yo+=width) // the center
+        for(int x=1; x<wid; x++)
+        { to=yo+x;
+          if(smap[to]==ushort.MaxValue) { sbuf[to]=0; continue; }
+          val=0; n=0;
+          if(smap[to-1]!=ushort.MaxValue) { val += smap[to-1]; n++; }
+          if(smap[to+1]!=ushort.MaxValue) { val += smap[to+1]; n++; }
+          to -= width;
+          if(smap[to]!=ushort.MaxValue) { val += smap[to]; n++; }
+          if(smap[to-1]!=ushort.MaxValue) { val += smap[to-1]; n++; }
+          if(smap[to+1]!=ushort.MaxValue) { val += smap[to+1]; n++; }
+          to += width+width;
+          if(smap[to]!=ushort.MaxValue) { val += smap[to]; n++; }
+          if(smap[to-1]!=ushort.MaxValue) { val += smap[to-1]; n++; }
+          if(smap[to+1]!=ushort.MaxValue) { val += smap[to+1]; n++; }
+          sbuf[yo+x] = val>3 ? (ushort)Math.Max(val/n-3, 0) : (ushort)0;
+        }
+
+      GameLib.Interop.Unsafe.Copy(sbuf, smap, width*height*sizeof(ushort));
+    }
   }
+  #endregion
 
   public static bool IsDangerous(TileType type) { return (tileFlag[(int)type]&TileFlag.Dangerous) != TileFlag.None; }
   public static bool IsLink(TileType type) { return (tileFlag[(int)type]&TileFlag.Link) != TileFlag.None; }
@@ -526,8 +715,7 @@ public class Map : UniqueObject
 
   public Map Memory;
   public MapCollection Dungeon;
-  public int Index;
-  public bool IsDungeon; // determines whether we should do things like propogate sound, scent, etc
+  public int Index, GroupID=-1;
 
   protected int Age { get { return age; } }
   protected int NumCreatures { get { return numCreatures; } }
@@ -561,6 +749,8 @@ public class Map : UniqueObject
 
   Tile[,] map;
   Link[]  links = new Link[0];
+  Shop[]  shops;
+  ushort[,] scentmap;
   EntityCollection entities;
   PriorityQueue thinkQueue = new PriorityQueue(new EntityComparer());
   Hashtable removedEntities = new Hashtable();
@@ -568,6 +758,7 @@ public class Map : UniqueObject
 
   static ushort[] scentbuf;
   static Point[] soundStack;
+  static SpawnInfo[][] objSpawns;
 
   [Flags]
   enum TileFlag : byte { None=0, Passable=1, Wall=2, Door=4, Dangerous=8, Link=16 }
@@ -619,13 +810,7 @@ public class TestMap : Map
   }
 
   Item SpawnItem()
-  { SpawnInfo s = Global.NextSpawn();
-    Item item = (Item)s.ItemType.GetConstructor(Type.EmptyTypes).Invoke(null);
-    item.Count = Global.Rand(s.SpawnMax-s.SpawnMin)+s.SpawnMin;
-
-    if(Global.Rand(100)<15) item.Curse(); // TODO: make these improve weapon/armor
-    else if(Global.Rand(100)<10) item.Bless();
-
+  { Item item = Global.SpawnItem(Global.NextSpawn());
     AddItem(FreeSpace(Map.Space.All), item);
     return item;
   }

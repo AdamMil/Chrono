@@ -239,6 +239,8 @@ public class TownGenerator : MapGenerator
 
   public override void Generate(Map map)
   { this.map = map;
+    if(map.GroupID==-1) map.GroupID = Global.NewSocialGroup(false, true);
+
     map.Fill(TileType.Grass);
     int size = map.Width*map.Height;
     for(int ntrees=size/50; ntrees>0; ntrees--) map.SetType(map.FreeSpace(), TileType.Tree);
@@ -247,12 +249,13 @@ public class TownGenerator : MapGenerator
     AddShop(ShopType.Food);
     AddShop(ShopType.ArmorWeapons);
     AddShop(ShopType.Magic);
-    
+
     while(AddRandomRoom());
     
-    for(int npeople=size/50-5; npeople>0; npeople--)
+    for(int npeople=size/200; npeople>0; npeople--)
     { Entity peon = Entity.Generate(typeof(Townsperson), Global.Rand(0, 3), EntityClass.Worker);
       peon.Position = map.FreeSpace();
+      peon.SocialGroup = map.GroupID;
       map.Entities.Add(peon);
     }
 
@@ -310,17 +313,29 @@ public class TownGenerator : MapGenerator
   }
 
   bool AddRandomRoom()
-  { int i = AddRoom(5, 12);
+  { int i;
+    if(Rand.Next(8)==7) // shop
+    { i = AddRoom(5, 10);
+      if(i!=-1) MakeShop(i, (ShopType)Rand.Next((int)ShopType.NumTypes));
+    }
+    else i = AddRoom(5, 12);
     return i!=-1;
   }
 
   void AddShop(ShopType type)
   { int i = AddRoom(5, 10);
     if(i==-1) throw new UnableToGenerateException("Couldn't add enough rooms");
+    MakeShop(i, type);
   }
-
+  
   TraceAction DoorTrace(Point pt, object context)
   { return ((Rectangle)context).Contains(pt) && map[pt].Type==TileType.Wall ? TraceAction.Stop : TraceAction.Go;
+  }
+
+  void MakeShop(int i, ShopType type)
+  { Rectangle rect = (Rectangle)rooms[i];
+    rect.Inflate(-1, -1); // exclude the wall
+    map.AddShop(rect, type);
   }
 
   ArrayList rooms = new ArrayList();

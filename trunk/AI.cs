@@ -25,6 +25,10 @@ public abstract class AI : Entity
 
   public override void Generate(int level, EntityClass myClass)
   { base.Generate(level, myClass);
+
+    int si = (int)Race*3;
+    Eyesight = raceSenses[si]; Hearing = raceSenses[si+1]; Smelling = raceSenses[si+2];
+
     if(--level==0) return;
 
     Skill[] skills = classSkills[(int)myClass];
@@ -40,6 +44,11 @@ public abstract class AI : Entity
     }
     else skills=null;
     AddSkills(300*level, skills);
+  }
+
+  public bool HostileTowards(Entity e)
+  { return e==attacker || e==target || e.SocialGroup==App.Player.SocialGroup &&
+                                       (alwaysHostile || SocialGroup!=-1 && Global.GetSocialGroup(SocialGroup).Hostile);
   }
 
   public override void OnDrink(Potion potion) { Does("drinks", potion); }
@@ -99,7 +108,15 @@ public abstract class AI : Entity
         case AIState.Patrolling: thresh += thresh/2; break;            // 2/3 as likely to notice if patrolling
       }
 
-      if(volume>Map.MaxSound*thresh/100) GotoState(AIState.Attacking);
+      if(volume>Map.MaxSound*thresh/100)
+      { if(state==AIState.Asleep && App.Player.CanSee(this)) App.IO.Print("{0} wakes up.", TheName);
+        if(source.SocialGroup==App.Player.SocialGroup &&
+           (alwaysHostile || SocialGroup!=-1 && Global.GetSocialGroup(SocialGroup).Hostile))
+        { GotoState(AIState.Attacking);
+          shout = false;
+        }
+        else if(state==AIState.Asleep) GotoState(defaultState);
+      }
     }
 
     if(state==AIState.Attacking)
@@ -129,11 +146,15 @@ public abstract class AI : Entity
   { base.Think();
     if(HP<=0) return;
     if(attacker!=null && attacker.HP<=0) attacker=null;
+    if(shout)
+    { Map.MakeNoise(Position, this, Noise.Alert, 150);
+      shout=false;
+    }
     HandleState(state);
     noiseDir=scentDir=Direction.Invalid; maxNoise=0;
   }
 
-  public byte Eyesight=100, Hearing=100, Smelling=100; // effectiveness of these senses, 0-100%
+  public byte Eyesight, Hearing, Smelling; // effectiveness of these senses, 0-100%
   public byte CorpseChance=30; // chance of leaving a corpse, 0-100%
   public bool HasInventory=true; // whether the monster will pick up and use items
   
@@ -174,63 +195,75 @@ public abstract class AI : Entity
   }
 
   protected virtual bool Attack()
-  { int dist = targetPoint.X==-1 ? 0 : Math.Max(X-targetPoint.X, Y-targetPoint.Y);
+  { const int rangedThresh = 3;
+    
+    Direction dir;
+    int dist = target==null ? 0 : Math.Max(Math.Abs(X-target.X), Math.Abs(Y-target.Y));
+    bool print = target==App.Player || App.Player.CanSee(Position);
 
     if(wakeup>0) // if we have a wakeup delay, don't attack yet
     { wakeup--;
-      if(dist>=3) // but we can prepare for combat
+      if(dist>=rangedThresh) // but we can prepare for combat
       { if(combat!=Combat.Ranged && PrepareRanged(true)) return true;
       }
       else if(combat!=Combat.Melee && PrepareMelee(true)) return true;
       return false;
     }
 
-    if(targetPoint.X!=-1 && CanSee(targetPoint)) // we have a line of sight to the enemy
-    { timeout=5; // we know where the enemy is! our vigor is renewed!
-      if(dist>=3 || bestWand!=null) // we know exactly where the target is and we want to use a ranged attack
+    if(target!=null && (dir=LookAt(target.Position))!=Direction.Invalid) // we have a line of sight to the enemy
+    { timeout=5; lastDir=dir; // we know where the enemy is! our vigor is renewed!
+      // if we know exactly where the target is and we want to use a ranged attack
+      if(dist>=rangedThresh || bestWand!=null || Spells!=null)
       { if(bestWand!=null && bestWand.Spell.Range>=dist) // use a wand if possible
         { bool discard = bestWand.Charges==0;
-          App.IO.Print("{0} zaps {1}!", TheName, bestWand.GetAName(App.Player));
-          if(bestWand.Zap(this, targetPoint)) { Inv.Remove(bestWand); bestWand=null; }
+          if(print) App.IO.Print("{0} zaps {1}!", App.Player.CanSee(this) ? TheName : "Something",
+                                 bestWand.GetAName(App.Player));
+          if(bestWand.Zap(this, target.Position)) { Inv.Remove(bestWand); bestWand=null; }
           else if(discard) bestWand=null;
           return true;
         }
+
+        // if we don't have a wand and the target is close, attack with a melee weapon if we have it. otherwise, if
+        // we have no melee weapon (just our fists), consider using a spell or ranged weapon
+        if(dist<rangedThresh)
+        { if(combat!=Combat.Melee && PrepareMelee(true)) return true;
+          else if(combat==Combat.Melee && Weapon!=null) goto melee;
+        }
+
+        Spell bestSpell = SelectSpell(dist, target.Position);
+        if(bestSpell!=null)
+        { if(print) App.IO.Print("{0} casts a spell!", App.Player.CanSee(this) ? TheName : "Something");
+          bestSpell.Cast(this, target.Position, Direction.Invalid);
+          MP -= bestSpell.Power;
+          // FIXME: exercise attributes and skills
+          return true;
+        }
+
         if(combat!=Combat.Ranged && PrepareRanged(true)) return true; // switch to ranged weapon if possible
         // TODO: check to make sure the enemy is in range of our weapon
         Weapon w = Weapon;
         Ammo   a = SelectAmmo(w);
         if(a!=null || w!=null && w.wClass==WeaponClass.Thrown)
-        { App.IO.Print("{0} attacks with {1}.", TheName, w.GetAName(App.Player, true));
-          Attack(w, a, targetPoint); return true;
+        { if(print) App.IO.Print("{0} attacks with {1}.", TheName, w.GetAName(App.Player, true));
+          Attack(w, a, target.Position); return true;
         }
       }
       if(combat!=Combat.Melee && PrepareMelee(true)) return true; // it's close or we have no ranged attack. use melee.
     }
-    
+
+    melee:
     // try our senses in the orders that are most reliable (sight, sound, scent, memory)
-    Direction dir = sightDir!=Direction.Invalid ? sightDir : hitDir!=Direction.Invalid ? hitDir :
-                    noiseDir!=Direction.Invalid ? noiseDir : scentDir!=Direction.Invalid ? scentDir : lastDir;
+    dir = sightDir!=Direction.Invalid ? sightDir : hitDir!=Direction.Invalid ? hitDir :
+          noiseDir!=Direction.Invalid ? noiseDir : scentDir!=Direction.Invalid ? scentDir : lastDir;
 
     if(dir!=Direction.Invalid) // we have some clue as to the target's direction
-    { bool usedSight=sightDir!=Direction.Invalid, usedHit=hitDir!=Direction.Invalid,
-           usedSound=noiseDir!=Direction.Invalid;
-      Direction pdir = lastDir, nd; // lastDir is going to change on the next line, and we need the old value
+    { Direction pdir = lastDir; // lastDir is going to change on the next line, and we need the old value
       lastDir = dir;
 
-      for(int i=-1; i<=1; i++) // if enemy is in front, attack. // TODO: prefer target, then any enemy
-      { nd = (Direction)((int)dir+i);
-        if(Map.GetEntity(Global.Move(Position, nd))==App.Player)
-        { if(combat!=Combat.Melee && PrepareMelee(true)) return true; // there's something close. goto melee
-          if(usedSight || pdir==nd || Global.Rand(100)<(usedHit?85:usedSound?75:50))
-            Attack(Weapon, null, lastDir=nd);
-          else if(!usedSight && pdir!=nd && Map.GetEntity(Global.Move(Position, pdir))==null)
-          { Attack(Weapon, null, pdir);
-            App.IO.Print(TheName+" attacks empty space.");
-          }
-          timeout = 5; // we attacked something, so our vigor is renewed!
-          return true; // but our turn is up
-        }
-      }
+      if(target!=null && TryAttack(target, dir, pdir)) return true;
+      if(alwaysHostile || SocialGroup!=-1 && Global.GetSocialGroup(SocialGroup).Hostile)
+        foreach(Entity e in Global.GetSocialGroup(App.Player.SocialGroup).Entities)
+          if(e!=target && TryAttack(e, dir, pdir)) return true;
 
       hitDir=Direction.Invalid;
       if(timeout==0) { lastDir=Direction.Invalid; GotoState(defaultState); return false; } // we give up
@@ -239,17 +272,18 @@ public abstract class AI : Entity
       if(TryMove(np)) return true;
       else if(TryMove(dir-1)) { lastDir--; return true; }
       else if(TryMove(dir+1)) { lastDir++; return true; }
-      if(!usedSight && !usedSound) timeout--;
+      if(sightDir==Direction.Invalid && noiseDir==Direction.Invalid) timeout--;
     }
     return false;
   }
 
   protected virtual void Die()
-  { attacker=target=null;
+  { attacker=target=null; // FIXME: remove this after we revamp saving/loading
     if(Global.Rand(100)<CorpseChance) Map.AddItem(Position, new Corpse(this));
     for(int i=0; i<Inv.Count; i++) Map.AddItem(Position, Inv[i]);
     Inv.Clear();
     Map.Entities.Remove(this);
+    if(SocialGroup!=-1) Global.RemoveFromSocialGroup(SocialGroup, this);
   }
 
   protected virtual bool DoIdleStuff() // returns true if our turn was used up
@@ -288,9 +322,20 @@ public abstract class AI : Entity
   }
 
   protected virtual bool EvaluateRanged(Weapon w, ref Item item, ref int quality)
-  { int score = w!=null && w.Ranged ? RangedScore(w) : MeleeScore(w)/3;
+  { if(w==null || !w.Ranged) return false;
+    int score = RangedScore(w);
     if(score>quality)
     { item = w;
+      quality = score;
+      return true;
+    }
+    return false;
+  }
+  
+  protected virtual bool EvaluateSpell(Spell s, ref Spell spell, ref int quality)
+  { int score = SpellScore(s);
+    if(score>quality)
+    { spell = s;
       quality = score;
       return true;
     }
@@ -327,7 +372,7 @@ public abstract class AI : Entity
     }
     else if(newstate==AIState.Attacking)
     { wakeup = state==AIState.Idle || state==AIState.Wandering ? 1 : state==AIState.Asleep ? 2 : 0;
-      if(sightDir!=Direction.Invalid || hitDir!=Direction.Invalid) Map.MakeNoise(Position, this, Noise.Alert, 150);
+      if(sightDir!=Direction.Invalid || hitDir!=Direction.Invalid) shout=true;
       if(state==AIState.Escaping && App.Player.CanSee(this)) App.IO.Print(TheName+" rejoins the battle!");
       timeout = 5; // we'll be in the attack state for at least 5 turns
       lastDir = Direction.Invalid; // force us to calculate a new direction
@@ -350,7 +395,7 @@ public abstract class AI : Entity
         bool enemy = SenseEnemy();
         if(HP*100/MaxHP>=75 && GotoState(enemy ? AIState.Attacking : defaultState)) return HandleState(this.state);
         return Heal() || Escape() || Attack();
-      case AIState.Idle:   return DoIdleStuff();
+      case AIState.Idle: return DoIdleStuff();
       case AIState.Patrolling: case AIState.Wandering: return DoIdleStuff() || Wander(); // TODO: implement AIState.Patrol
     }
     return false;
@@ -399,6 +444,8 @@ public abstract class AI : Entity
 
   protected virtual bool PickupItems()
   { if(!HasInventory || Inv.IsFull || !Map.HasItems(Position)) return false;
+    Shop shop = Map.GetShop(Position);
+    if(shop!=null && shop.Shopkeeper!=null) return false; // don't pick up items in shops (unless the shop is abandoned)
 
     int weight = CarryWeight, burdenedAt = BurdenedAt*CarryMax/100;
     bool pickup=false;
@@ -550,17 +597,33 @@ public abstract class AI : Entity
     return true;
   }
 
-  protected bool SenseEnemy()
-  { if(target==null) target = App.Player; // TODO: look for any enemy in the area (when we have entity<->entity relationships)
-    bool dontignore = state==AIState.Attacking || Global.Rand(100)>=target.Stealth*10-3; // ignore stealthy entities
+  protected Spell SelectSpell(int distance, Point target)
+  { if(Spells==null || Spells.Count==0) return null;
+    Spell spell = null;
+    int score = 0;
+    foreach(Spell s in Spells) if(s.Range>=distance && MP>=s.Power) EvaluateSpell(s, ref spell, ref score);
+    return spell;
+  }
 
-    sightDir = dontignore && Global.Rand(100)<Eyesight ? LookAt(target) : Direction.Invalid; // eyesight
-    targetPoint = sightDir!=Direction.Invalid ? target.Position : new Point(-1, -1);
-    if(Smelling>0) // try smell (not dampened by stealth, sound is handled elsewhere)
-    { int maxScent=0;
+  protected bool SenseEnemy()
+  { if(target!=null && SenseEnemy(target)) return true;     // first try last target
+    if(attacker!=null && SenseEnemy(attacker)) return true; // then attacker
+    if(alwaysHostile || SocialGroup!=-1 && Global.GetSocialGroup(SocialGroup).Hostile) // then any party member
+      foreach(Entity e in Global.GetSocialGroup(App.Player.SocialGroup).Entities)
+        if(SenseEnemy(e)) return true;
+    return false;
+  }
+
+  protected bool SenseEnemy(Entity e)
+  { bool dontignore = state==AIState.Attacking || Global.Rand(100)>=e.Stealth*10-3; // ignore stealthy entities
+    sightDir = dontignore && Global.Rand(100)<Eyesight ? LookAt(e) : Direction.Invalid; // eyesight
+    target = sightDir!=Direction.Invalid ? e : null;
+    if(e==App.Player && Smelling>0) // try smell (not dampened by stealth, sound is handled elsewhere)
+    { int maxScent=0, scent;
       for(int i=0; i<8; i++)
-      { Tile t = Map[Global.Move(Position, i)];
-        if(Map.IsPassable(t.Type) && t.Scent>maxScent) { maxScent=t.Scent; scentDir=(Direction)i; }
+      { Point np = Global.Move(Position, i);
+        Tile t = Map[np];
+        if(Map.IsPassable(t.Type) && (scent=Map.GetScent(np))>maxScent) { maxScent=scent; scentDir=(Direction)i; }
       }
       if(maxScent!=100) maxScent = maxScent*Smelling/100; // scale by our smelling ability
       if(state!=AIState.Attacking && maxScent<(Map.MaxScent/10)) // ignore light scents if not alerted
@@ -568,6 +631,12 @@ public abstract class AI : Entity
     }
     else scentDir=Direction.Invalid;
     return sightDir!=Direction.Invalid || noiseDir!=Direction.Invalid || scentDir!=Direction.Invalid;
+  }
+
+  protected virtual int SpellScore(Spell spell)
+  { if(spell is FireSpell) return 10;
+    if(spell is ForceBolt) return 2;
+    return 0;
   }
 
   protected bool UseItem(IInventory inv, Item i)
@@ -602,7 +671,7 @@ public abstract class AI : Entity
     { for(int i=0; i<8; i++) if(Map.IsPassable(Global.Move(Position, i))) { lastDir=(Direction)i; goto move; }
       return false;
     }
-    else if(Global.OneIn(4))
+    else if(Global.OneIn(3))
     { if(Global.Coinflip()) lastDir++;
       else lastDir--;
     }
@@ -625,7 +694,6 @@ public abstract class AI : Entity
   protected Entity target;        // the entity we're attacking
   protected Wand bestWand;        // the best wand for attacking
   protected ArrayList items;      // items we've pickup up but haven't considered yet
-  protected Point targetPoint;    // where the target is (if we know) or -1,-1 if we don't
   protected int timeout;          // how long we keep trying the current action
   protected int wakeup;           // how long it takes us to get into attack mode
   protected Direction noiseDir=Direction.Invalid;   // the direction of the last noise we heard
@@ -637,17 +705,21 @@ public abstract class AI : Entity
   protected AIState state=AIState.Wandering;        // our current state
   protected Combat combat;        // the type of combat we're prepared for
   protected byte maxNoise;        // the loudest noise we've heard so far (reset at the end of every turn)
+  protected bool alwaysHostile=true; // true if we should attack the player's party regardless of social group considerations
+  protected bool shout;           // true if we will shout on our next turn to alert others
 
   void AddSkills(int points, Skill[] skills)
   { if(skills==null) return;
     int[] skillTable = RaceSkills[(int)Race];
-    int min=int.MaxValue, max=0, range;
+    int max=0, avg=0, range;
 
     for(int i=0; i<skills.Length; i++)
     { int val = skillTable[(int)skills[i]];
-      if(val<min) min=val; if(val>max) max=val;
+      avg += val;
+      if(val>max) max=val;
     }
-    range = max*2-min;
+    avg /= skills.Length;
+    range = max+avg;
 
     do
       for(int i=0; i<skills.Length; i++)
@@ -664,10 +736,38 @@ public abstract class AI : Entity
     while(points>0);
   }
   
+  bool TryAttack(Entity e, Direction dir, Direction prevDir)
+  { bool usedSight=sightDir!=Direction.Invalid, usedHit=hitDir!=Direction.Invalid,
+         usedSound=noiseDir!=Direction.Invalid;
+    for(int i=-1; i<=1; i++) // if enemy is in front, attack.
+    { Direction nd = (Direction)((int)dir+i);
+      if(Map.GetEntity(Global.Move(Position, nd))==e)
+      { if(combat!=Combat.Melee && PrepareMelee(true)) return true; // there's something close. goto melee
+        if(usedSight || prevDir==nd || Global.Rand(100)<(usedHit?85:usedSound?75:50))
+          Attack(Weapon, null, lastDir=nd);
+        else if(!usedSight && prevDir!=nd && Map.GetEntity(Global.Move(Position, prevDir))==null)
+        { Attack(Weapon, null, prevDir);
+          if(App.Player.CanSee(this)) App.IO.Print(TheName+" attacks empty space.");
+        }
+        timeout = 5; // we attacked something, so our vigor is renewed!
+        return true; // but our turn is up
+      }
+    }
+    return false;
+  }
+
   static readonly Skill[][] classSkills = new Skill[(int)EntityClass.NumClasses][]
-  { new Skill[] { Skill.Fighting, Skill.Armor, Skill.Dodge, Skill.Shields }, // Fighter
-    new Skill[] { Skill.Casting, Skill.Elemental, Skill.Telekinesis, Skill.Translocation, Skill.Staff }, // Wizard
-    null
+  { new Skill[] { Skill.Fighting, Skill.Armor, Skill.Dodge, Skill.Shields, Skill.MagicResistance }, // Fighter
+    new Skill[] // Wizard
+    { Skill.Casting, Skill.Elemental, Skill.Telekinesis, Skill.Translocation, Skill.MagicResistance, Skill.Staff
+    },
+    null // Worker
+  };
+
+  static readonly byte[] raceSenses = new byte[(int)Race.NumRaces*3]
+  { // Eyesight, Hearing, Smelling
+    95, 70, 25, // Human
+    90, 85, 75, // Orc
   };
 }
 

@@ -104,12 +104,12 @@
                     BuildAction = "Compile"
                 />
                 <File
-                    RelPath = "Creature.cs"
+                    RelPath = "Dungeon.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
                 />
                 <File
-                    RelPath = "Dungeon.cs"
+                    RelPath = "Entity.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
                 />
@@ -165,6 +165,16 @@
                 />
                 <File
                     RelPath = "Player.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
+                    RelPath = "Potions.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
+                    RelPath = "Scrolls.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
                 />

@@ -208,8 +208,6 @@ public class NTConsole
     remove { SetConsoleCtrlHandler(value, false); }
   }
 
-  public Attribute ForeToBack(Attribute fore) { return (Attribute)((byte)fore<<4); }
-
   public void SetCursorVisibility(bool visible, int fillPct)
   { if(fillPct<0 || fillPct>100)
       throw new ArgumentOutOfRangeException("fillPct", fillPct, "Must be percent from 0 to 100");
@@ -457,6 +455,8 @@ public class NTConsole
     SmallRect drect = new SmallRect(dx, dy, dx+width, dy+height);
     WriteConsoleOutput(hWrite, buf, new Coord(width, height), new Coord(sx, sy), ref drect);
   }
+
+  public static Attribute ForeToBack(Attribute fore) { return (Attribute)((byte)fore<<4); }
 
   static readonly public CharInfo Blank = new CharInfo(' ', Attribute.Black);
 

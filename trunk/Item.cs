@@ -20,10 +20,7 @@ public abstract class Item : ICloneable
     Age=item.Age; Count=item.Count; Weight=item.Weight; Color=item.Color; Char=item.Char;
   }
 
-  public virtual void Think(Creature holder) { Age++; }
-
-  public virtual bool Apply(Creature user, Direction direction) { return false; }
-  public virtual bool Invoke(Creature user) { return false; }
+  public virtual void Think(Entity holder) { Age++; }
 
   public string AreIs { get { return Count>1 ? "are" : "is"; } }
 
@@ -50,8 +47,10 @@ public abstract class Item : ICloneable
     return false;
   }
 
-  public virtual void OnPickup(Creature holder) { }
-  public virtual void OnDrop  (Creature holder) { }
+  public virtual void Invoke(Entity user) { if(user==App.Player) App.IO.Print("Nothing seems to happen."); }
+
+  public virtual void OnPickup(Entity holder) { }
+  public virtual void OnDrop  (Entity holder) { }
 
   public Item Split(int toRemove)
   { if(toRemove>=Count) throw new ArgumentOutOfRangeException("toRemove", toRemove, "is >= than Count");
@@ -63,7 +62,7 @@ public abstract class Item : ICloneable
 
   public override string ToString() { return FullName; }
 
-  public string Title, Prefix, PluralPrefix, PluralSuffix;
+  public string Title, Prefix, PluralPrefix, PluralSuffix, ShortDesc, LongDesc;
   public int Age, Count, Weight;
   public ItemClass Class;
   public Color Color;
@@ -104,8 +103,8 @@ public abstract class Wearable : Modifying
     }
   }
 
-  public virtual void OnRemove(Creature equipper) { worn=false;  }
-  public virtual void OnWear  (Creature equipper) { worn=true; }
+  public virtual void OnRemove(Entity equipper) { worn=false;  }
+  public virtual void OnWear  (Entity equipper) { worn=true; }
 
   public string EquipText;
   public Slot Slot;
@@ -121,12 +120,18 @@ public abstract class Wieldable : Modifying
     }
   }
 
-  public virtual void OnEquip  (Creature equipper) { equipped=true;  }
-  public virtual void OnUnequip(Creature equipper) { equipped=false; }
+  public virtual void OnEquip  (Entity equipper) { equipped=true;  }
+  public virtual void OnUnequip(Entity equipper) { equipped=false; }
 
   public Attr Exercises;
   public bool AllHandWield;
   bool equipped;
+}
+
+public abstract class Readable : Item
+{ protected Readable() { }
+  protected Readable(Item item) : base(item) { }
+  public abstract void Read(Entity user);
 }
 
 } // namespace Chrono

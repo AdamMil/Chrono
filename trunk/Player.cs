@@ -4,7 +4,7 @@ using System.Drawing;
 namespace Chrono
 {
 
-public class Player : Creature
+public class Player : Entity
 { public Player() { Color=Color.White; Timer=50; /*we get a headstart*/ }
 
   public override void Die(string cause)
@@ -67,26 +67,11 @@ public class Player : Creature
       case Action.Eat:
       { if(Hunger<Food.MaxFoodPerTurn) { App.IO.Print("You're still full."); goto next; }
 
-        Food toEat=null;
+        Item item=null;
         IInventory inv=null;
-        if(Map.HasItems(Position))
-        { Item[] items = Map[Position].Items.GetItems(ItemClass.Food);
-          foreach(Item i in items)
-            if(App.IO.YesNo(string.Format("There {0} {1} here. Eat {2}?", i.AreIs, i, i.ItOne),
-                            false))
-            { toEat=(Food)i; inv=Map[Position].Items;
-              break;
-            }
-        }
-        if(toEat==null)
-        { if(!Inv.Has(ItemClass.Food)) { App.IO.Print("You have nothing to eat!"); goto next; }
-          MenuItem[] items = App.IO.ChooseItem("What do you want to eat?", Inv, MenuFlag.None, ItemClass.Food);
-          if(items.Length==0) goto nevermind;
-          toEat = items[0].Item as Food;
-          if(toEat==null) { App.IO.Print("You can't eat that!"); goto next; }
-          inv = Inv;
-        }
-        if(toEat==null) goto next;
+        if(!GroundPackUse(typeof(Food), "Eat", out item, out inv, ItemClass.Food)) goto next;
+
+        Food toEat = (Food)item;
         bool split=false, consumed=false;
         if(toEat.Count>1) { toEat = (Food)toEat.Split(1); split=true; }
         if(toEat.FoodLeft>Food.MaxFoodPerTurn) App.IO.Print("You begin to eat {0}.", toEat);
@@ -97,13 +82,57 @@ public class Player : Creature
         }
         if(consumed && !split) inv.Remove(toEat);
         else if(split && !consumed) inv.Add(toEat);
-        App.IO.Print(consumed ? "You finish eating." : "You feel full.");
+        if(consumed) App.IO.Print("You finish eating.");
+        if(Hunger<Food.MaxFoodPerTurn) App.IO.Print("You feel full.");
+        break;
+      }
+
+      case Action.Fire:
+      { Direction d = App.IO.ChooseDirection(false, false);
+        if(d==Direction.Invalid) goto nevermind;
+        Attack(d);
+        break;
+      }
+
+      case Action.GoDown:
+      { if(Map[Position].Type!=TileType.DownStairs) { App.IO.Print("You can't go down here!"); goto next; }
+        Map.SaveMemory(Memory);
+        Link link = Map.GetLink(Position);
+        Map.Creatures.Remove(this);
+        App.Dungeon[App.CurrentLevel=link.ToLevel].Creatures.Add(this);
+        Position = link.To;
+        break;
+      }
+
+      case Action.GoUp:
+      { if(Map[Position].Type!=TileType.UpStairs) { App.IO.Print("You can't go up here!"); goto next; }
+        if(App.CurrentLevel==0)
+        { if(App.IO.YesNo("If you go up here, you will leave the dungeon. Are you sure?", false)) App.Quit=true;
+        }
+        else
+        { Map.SaveMemory(Memory);
+          Link link = Map.GetLink(Position);
+          Map.Creatures.Remove(this);
+          App.Dungeon[App.CurrentLevel=link.ToLevel].Creatures.Add(this);
+          Position = link.To;
+        }
+        break;
+      }
+
+      case Action.Invoke:
+      { Inventory inv = new Inventory();
+        for(int i=0; i<Hands.Length; i++) if(Hands[i]!=null) inv.Add(Hands[i]);
+        if(inv.Count==0) { App.IO.Print("You have no items equipped!"); goto next; }
+        if(inv.Count==1) { Invoke(inv[0]); break; }
+        MenuItem[] items = App.IO.ChooseItem("Invoke which item?", inv, MenuFlag.None, ItemClass.Any);
+        if(items.Length==0) goto nevermind;
+        Invoke(items[0].Item);
         break;
       }
 
       case Action.Move:
       { Point np = Global.Move(Position, inp.Direction);
-        Creature c = Map.GetCreature(np);
+        Entity c = Map.GetCreature(np);
         if(c!=null) Attack(c);
         else if(Map.IsPassable(np))
         { Position = np;
@@ -119,12 +148,11 @@ public class Player : Creature
         if(!Map.IsPassable(np)) goto next;
         Position = np;
 
-        int dir = (int)inp.Direction, options=0;
-        int[] chk = new int[5] { dir-2, dir-1, dir, dir+1, dir+2 };
+        int options=0;
+        Direction dir = inp.Direction;
+        Direction[] chk = new Direction[5] { dir-2, dir-1, dir, dir+1, dir+2 };
         for(int i=0; i<5; i++)
-        { if(chk[i]<0) chk[i] += 8;
-          else if(chk[i]>=8) chk[i] -= 8;
-          np = Global.Move(Position, chk[i]);
+        { np = Global.Move(Position, chk[i]);
           if(Map.IsPassable(np) || Map.IsDoor(np)) options++;
         }
         while(true)
@@ -138,7 +166,7 @@ public class Player : Creature
           { np = Global.Move(Position, chk[i]);
             if(Map.IsPassable(np) || Map.IsDoor(np)) newopts++;
           }
-          if(newopts!=options || IsMonsterVisible(vis)) goto next;
+          if(newopts!=options) goto next;
 
           np = Global.Move(Position, inp.Direction);
           if(Map.IsPassable(np) && !Map.IsDangerous(np)) Position = np;
@@ -178,9 +206,59 @@ public class Player : Creature
         break;
       }
 
+      case Action.Quaff:
+      { Item potion;
+        IInventory inv;
+        if(!GroundPackUse(typeof(Potion), "Drink", out potion, out inv, ItemClass.Potion)) goto next;
+        if(potion.Count>1) ((Potion)potion.Split(1)).Drink(this);
+        else { inv.Remove(potion); ((Potion)potion).Drink(this); }
+        break;
+      }
+
       case Action.Quit:
         if(App.IO.YesNo(Color.Warning, "Do you really want to quit?", false)) App.Quit=true;
         break;
+
+      case Action.Read:
+      { Item read;
+        IInventory inv;
+        if(!GroundPackUse(typeof(Readable), "Read", out read, out inv, ItemClass.Scroll, ItemClass.Spellbook))
+          goto next;
+        Scroll scroll = read as Scroll;
+        if(scroll != null)
+        { if(scroll.Count>1) ((Scroll)scroll.Split(1)).Read(this);
+          else { inv.Remove(scroll); scroll.Read(this); }
+        }
+        else
+        { /* read spellbook */
+        }
+        break;
+      }
+
+      case Action.Reassign:
+      { if(Inv.Count==0) { App.IO.Print("You're not carrying anything!"); goto next; }
+        MenuItem[] items = App.IO.ChooseItem("Reassign which item?", Inv, MenuFlag.None, ItemClass.Any);
+        if(items.Length==0) goto nevermind;
+        char c;
+        while(true)
+        { c = App.IO.CharChoice("Reassign to?", null);
+          if(c==0) goto nevermind;
+          if(char.IsLetter(c)) break;
+          else App.IO.Print("Invalid character.");
+        }
+        Item other = Inv[c];
+        Inv.Remove(c);
+        Inv.Remove(items[0].Item.Char);
+        if(other!=null && other!=items[0].Item)
+        { other.Char = items[0].Item.Char;
+          Inv.Add(other);
+          App.IO.Print("{0} - {1}", other.Char, other);
+        }
+        items[0].Item.Char = c;
+        Inv.Add(items[0].Item);
+        App.IO.Print("{0} - {1}", c, items[0].Item);
+        goto next;
+      }
 
       case Action.Remove:
       { Inventory inv = new Inventory();
@@ -196,12 +274,36 @@ public class Player : Creature
         if(count>1)
         { bool fullHP=(HP==MaxHP), fullMP=(MP==MaxMP);
           while(--count>0)
-            if(ThinkUpdate(ref vis) || IsMonsterVisible(vis) || !fullHP && HP==MaxHP || !fullMP && MP==MaxMP)
+            if(ThinkUpdate(ref vis) || !fullHP && HP==MaxHP || !fullMP && MP==MaxMP)
               goto next;
         }
         break;
 
       case Action.ShowMap: App.IO.DisplayMap(this); goto next;
+      
+      case Action.SwapAB:
+      { Wieldable w=null;
+        for(int i=0; i<Hands.Length; i++)
+          if(Hands[i]!=null && (Hands[i].Char=='a' || Hands[i].Char=='b')) { w=Hands[i]; break; }
+        if(w==null)
+        { for(char c='a'; c<='b'; c++) if(Inv[c] is Wieldable && TryEquip((Wieldable)Inv[c])) goto done;
+        }
+        else
+        { char c = w.Char=='a' ? 'b' : 'a';
+          Item i = Inv[c];
+          if(!(i is Wieldable) || !TryEquip((Wieldable)i))
+          { App.IO.Print("No suitable item found to equip."); goto next;
+          }
+        }
+        done: break;
+      }
+
+      case Action.ViewItem:
+      { MenuItem[] items = App.IO.ChooseItem("Examine which item?", Inv, MenuFlag.None, ItemClass.Any);
+        if(items.Length==0) goto nevermind;
+        App.IO.ViewItem(items[0].Item);
+        goto next;
+      }
 
       case Action.Wear:
       { MenuItem[] items = App.IO.ChooseItem("Wear what?", Inv, MenuFlag.None, wearableClasses);
@@ -244,6 +346,27 @@ public class Player : Creature
     if(Age>0) App.IO.Print(Color.Green, "You are now a level {0} {1}!", ExpLevel+1, Class);
   }
 
+  protected bool GroundPackUse(Type type, string verb, out Item item, out IInventory inv, params ItemClass[] classes)
+  { item = null; inv = null;
+    if(Map.HasItems(Position))
+    { Item[] items = Map[Position].Items.GetItems(classes);
+      foreach(Item i in items)
+        if(App.IO.YesNo(string.Format("There {0} {1} here. {2} {3}?", i.AreIs, i, verb, i.ItOne),
+                        false))
+        { item=i; inv=Map[Position].Items; break;
+        }
+    }
+    if(item==null)
+    { if(!Inv.Has(classes)) { App.IO.Print("You have nothing to {0}!", verb.ToLower()); return false; }
+      MenuItem[] items = App.IO.ChooseItem(verb+" what?", Inv, MenuFlag.None, classes);
+      if(items.Length==0) { App.IO.Print("Never mind."); return false; }
+      if(!type.IsInstanceOfType(items[0].Item)) { App.IO.Print("You can't {0} that!", verb.ToLower()); return false; }
+      item = items[0].Item;
+      inv = Inv;
+    }
+    return true;
+  }
+  
   protected virtual void OnAge()
   { Hunger++;
     if(Hunger==HungryAt || Hunger==StarvingAt || Hunger==StarveAt)
@@ -260,17 +383,21 @@ public class Player : Creature
     Map.SpreadScent();
   }
 
+  public override void OnDrink(Potion potion) { App.IO.Print("You drink {0}.", potion); }
   public override void OnDrop(Item item) { App.IO.Print("You drop {0}.", item); }
   public override void OnEquip(Wieldable item) { App.IO.Print("You equip {0}.", item); }
-  public override void OnHit(Creature hit, Weapon w, int damage)
+  public override void OnHit(Entity hit, Weapon w, int damage)
   { App.IO.Print(damage>0 ? "You hit {0}." : "You hit {0}, but do no damage.", hit.theName);
   }
-  public override void OnHitBy(Creature hit, Weapon w, int damage)
-  { App.IO.Print(damage>0 ? "{0} hits you!" : "{0} hits you, but does no damage.", hit.TheName);
+  public override void OnHitBy(Entity hit, Weapon w, int damage)
+  { Interrupt();
+    App.IO.Print(damage>0 ? "{0} hits you!" : "{0} hits you, but does no damage.", hit.TheName);
   }
-  public override void OnKill(Creature killed) { App.IO.Print("You kill {0}!", killed.TheName); }
-  public override void OnMiss(Creature hit, Weapon w) { App.IO.Print("You miss {0}.", hit.theName); }
-  public override void OnMissBy(Creature hit, Weapon w) { App.IO.Print("{0} misses you.", hit.TheName); }
+  public override void OnInvoke(Item item) { App.IO.Print("You invoke {0}.", item); }
+  public override void OnKill(Entity killed) { App.IO.Print("You kill {0}!", killed.TheName); }
+  public override void OnMiss(Entity hit, Weapon w) { App.IO.Print("You miss {0}.", hit.theName); }
+  public override void OnMissBy(Entity hit, Weapon w) { App.IO.Print("{0} misses you.", hit.TheName); }
+  public override void OnReadScroll(Scroll item) { App.IO.Print("You read {0}.", item); }
   public override void OnRemove(Wearable item) { App.IO.Print("You remove {0}.", item); }
   public override void OnUnequip(Wieldable item) { App.IO.Print("You unequip {0}.", item); }
   public override void OnWear(Wearable item)
@@ -280,7 +407,11 @@ public class Player : Creature
 
   protected internal override void OnMapChanged()
   { base.OnMapChanged();
-    Memory = Map==null ? null : new Map(Map.Width, Map.Height);
+    if(Map==null) Memory=null;
+    else
+    { Memory = Map.RestoreMemory();
+      if(Memory==null) Memory = new Map(Map.Width, Map.Height);
+    }
   }
 
   protected bool ThinkUpdate(ref Point[] vis)
@@ -288,6 +419,7 @@ public class Player : Creature
     base.Think();
     if(vis!=null) UpdateMemory(vis);
     vis = VisibleTiles();
+    if(IsMonsterVisible(vis)) interrupt=true;
     OnAge();
     if(interrupt) { interrupt=false; return true; }
     return false;

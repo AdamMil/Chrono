@@ -115,7 +115,7 @@ public class Player : Entity
         { switch(spell.Target)
           { case SpellTarget.Self: spell.Cast(this); break;
             case SpellTarget.Item:
-              MenuItem[] items = App.IO.ChooseItem("Cast on which item?", Inv, MenuFlag.None, ItemClass.Any);
+              MenuItem[] items = App.IO.ChooseItem("Cast on which item?", this, MenuFlag.None, ItemClass.Any);
               if(items.Length==0) App.IO.Print("The energy rises within you, and then fades.");
               else spell.Cast(this, items[0].Item);
               break;
@@ -155,7 +155,7 @@ public class Player : Entity
 
       case Action.Drop:
       { if(Inv.Count==0) { App.IO.Print("You're not carrying anything."); goto next; }
-        MenuItem[] items = App.IO.ChooseItem("Drop what?", Inv, MenuFlag.AllowNum|MenuFlag.Multi, ItemClass.Any);
+        MenuItem[] items = App.IO.ChooseItem("Drop what?", this, MenuFlag.AllowNum|MenuFlag.Multi, ItemClass.Any);
         if(items.Length==0) goto nevermind;
         foreach(MenuItem i in items)
           if((!Wearing(i.Item) || TryRemove(i.Item)) && (!Equipped(i.Item) || TryUnequip(i.Item)))
@@ -222,7 +222,7 @@ public class Player : Entity
         Map.SaveMemory(Memory);
         Link link = Map.GetLink(Position);
         Map.Entities.Remove(this);
-        App.Dungeon[App.CurrentLevel=link.ToLevel].Entities.Add(this);
+        App.Dungeon[link.ToLevel].Entities.Add(this);
         Position = link.To;
         if(stress>=CarryStress.Stressed || stress==CarryStress.Burdened && Global.Coinflip())
         { App.IO.Print("You fall down the stairs!");
@@ -234,14 +234,14 @@ public class Player : Entity
       case Action.GoUp:
       { if(CarryStress>CarryStress.Stressed) goto carrytoomuch;
         if(Map[Position].Type!=TileType.UpStairs) { App.IO.Print("You can't go up here!"); goto next; }
-        if(App.CurrentLevel==0)
+        if(Map.Index==0)
         { if(App.IO.YesNo("If you go up here, you will leave the dungeon. Are you sure?", false)) App.Quit=true;
         }
         else
         { Map.SaveMemory(Memory);
           Link link = Map.GetLink(Position);
           Map.Entities.Remove(this);
-          App.Dungeon[App.CurrentLevel=link.ToLevel].Entities.Add(this);
+          App.Dungeon[link.ToLevel].Entities.Add(this);
           Position = link.To;
         }
         break;
@@ -253,7 +253,7 @@ public class Player : Entity
         for(int i=0; i<Hands.Length; i++) if(Hands[i]!=null) inv.Add(Hands[i]);
         if(inv.Count==0) { App.IO.Print("You have no items equipped!"); goto next; }
         if(inv.Count==1) { Invoke(inv[0]); break; }
-        MenuItem[] items = App.IO.ChooseItem("Invoke which item?", inv, MenuFlag.None, ItemClass.Any);
+        MenuItem[] items = App.IO.ChooseItem("Invoke which item?", this, inv, MenuFlag.None, ItemClass.Any);
         if(items.Length==0) goto nevermind;
         Invoke(items[0].Item);
         break;
@@ -320,7 +320,7 @@ public class Player : Entity
         }
       }
 
-      case Action.Inventory: App.IO.DisplayInventory(Inv); goto next;
+      case Action.Inventory: App.IO.DisplayInventory(this); goto next;
 
       case Action.OpenDoor:
       { if(CarryStress==CarryStress.Overtaxed) goto carrytoomuch;
@@ -353,7 +353,7 @@ public class Player : Entity
           App.IO.Print(s);
         }
         else
-          foreach(MenuItem item in App.IO.Menu(inv, MenuFlag.AllowNum|MenuFlag.Multi|MenuFlag.Reletter))
+          foreach(MenuItem item in App.IO.Menu(this, inv, MenuFlag.AllowNum|MenuFlag.Multi|MenuFlag.Reletter))
           { Item newItem = item.Count==item.Item.Count ? Pickup(inv, item.Item) : Pickup(item.Item.Split(item.Count));
             string s = string.Format("{0} - {1}", newItem.Char, item.Item.FullName);
             if(item.Count!=newItem.Count) s += string.Format(" (now {0})", newItem.Count);
@@ -446,7 +446,7 @@ public class Player : Entity
 
       case Action.Reassign:
       { if(Inv.Count==0) { App.IO.Print("You're not carrying anything!"); goto next; }
-        MenuItem[] items = App.IO.ChooseItem("Reassign which item?", Inv, MenuFlag.None, ItemClass.Any);
+        MenuItem[] items = App.IO.ChooseItem("Reassign which item?", this, MenuFlag.None, ItemClass.Any);
         if(items.Length==0) goto nevermind;
         char c;
         while(true)
@@ -475,7 +475,7 @@ public class Player : Entity
         for(int i=0; i<Slots.Length; i++) if(Slots[i]!=null) inv.Add(Slots[i]);
         for(int i=0; i<Hands.Length; i++) if(Hands[i]!=null && Hands[i].Class==ItemClass.Shield) inv.Add(Hands[i]);
         if(inv.Count==0) { App.IO.Print("You're not wearing anything!"); goto next; }
-        MenuItem[] items = App.IO.ChooseItem("Remove what?", inv, MenuFlag.Multi, ItemClass.Any);
+        MenuItem[] items = App.IO.ChooseItem("Remove what?", this, inv, MenuFlag.Multi, ItemClass.Any);
         if(items.Length==0) goto nevermind;
         foreach(MenuItem i in items)
           if(i.Item.Class==ItemClass.Shield) TryUnequip(i.Item);
@@ -539,7 +539,7 @@ public class Player : Entity
 
       case Action.Throw:
       { if(CarryStress>=CarryStress.Stressed) goto carrytoomuch;
-        MenuItem[] items = App.IO.ChooseItem("Throw which item?", Inv, MenuFlag.None, ItemClass.Any);
+        MenuItem[] items = App.IO.ChooseItem("Throw which item?", this, MenuFlag.None, ItemClass.Any);
         if(items.Length==0) goto nevermind;
         if(Wearing(items[0].Item)) { App.IO.Print("You can't throw something you're wearing!"); goto next; }
         RangeTarget rt = App.IO.ChooseTarget(this, true);
@@ -554,7 +554,7 @@ public class Player : Entity
         Inventory inv = new Inventory();
         foreach(Item ii in Inv) if(ii.Usability!=ItemUse.NoUse) inv.Add(ii);
         if(inv.Count==0) { App.IO.Print("You have no useable items."); goto next; }
-        MenuItem[] items = App.IO.ChooseItem("Use which item?", inv, MenuFlag.None, ItemClass.Any);
+        MenuItem[] items = App.IO.ChooseItem("Use which item?", this, inv, MenuFlag.None, ItemClass.Any);
         if(items.Length==0) goto nevermind;
         Item i = items[0].Item;
         bool consume;
@@ -577,7 +577,7 @@ public class Player : Entity
       }
 
       case Action.ViewItem:
-      { MenuItem[] items = App.IO.ChooseItem("Examine which item?", Inv, MenuFlag.None, ItemClass.Any);
+      { MenuItem[] items = App.IO.ChooseItem("Examine which item?", this, MenuFlag.None, ItemClass.Any);
         if(items.Length==0) goto nevermind;
         App.IO.ExamineItem(this, items[0].Item);
         goto next;
@@ -585,7 +585,7 @@ public class Player : Entity
 
       case Action.Wear:
       { if(CarryStress>=CarryStress.Stressed) goto carrytoomuch;
-        MenuItem[] items = App.IO.ChooseItem("Wear what?", Inv, MenuFlag.None, wearableClasses);
+        MenuItem[] items = App.IO.ChooseItem("Wear what?", this, MenuFlag.None, wearableClasses);
         if(items.Length==0) goto nevermind;
         if(items[0].Item.Class==ItemClass.Shield)
         { Shield shield = (Shield)items[0].Item;
@@ -609,7 +609,7 @@ public class Player : Entity
 
       case Action.Wield:
       { if(CarryStress>=CarryStress.Stressed) goto carrytoomuch;
-        MenuItem[] items = App.IO.ChooseItem("Wield what?", Inv, MenuFlag.AllowNothing, ItemClass.Weapon);
+        MenuItem[] items = App.IO.ChooseItem("Wield what?", this, MenuFlag.AllowNothing, ItemClass.Weapon);
         if(items.Length==0) goto nevermind;
         if(items[0].Item==null) TryEquip(null);
         else
@@ -623,7 +623,7 @@ public class Player : Entity
       
       case Action.ZapWand:
       { if(CarryStress==CarryStress.Overtaxed) goto carrytoomuch;
-        MenuItem[] items = App.IO.ChooseItem("Zap what?", Inv, MenuFlag.None, ItemClass.Wand);
+        MenuItem[] items = App.IO.ChooseItem("Zap what?", this, MenuFlag.None, ItemClass.Wand);
         if(items.Length==0) goto nevermind;
         Wand wand = items[0].Item as Wand;
         if(wand==null) { App.IO.Print("You can't zap that!"); goto next; }
@@ -668,7 +668,7 @@ public class Player : Entity
     }
     if(item==null)
     { if(!Inv.Has(classes)) { App.IO.Print("You have nothing to {0}!", verb.ToLower()); return false; }
-      MenuItem[] items = App.IO.ChooseItem(verb+" what?", Inv, MenuFlag.None, classes);
+      MenuItem[] items = App.IO.ChooseItem(verb+" what?", this, MenuFlag.None, classes);
       if(items.Length==0) { App.IO.Print("Never mind."); return false; }
       if(!type.IsInstanceOfType(items[0].Item)) { App.IO.Print("You can't {0} that!", verb.ToLower()); return false; }
       item = items[0].Item;

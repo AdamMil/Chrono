@@ -234,19 +234,10 @@ public abstract class Entity
     }
     else effects[numEffects++] = effect;
   }
-  public void CancelEffect(int i)
-  { bool cf = effects[i].Attr==Attr.Flags;
-    for(i++; i<numEffects; i++) effects[i-1]=effects[i];
-    numEffects--;
-    if(cf) CheckFlags();
-  }
-  public void CancelEffect(Attr attr)
-  { for(int i=0; i<numEffects; i++) if(effects[i].Attr==attr) CancelEffect(i--);
-  }
-  public void CancelEffect(Flag flag)
-  { flag = ~flag;
-    for(int i=0; i<numEffects; i++)
-      if(effects[i].Attr==Attr.Flags && (effects[i].Value&=(int)flag)==0) CancelEffect(i--);
+  
+  public void AddKnowledge(Item item)
+  { if(knowledge==null) knowledge = new Hashtable();
+    knowledge[item.GetType().ToString()] = null;
   }
 
   // attack in a direction, can be used for attacking locked doors, etc
@@ -311,6 +302,21 @@ public abstract class Entity
       else Map.AddItem(c!=null || Map.IsPassable(Map[res.Point].Type) ? res.Point : res.Previous, // stays
                        item.Count>1 ? item.Split(1) : item);
     }
+  }
+
+  public void CancelEffect(int i)
+  { bool cf = effects[i].Attr==Attr.Flags;
+    for(i++; i<numEffects; i++) effects[i-1]=effects[i];
+    numEffects--;
+    if(cf) CheckFlags();
+  }
+  public void CancelEffect(Attr attr)
+  { for(int i=0; i<numEffects; i++) if(effects[i].Attr==attr) CancelEffect(i--);
+  }
+  public void CancelEffect(Flag flag)
+  { flag = ~flag;
+    for(int i=0; i<numEffects; i++)
+      if(effects[i].Attr==Attr.Flags && (effects[i].Value&=(int)flag)==0) CancelEffect(i--);
   }
 
   // true if item can be removed (not cursed, etc) or slot is empty
@@ -464,7 +470,7 @@ public abstract class Entity
   { if(myClass==EntityClass.RandomClass)
       myClass = (EntityClass)Global.Rand((int)EntityClass.NumClasses);
 
-    Class = myClass; Title = GetTitle(); SetRawAttr(Attr.Light, 8);
+    Class = myClass; Title = GetTitle(); SetBaseAttr(Attr.Light, 8);
 
     int[] mods = raceAttrs[(int)Race].Mods; // attributes for race
     for(int i=0; i<mods.Length; i++) attr[i] += mods[i];
@@ -475,7 +481,7 @@ public abstract class Entity
     int points = 8; // allocate extra points randomly
     while(points>0)
     { int a = Global.Rand((int)Attr.NumBasics);
-      if(attr[a]<=17 || Global.Coinflip()) { SetRawAttr((Attr)a, attr[a]+1); points--; }
+      if(attr[a]<=17 || Global.Coinflip()) { SetBaseAttr((Attr)a, attr[a]+1); points--; }
     }
 
     HP = MaxHP; MP = MaxMP;
@@ -483,14 +489,14 @@ public abstract class Entity
     while(--level>0) LevelUp();
   }
 
-  public int GetRawAttr(Attr attribute) { return attr[(int)attribute]; } // gets a raw attribute value (no modifiers)
-  public void SetRawAttr(Attr attribute, int val) // sets a base attribute value
+  public int GetBaseAttr(Attr attribute) { return attr[(int)attribute]; } // gets a raw attribute value (no modifiers)
+  public void SetBaseAttr(Attr attribute, int val) // sets a base attribute value
   { attr[(int)attribute]=val;
   }
 
-  public bool GetRawFlag(Flag flag) { return (RawFlags&flag)!=0; } // gets a raw flag (no modifiers)
+  public bool GetRawFlag(Flag flag) { return (BaseFlags&flag)!=0; } // gets a raw flag (no modifiers)
   public void SetRawFlag(Flag flag, bool on) // sets a base flag
-  { if(on) RawFlags |= flag; else RawFlags &= ~flag;
+  { if(on) BaseFlags |= flag; else BaseFlags &= ~flag;
     CheckFlags();
   }
 
@@ -523,12 +529,14 @@ public abstract class Entity
   { for(int i=0; i<Inv.Count; i++) if(Inv[i].Think(this)) Inv.RemoveAt(i--);
   }
 
+  public bool KnowsAbout(Item item) { return knowledge!=null && knowledge.Contains(item.GetType().ToString()); }
+
   public virtual void LevelDown() { ExpLevel--; } // TODO: make this subtract from stats
   public virtual void LevelUp()
   { int hpGain = attr[(int)Attr.Str]/3+1;
     int mpGain = attr[(int)Attr.Int]/3+1;
-    SetRawAttr(Attr.MaxHP, GetRawAttr(Attr.MaxHP)+hpGain);
-    SetRawAttr(Attr.MaxMP, GetRawAttr(Attr.MaxMP)+mpGain);
+    SetBaseAttr(Attr.MaxHP, GetBaseAttr(Attr.MaxHP)+hpGain);
+    SetBaseAttr(Attr.MaxMP, GetBaseAttr(Attr.MaxMP)+mpGain);
     HP += hpGain; mp += mpGain;
     ExpLevel++;
   }
@@ -854,15 +862,16 @@ public abstract class Entity
   public Wearable[] Slots = new Wearable[(int)Slot.NumSlots]; // our worn item slots
   public int[] Skills = new int[(int)Skill.NumSkills], SkillExp = new int[(int)Skill.NumSkills]; // our skills
   public Wieldable[] Hands = new Wieldable[2]; // our hands (currently just 2, but maybe more in the future)
-  public ArrayList Spells;   // spells we've learned (don't modify this collection manually)
-  public string Name, Title; // Name can be null (our race [eg "orc"] is displayed). Title can be null (no title)
-  public Map    Map, Memory; // the map and our memory of it
-  public Point  Position;    // our position within the map
-  public int    Timer;       // when timer >= speed, our turn is up
-  public Flag   RawFlags;    // our flags, not counting modifiers
-  public Race   Race;        // our race
+  public ArrayList Spells;    // spells we've learned (don't modify this collection manually)
+  public Hashtable knowledge; // hash table of known item classes
+  public string Name, Title;  // Name can be null (our race [eg "orc"] is displayed). Title can be null (no title)
+  public Map    Map, Memory;  // the map and our memory of it
+  public Point  Position;     // our position within the map
+  public int    Timer;        // when timer >= speed, our turn is up
+  public Flag   BaseFlags;    // our flags, not counting modifiers
+  public Race   Race;         // our race
+  public EntityClass Class;   // our class/job
   public Color  Color=Color.Dire; // our general color
-  public EntityClass Class;  // our class/job
   public int Age, ExpPool, Hunger;
 
   // generates a creature, creates it and calls the creature's Generate() method. class is RandomClass if not passed
@@ -937,7 +946,7 @@ public abstract class Entity
   }
 
   protected void CheckFlags() // check if our flags have changed and call OnFlagsChanged if so
-  { Flag nf = RawFlags;
+  { Flag nf = BaseFlags;
     for(int i=0; i<Slots.Length; i++) if(Slots[i]!=null) nf |= Slots[i].FlagMods;
     for(int i=0; i<Hands.Length; i++) if(Hands[i]!=null) nf |= Hands[i].FlagMods;
     for(int i=0; i<numEffects; i++) if(effects[i].Attr==Attr.Flags) nf |= (Flag)effects[i].Value;
@@ -972,9 +981,9 @@ public abstract class Entity
     }
   }
 
-  protected string prefix;      // my name prefix (usually null)
-  protected int baseKillExp;    // the base experience gotten for killing me
-  protected bool interrupt;     // true if we've been interrupted
+  protected string prefix;       // my name prefix (usually null)
+  protected int baseKillExp;     // the base experience gotten for killing me
+  protected bool interrupt;      // true if we've been interrupted
 
   struct AttrMods
   { public AttrMods(params int[] mods) { Mods = mods; }

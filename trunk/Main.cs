@@ -10,7 +10,6 @@ public sealed class App
 { 
   public static Dungeon Dungeon = new Dungeon();
   public static Player Player;
-  public static int CurrentLevel;
   public static InputOutput IO;
   public static bool Quit;
 
@@ -27,8 +26,8 @@ public sealed class App
     for(int y=0; y<map.Height; y++) // place Player on the up staircase of the first level
       for(int x=0; x<map.Width; x++)
         if(map[x, y].Type==TileType.UpStairs) { Player.X = x; Player.Y = y; break; }
-    Player.SetRawAttr(Attr.AC, 6);
-    Player.SetRawAttr(Attr.EV, 5);
+    Player.SetBaseAttr(Attr.AC, 6);
+    Player.SetBaseAttr(Attr.EV, 5);
     /*Player.SetSkill(Skill.Casting, 1);
     Player.SetSkill(Skill.Elemental, 1);
     Player.SetSkill(Skill.Telekinesis, 1);*/
@@ -54,9 +53,10 @@ public sealed class App
     IO.Render(Player);
 
     while(!Quit)
-    { if(CurrentLevel>0) Dungeon[CurrentLevel-1].Simulate();
-      if(CurrentLevel<Dungeon.Count-1) Dungeon[CurrentLevel+1].Simulate();
-      Dungeon[CurrentLevel].Simulate();
+    { int level = Player.Map.Index;
+      if(level>0) Dungeon[level-1].Simulate();
+      if(level<Dungeon.Count-1) Dungeon[level+1].Simulate();
+      Dungeon[level].Simulate();
     }
   }
 

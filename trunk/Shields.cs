@@ -6,6 +6,14 @@ namespace Chrono
 public abstract class Shield : Wieldable
 { public Shield() { Class=ItemClass.Shield; }
 
+  public override string FullName
+  { get
+    { string ret = "a " + (AC<0 ? "" : "+") + AC + ' ' + Name;
+      if(Title!=null) ret += " named "+Title;
+      return ret;
+    }
+  }
+
   public int BlockChance; // base percentage chance that this shield will block a blow
 }
 

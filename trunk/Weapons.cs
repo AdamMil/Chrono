@@ -13,7 +13,19 @@ public abstract class Weapon : Wieldable
 { public Weapon() { Class=ItemClass.Weapon; }
   protected Weapon(Item item) : base(item)
   { Weapon ow = (Weapon)item;
-    wClass=ow.wClass; Delay=ow.Delay; Noise=ow.Noise; ToHitBonus=ow.ToHitBonus; Ranged=ow.Ranged;
+    wClass=ow.wClass; Delay=ow.Delay; Noise=ow.Noise; ToHitBonus=ow.ToHitBonus; baseToHit=ow.baseToHit;
+    baseDamage=ow.baseDamage; damageBonus=ow.damageBonus; Ranged=ow.Ranged;
+  }
+
+  public override string FullName
+  { get
+    { string ret = (Count>1 ? Count.ToString() : "a") + ' ' + 
+                   (damageBonus<baseDamage ? "" : "+") + (damageBonus-baseDamage) + ',' +
+                   (ToHitBonus<baseToHit ? "" : "+") + (ToHitBonus-baseToHit) + ' ' + Name;
+      if(Count>1) ret += PluralSuffix;
+      if(Title!=null) ret += " named "+Title;
+      return ret;
+    }
   }
 
   public abstract Damage CalculateDamage(Entity user, Ammo ammo, Entity target); // ammo and target can be null
@@ -30,6 +42,8 @@ public abstract class Weapon : Wieldable
   public int  Noise;  // noise this weapon makes (0-10)
   public int  ToHitBonus;
   public bool Ranged;
+  
+  protected int baseToHit, baseDamage, damageBonus; // base bonuses
 }
 
 public abstract class FiringWeapon : Weapon
@@ -71,7 +85,7 @@ public class Dart : Weapon
   public Dart(Item item) : base(item) { }
 
   public override Damage CalculateDamage(Entity user, Ammo ammo, Entity target)
-  { Damage d = new Damage(Global.NdN(1, 3+(int)CompatibleWith(user)) + user.StrBonus/2);
+  { Damage d = new Damage(Global.NdN(1, 3+(int)CompatibleWith(user)) + user.StrBonus/2 + damageBonus);
     if(Global.Rand(100)<100/(target.Poison+1)) d.Poison = 1;
     return d;
   }
@@ -89,7 +103,7 @@ public class Bow : FiringWeapon
 
   public override Damage CalculateDamage(Entity user, Ammo ammo, Entity target)
   { Damage dam = new Damage(ammo==null ? 1 : Global.NdN(1, 5+(int)CompatibleWith(user)+(int)CompatibleWith(ammo))
-                            + user.DexBonus);
+                            + user.DexBonus + damageBonus);
     return ammo.ModDamage(dam);
   }
 }
@@ -101,7 +115,7 @@ public class ShortSword : Weapon
   }
 
   public override Damage CalculateDamage(Entity user, Ammo ammo, Entity target)
-  { return new Damage(Global.NdN(1, 6+(int)CompatibleWith(user)) + user.StrBonus);
+  { return new Damage(Global.NdN(1, 6+(int)CompatibleWith(user)) + user.StrBonus + damageBonus);
   }
 }
 

@@ -38,12 +38,17 @@ public abstract class AI : Entity
     AddSkills(300*level, skills);
   }
 
-  public override void OnDrink(Potion potion)
-  { if(App.Player.CanSee(this)) App.IO.Print("{0} drinks {1}.", TheName, potion.FullName);
-  }
-  public override void OnDrop(Item item) { if(App.Player.CanSee(this)) App.IO.Print("{0} drops {1}.", TheName, item); }
+  public override void OnDrink(Potion potion) { Does("drinks", potion); }
+  public override void OnDrop(Item item) { Does("drops", item); }
   public override void OnEquip(Wieldable item)
-  { if(App.Player.CanSee(this)) App.IO.Print("{0}{1}.", TheName, item.FullName);
+  { if(App.Player.CanSee(this))
+    { App.IO.Print("{0} equips {1}.", TheName, item.GetAName(App.Player));
+      if(item.Cursed)
+      { App.IO.Print("The {0} welds itself to {1}'s {2}!", item.Name, TheName,
+                     item.Class==ItemClass.Shield ? "arm" : "hand");
+        item.Status |= ItemStatus.KnowCB;
+      }
+    }
   }
   public override void OnFlagsChanged(Chrono.Entity.Flag oldFlags, Chrono.Entity.Flag newFlags)
   { Flag diff = oldFlags ^ newFlags;
@@ -56,27 +61,17 @@ public abstract class AI : Entity
       }
     }
   }
-  public override void OnPickup(Item item)
-  { if(App.Player.CanSee(this)) App.IO.Print("{0} picks up {1}.", TheName, item.FullName);
-  }
-  public override void OnReadScroll(Scroll scroll)
-  { if(App.Player.CanSee(this)) App.IO.Print("{0} reads {1}.", TheName, scroll.FullName);
-  }
-  public override void OnRemove(Wearable item)
-  { if(App.Player.CanSee(this)) App.IO.Print("{0} removes {1}.", TheName, item.FullName);
-  }
+  public override void OnPickup(Item item) { Does("picks up", item); }
+  public override void OnReadScroll(Scroll scroll) { Does("reads", scroll); }
+  public override void OnRemove(Wearable item) { Does("removes", item); }
   public override void OnSick(string howSick)
   { if(App.Player.CanSee(this)) App.IO.Print("{0} looks {1}.", TheName, howSick);
   }
   public override void OnSkillUp(Skill skill)
   { if(App.Player.CanSee(this)) App.IO.Print("{0} looks more experienced.", TheName);
   }
-  public override void OnUnequip(Wieldable item)
-  { if(App.Player.CanSee(this)) App.IO.Print("{0} unequips {1}.", TheName, item.FullName);
-  }
-  public override void OnWear(Wearable item)
-  { if(App.Player.CanSee(this)) App.IO.Print("{0} puts on {1}.", TheName, item.FullName);
-  }
+  public override void OnUnequip(Wieldable item) { Does("unequips", item); }
+  public override void OnWear(Wearable item) { Does("puts on", item); }
 
   public bool HasEyes=true, HasEars=true, HasNose=true;
 
@@ -84,6 +79,10 @@ public abstract class AI : Entity
   { if(Global.Rand(100)<30) Map.AddItem(Position, new Corpse(this)); // 30% chance of leaving a corpse
     for(int i=0; i<Inv.Count; i++) Map.AddItem(Position, Inv[i]);
     Map.Entities.Remove(this);
+  }
+  
+  protected void Does(string verb, Item item)
+  { if(App.Player.CanSee(this)) App.IO.Print("{0} {1} {2}.", TheName, verb, item.GetAName(App.Player));
   }
 
   protected AIState state;

@@ -7,7 +7,7 @@ namespace Chrono
 public enum Action
 { None, Quit, Rest, Move, MoveToInteresting, MoveToDanger, MoveAFAP, OpenDoor, CloseDoor, Pickup, Drop, DropType,
   GoUp, GoDown, Eat, Wear, Remove, Wield, Inventory, ShowMap, Fire, Quaff, Read, ViewItem, Invoke, SwapAB, Reassign,
-  ManageSkills, UseItem, Carve, ExamineTile, Throw, ZapWand, CastSpell, ShowKnowledge, Save
+  ManageSkills, UseItem, Carve, ExamineTile, Throw, ZapWand, CastSpell, ShowKnowledge, Save, NameItem
 }
 
 public struct Input

@@ -152,12 +152,16 @@ public sealed class Global
       }
     }
   }
+  
+  public static string WithAorAn(string str) { return char.IsDigit(str[0]) ? str : AorAn(str) + ' ' + str; }
 
   public static void Deserialize(System.IO.Stream stream, IFormatter formatter)
-  { nextID = (ulong)formatter.Deserialize(stream);
+  { Random = (Random)formatter.Deserialize(stream);
+    nextID = (ulong)formatter.Deserialize(stream);
   }
   public static void Serialize(System.IO.Stream stream, IFormatter formatter)
-  { formatter.Serialize(stream, nextID);
+  { formatter.Serialize(stream, Random);
+    formatter.Serialize(stream, nextID);
   }
 
   public static readonly Point[] DirMap = new Point[8]

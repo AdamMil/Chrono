@@ -15,7 +15,7 @@ public abstract class Shield : Wieldable
       if(status!="") status += ' ';
       string ret = status + (AC<0 ? "" : "+") + AC + ' ' + Name;
       if(Title!=null) ret += " named "+Title;
-      return Global.AorAn(ret) + ' ' + ret;
+      return ret;
     }
   }
 

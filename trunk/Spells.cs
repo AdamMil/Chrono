@@ -58,14 +58,33 @@ public abstract class Spell : UniqueObject
   { int skill = (user.GetSkill(Skill.Casting)+GetSpellSkill(user)+1)/2;
     double smul = 1.2-1/Math.Pow(1.1746189430880190059144636656919, skill);
     int chance = (int)Math.Round((user.Int-7)*100*smul/Difficulty) - 10;
+    int penalty = CastPenalty(user);
+    if(penalty>0) chance -= chance*penalty/100;
     return chance<0 ? 0 : chance>100 ? 100 : chance;
   }
+
+  public int CastPenalty(Entity user)
+  { int penalty = user.Shield==null ? 0 : 20; // -20% for having a shield
+    for(int i=0; i<user.Hands.Length; i++)
+      if(user.Hands[i]==null) break;
+      else if(i==user.Hands.Length-1) penalty += 15; // -15% for having your hands full
+    for(int i=0; i<armorPenalty.Length; i+=2)
+      if(user.Slots[armorPenalty[i]]!=null && user.Slots[armorPenalty[i]].Material>=Material.HardMaterials)
+        penalty += armorPenalty[i+1];
+    penalty += (int)user.HungerLevel*10; // -10% per hunger level
+    return penalty;
+  }
+
   public bool CastTest(Entity user) { return Global.Rand(100)<CastChance(user); }
+
+  public int GetSpellSkill(Entity user) { return user.GetSkill((Skill)((int)Class+(int)Skill.WeaponSkills)); }
 
   // (Int-8) * 100 * (1.1 - 1/(skill^1.126)) / Difficulty - 20
   public int LearnChance(Entity user)
   { double smul = 1.1-1/Math.Pow(1.2589254117941672104239541063958, GetSpellSkill(user));
     int chance = (int)Math.Round((user.Int-8)*100*smul/Difficulty) - 20;
+    int penalty = (int)user.HungerLevel*10; // -10% per hunger level
+    if(penalty>0) chance -= chance*penalty/100;
     return chance<0 ? 0 : chance>100 ? 100 : chance;
   }
 
@@ -79,9 +98,11 @@ public abstract class Spell : UniqueObject
   public int Power;  // MP usage
   public bool AutoIdentify;
   
-  protected int GetSpellSkill(Entity user) { return user.GetSkill((Skill)((int)Class+(int)Skill.WeaponSkills)); }
-
   protected static ArrayList path = new ArrayList();
+  
+  static readonly int[] armorPenalty = new int[]
+  { (int)Slot.Feet, 5, (int)Slot.Hands, 10, (int)Slot.Head, 5, (int)Slot.Legs, 10, (int)Slot.Torso, 25
+  };
 }
 #endregion
 
@@ -161,7 +182,7 @@ public class ForceBolt : BeamSpell
   }
   public ForceBolt(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
-  protected override object Hit(Entity user, Point pt) { return user.Map.GetEntity(pt); }
+  protected override object Hit(Entity user, Point pt) { return user.Map.IsPassable(pt) ? null : (object)pt; }
 
   protected override bool Affect(Entity user, Direction dir)
   { if(dir==Direction.Above)
@@ -173,15 +194,9 @@ public class ForceBolt : BeamSpell
   }
 
   protected override void Affect(Entity user, object obj)
-  { Entity e = obj as Entity;
-    if(e!=null)
-    { e.Exercise(Skill.MagicResistance);
-      Damage damage = new Damage(Global.NdN(1, 6));
-      damage.Direct = 2;
-      e.OnHitBy(user, this, damage);
-      user.OnHit(e, this, damage);
-      e.DoDamage(user, Death.Combat, damage);
-    }
+  { Damage damage = new Damage(Global.NdN(1, 6));
+    damage.Direct = 2;
+    user.TrySpellDamage(this, (Point)obj, damage);
   }
 
   public static ForceBolt Default = new ForceBolt();
@@ -227,20 +242,18 @@ public class FireSpell : BeamSpell
   }
 
   protected override void Affect(Entity user, object obj)
-  { Entity e = obj as Entity;
+  { Damage damage = new Damage();
+    damage.Heat = (ushort)Global.NdN(4, 10);
+    Entity e = obj as Entity;
     bool print;
     if(e!=null)
-    { e.Exercise(Skill.MagicResistance);
-      Damage damage = new Damage();
-      damage.Heat = (ushort)Global.NdN(4, 10);
-      e.OnHitBy(user, this, damage);
-      user.OnHit(e, this, damage);
+    { user.TrySpellDamage(this, e.Position, damage);
       print = App.Player.CanSee(e);
       for(int i=0; i<e.Inv.Count; i++) if(Global.Rand(100)<30 && AffectItem(e.Inv, e.Inv[i], print)) i--;
-      e.DoDamage(user, Death.Combat, damage);
     }
     else
     { Point pt = (Point)obj;
+      user.TrySpellDamage(this, pt, damage);
       IInventory inv = user.Map[pt].Items;
       if(inv!=null)
       { print = App.Player.CanSee(pt);
@@ -253,8 +266,8 @@ public class FireSpell : BeamSpell
   { if(i.Class==ItemClass.Scroll || i.Class==ItemClass.Potion || i.Class==ItemClass.Spellbook)
     { if(print)
       { string plural = i.Count>1 ? "" : "s";
-        App.IO.Print(i.Class==ItemClass.Potion ? "{0} heat{1} up and burst{1}!" : "{0} burn{1} up!",
-                     Global.Cap1(i.ToString()), plural);
+        App.IO.Print(i.Class==ItemClass.Potion ? "Your {0} heat{1} up and burst{1}!" : "Your {0} burn{1} up!",
+                     i.GetFullName(App.Player), plural);
       }
       inv.Remove(i);
       return true;
@@ -342,7 +355,7 @@ public class IdentifySpell : Spell
   public override void Cast(Entity user, ItemStatus buc, Item target)
   { if(user==App.Player)
     { user.AddKnowledge(target, true);
-      App.IO.Print("{0} - {1}", target.Char, target.GetFullName(user));
+      App.IO.Print("{0} - {1}", target.Char, target.GetAName(user));
     }
   }
 

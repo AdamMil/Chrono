@@ -34,7 +34,7 @@ public class Player : Entity
           if((food.Flags&Food.Flag.Tainted)!=0) prefix += "tainted ";
           Die(prefix+"food");
         }
-        else if(killer is Item) Die(prefix + ((Item)killer).FullName);
+        else if(killer is Item) Die(prefix + ((Item)killer).GetAName(this));
         else Die(cause==Death.Poison ? "poison" : "sickness");
         break;
       }
@@ -75,19 +75,20 @@ public class Player : Entity
       { if(CarryStress==CarryStress.Overtaxed) goto carrytoomuch;
         Weapon w = Weapon;
         Item si=null;
-        if(IsSharp(w)) si=w;
+        if(w!=null && IsSharp(w)) si=w;
         else
-        { foreach(Item i in Inv)
-            if(i.Class==ItemClass.Weapon && !i.KnownCursed && IsSharp((Weapon)i))
-            { if(!TryUnequip(w))
-              { App.IO.Print("You need a sharp object, but you can't unequip {0}.", w.GetFullName(this));
+        { App.IO.Print("You need a sharp item to carve with.");
+          foreach(Item i in Inv)
+            if(i.Class==ItemClass.Weapon && (i.KnownUncursed || i.KnownBlessed) && IsSharp((Weapon)i))
+            { if(w!=null && !TryUnequip(w))
+              { App.IO.Print("You can't equip a suitable item!");
                 goto next;
               }
               si = i;
               Equip((Weapon)i);
               break;
             }
-          if(si==null) { App.IO.Print("You can't find a sharp item to use!"); goto next; }
+          if(si==null) { App.IO.Print("You can't find a suitable (known uncursed) sharp item to use!"); goto next; }
         }
 
         Item item;
@@ -117,14 +118,16 @@ public class Player : Entity
           }
         }
         if(si!=w)
-        { if(TryUnequip(si)) Equip(w);
-          else App.IO.Print("You can't unequip {0}!", si.GetFullName(this));
+        { if(TryUnequip(si))
+          { if(w!=null) Equip(w);
+          }
+          else App.IO.Print("You can't unequip your {0}!", si.GetFullName(this));
         }
         break;
       }
 
       case Action.CastSpell:
-      { if(Spells.Count==0) { App.IO.Print("You don't know any spells!"); break; }
+      { if(Spells.Count==0) { App.IO.Print("You don't know any spells!"); goto next; }
         if(CarryStress==CarryStress.Overtaxed) goto carrytoomuch;
         Spell spell = App.IO.ChooseSpell(this);
         if(spell==null) goto nevermind;
@@ -414,6 +417,14 @@ public class Player : Entity
       }
 
       case Action.Inventory: App.IO.DisplayInventory(this); goto next;
+      
+      case Action.NameItem:
+      { MenuItem[] items = App.IO.ChooseItem("Name which item?", this, MenuFlag.None, ItemClass.Any);
+        if(items.Length==0) goto nevermind;
+        string name = App.IO.Ask("Choose a name for this "+items[0].Item.GetFullName(this)+':', true, null);
+        items[0].Item.Title = name!="" ? name : null;
+        goto next;
+      }
 
       case Action.OpenDoor:
       { if(CarryStress==CarryStress.Overtaxed) goto carrytoomuch;
@@ -441,14 +452,14 @@ public class Player : Entity
         CarryStress stress = CarryStress, newstress;
         if(inv.Count==1)
         { Item item = inv[0], newItem = Pickup(inv, 0);
-          string s = string.Format("{0} - {1}", newItem.Char, item.GetFullName(this));
+          string s = string.Format("{0} - {1}", newItem.Char, item.GetAName(this));
           if(item.Count!=newItem.Count) s += string.Format(" (now {0})", newItem.Count);
           App.IO.Print(s);
         }
         else
           foreach(MenuItem item in App.IO.Menu(this, inv, MenuFlag.AllowNum|MenuFlag.Multi|MenuFlag.Reletter))
           { Item newItem = item.Count==item.Item.Count ? Pickup(inv, item.Item) : Pickup(item.Item.Split(item.Count));
-            string s = string.Format("{0} - {1}", newItem.Char, item.Item.GetFullName(this));
+            string s = string.Format("{0} - {1}", newItem.Char, item.Item.GetAName(this));
             if(item.Count!=newItem.Count) s += string.Format(" (now {0})", newItem.Count);
             App.IO.Print(s);
           }
@@ -833,9 +844,15 @@ public class Player : Entity
     if(feel==null) return;
     App.IO.Print(Color.Green, "You feel {0}!", feel);
   }
-  public override void OnDrink(Potion potion) { App.IO.Print("You drink {0}.", potion.GetFullName(this)); }
-  public override void OnDrop(Item item) { App.IO.Print("You drop {0}.", item.GetFullName(this)); }
-  public override void OnEquip(Wieldable item) { App.IO.Print("You equip {0}.", item.GetFullName(this)); }
+  public override void OnDrink(Potion potion) { App.IO.Print("You drink {0}.", potion.GetAName(this)); }
+  public override void OnDrop(Item item) { App.IO.Print("You drop {0}.", item.GetAName(this)); }
+  public override void OnEquip(Wieldable item)
+  { App.IO.Print("You equip {0}.", item.GetAName(this));
+    if(item.Cursed)
+    { App.IO.Print("The {0} welds itself to your {1}!", item.Name, item.Class==ItemClass.Shield ? "arm" : "hand");
+      item.Status |= ItemStatus.KnowCB;
+    }
+  }
   public override void OnFlagsChanged(Chrono.Entity.Flag oldFlags, Chrono.Entity.Flag newFlags)
   { Flag diff = oldFlags ^ newFlags;
     if((diff&newFlags&Flag.Asleep)!=0) App.IO.Print("You wake up.");
@@ -869,7 +886,7 @@ public class Player : Entity
     if(attacker!=this)
       App.IO.Print(damage.Total>0 ? "{0} hits you!" : "{0} hits you, but does no damage.", attacker.TheName);
   }
-  public override void OnInvoke(Item item) { App.IO.Print("You invoke {0}.", item.GetFullName(this)); }
+  public override void OnInvoke(Item item) { App.IO.Print("You invoke {0}.", item.GetAName(this)); }
   public override void OnKill(Entity killed) { App.IO.Print("You kill {0}!", killed.TheName); }
   public override void OnMiss(Entity hit, object item)
   { if(item==null || item is Weapon) App.IO.Print("You miss {0}.", hit.theName);
@@ -882,14 +899,14 @@ public class Player : Entity
   public override void OnNoise(Entity source, Noise type, int volume)
   { if(type==Noise.Alert) { App.IO.Print("You hear a shout!"); Interrupt(); }
   }
-  public override void OnReadScroll(Scroll item) { App.IO.Print("You read {0}.", item.GetFullName(this)); }
-  public override void OnRemove(Wearable item) { App.IO.Print("You remove {0}.", item.GetFullName(this)); }
+  public override void OnReadScroll(Scroll item) { App.IO.Print("You read {0}.", item.GetAName(this)); }
+  public override void OnRemove(Wearable item) { App.IO.Print("You remove {0}.", item.GetAName(this)); }
   public override void OnSick(string howSick) { App.IO.Print(Color.Dire, "You feel {0}.", howSick); }
   public override void OnSkillUp(Skill skill)
   { App.IO.Print(Color.Green, "Your {0} skill went up!", skill.ToString().ToLower());
   }
-  public override void OnUnequip(Wieldable item) { App.IO.Print("You unequip {0}.", item.GetFullName(this)); }
-  public override void OnWear(Wearable item) { App.IO.Print("You put on {0}.", item.GetFullName(this)); }
+  public override void OnUnequip(Wieldable item) { App.IO.Print("You unequip {0}.", item.GetAName(this)); }
+  public override void OnWear(Wearable item) { App.IO.Print("You put on {0}.", item.GetAName(this)); }
 
   protected internal override void OnMapChanged()
   { base.OnMapChanged();

@@ -10,7 +10,7 @@ public class Corpse : Item
 
   public Corpse(Entity of)
   { Class = ItemClass.Corpse; Color = of.Color; Weight=raceWeight[(int)of.Race];
-    name  = of.Race.ToString().ToLower() + " corpse"; Prefix = Global.AorAn(name)+' ';
+    name  = of.Race.ToString().ToLower() + " corpse";
     CorpseOf = of;
     if(of.Sickness+of.Poison>1) Flags |= Flag.Tainted;
   }
@@ -20,13 +20,13 @@ public class Corpse : Item
   { base.Think(holder);
     if(Age==75)
     { Flags |= Flag.Rotting;
-      name="rotting "+CorpseOf.Race.ToString().ToLower()+" corpse"; Prefix="a ";
+      name="rotting "+CorpseOf.Race.ToString().ToLower()+" corpse";
       if(holder==App.Player) App.IO.Print(Global.Coinflip() ? "Eww! There's something really disgusting in your pack!"
                                                             : "You smell the putrid stench of decay.");
     }
     else if(Age==150)
     { Flags = Flags & ~Flag.Rotting | Flag.Skeleton;
-      name=CorpseOf.Race.ToString().ToLower()+" skeleton"; Prefix = Global.AorAn(name)+' ';
+      name=CorpseOf.Race.ToString().ToLower()+" skeleton";
     }
     else if(Age==200)
     { if(holder==App.Player) App.IO.Print("Your {0} rots away.", Name);

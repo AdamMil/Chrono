@@ -443,6 +443,7 @@ public sealed class ConsoleIO : InputOutput
     console.SetCursorPosition(0, 0);
     console.WriteLine("{0} - {1}", item.Char, item.GetInvName(viewer));
     console.WriteLine();
+    string noiseStr=null;
     if(item.ShortDesc!=null)
     { WriteWrapped(item.ShortDesc, MapWidth);
       console.WriteLine();
@@ -461,26 +462,35 @@ public sealed class ConsoleIO : InputOutput
       console.WriteLine("This item has {0} charges remaining.", ch.Charges);
       if(ch.Recharged>0) console.WriteLine("This item has been recharged {0} times.", ch.Recharged);
     }
-    if(item is Weapon)
+    if(item.Class==ItemClass.Weapon)
     { Weapon w = (Weapon)item;
       if(w.Delay!=0) console.WriteLine("Attack delay: {0}%", w.Delay);
-      if(w.Noise==0) console.WriteLine("This weapon is silent (noise=0).");
-      else if(w.Noise<4) console.WriteLine("This weapon is rather quiet (noise={0}).", w.Noise);
-      else if(w.Noise<8) console.WriteLine("This weapon is quite noisy (noise={0}).", w.Noise);
-      else console.WriteLine("This weapon is extremely noisy (noise={0}).", w.Noise);
       if(w.ToHitBonus!=0) console.WriteLine("To hit {0}: {1}", w.ToHitBonus<0 ? "penalty" : "bonus", w.ToHitBonus);
       console.WriteLine("It falls into the '{0}' category.", w.wClass.ToString().ToLower());
+      noiseStr = "This weapon";
     }
-    else if(item is Shield)
+    else if(item.Class==ItemClass.Shield)
     { Shield s = (Shield)item;
       console.WriteLine("Chance to block: {0}%", s.BlockChance);
     }
+    else if(item.Class==ItemClass.Food || item.Class==ItemClass.Potion || item.Class==ItemClass.Scroll ||
+            item.Class==ItemClass.Tool || item.Class==ItemClass.Wand)
+      noiseStr = "Using this item";
     if(item is Wieldable)
     { Wieldable w = (Wieldable)item;
       console.WriteLine("It is a {0}-handed item.", w.AllHandWield ? "two" : "one");
       console.WriteLine("This item is better for the {0}.",
                         w.Exercises==Attr.Str ? "strong" : w.Exercises==Attr.Dex ? "dexterous" : "intelligent");
     }
+    if(noiseStr!=null)
+    { if(item.Noise==0) console.WriteLine("{0} is completely silent (noise=0).", noiseStr);
+      else if(item.Noise<4) console.WriteLine("{0} is rather quiet (noise={1}).", noiseStr, item.Noise);
+      else if(item.Noise<8) console.WriteLine("{0} is quite noisy (noise={1}).", noiseStr, item.Noise);
+      else console.WriteLine("{0} is extremely noisy (noise={1}).", noiseStr, item.Noise);
+    }
+    if(item is Wearable)
+      console.WriteLine("This item is made of {0}.", ((Wearable)item).Material.ToString().ToLower());
+
     if(item.Count>1)
       console.WriteLine("They weigh about {0} mt. each ({1} total).", item.Weight, item.Weight*item.Count);
     else console.WriteLine("It weighs about {0} mt.", item.Weight);
@@ -505,7 +515,7 @@ public sealed class ConsoleIO : InputOutput
     Skill[] skills = new Skill[(int)Skill.NumSkills];
     int numSkills=0;
 
-    for(int i=0; i<(int)Skill.NumSkills; i++) if(player.SkillExp[i]>0) skills[numSkills++]=(Skill)i;
+    for(int i=0; i<(int)Skill.NumSkills; i++) if(player.Skills[i]>0) skills[numSkills++]=(Skill)i;
     console.WriteLine(numSkills==0 ? "You are completely unskilled!" : "Select a skill to toggle training it.");
 
     while(true)
@@ -514,7 +524,7 @@ public sealed class ConsoleIO : InputOutput
       for(int i=0; i<numSkills; i++)
       { bool enabled = player.Training(skills[i]);
         Write(enabled ? Color.Normal : Color.DarkGrey, "{0} {1} {2} Skill {3} ",
-              c++, enabled ? '+' : '-', skills[i].ToString().PadRight(18), player.GetSkill(skills[i])+1);
+              c++, enabled ? '+' : '-', skills[i].ToString().PadRight(18), player.GetSkill(skills[i]));
         WriteLine(Color.LightBlue, "({0})", player.SkillExp[(int)skills[i]]*9/skillTable[(int)skills[i]]+1);
       }
 
@@ -654,6 +664,7 @@ public sealed class ConsoleIO : InputOutput
         }
       else if(rec.Key.HasMod(NTConsole.Modifier.Ctrl)) switch(c+64)
       { case 'P': DisplayMessages(false); break;
+        case 'N': inp.Action = Action.NameItem; break;
         case 'Q': inp.Action = Action.Quit; break;
         case 'X': inp.Action = Action.Save; break;
       }
@@ -876,7 +887,8 @@ z - zap a wand              Z - cast a spell
 b, h, j, k, l, n, u, y - nethack-like movement
 / DIR  - long walk          / .    - rest up to 100 turns
 Ctrl-A - toggle autopickup  Ctrl-Q - quit
-Ctrl-P - see old messages   Ctrl-X - quit + save";
+Ctrl-N - name an item       Ctrl-X - quit + save
+Ctrl-P - see old messages";
 
     console.SetCursorPosition(0, 0);
     NTConsole.OutputModes mode = console.OutputMode;

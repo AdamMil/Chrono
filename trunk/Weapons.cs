@@ -25,7 +25,7 @@ public abstract class Weapon : Wieldable
                    (ToHitBonus<baseToHit ? "" : "+") + (ToHitBonus-baseToHit) + ' ' + Name;
       if(Count>1) ret += PluralSuffix;
       if(Title!=null) ret += " named "+Title;
-      return Count>1 ? ret : Global.AorAn(ret) + ' ' + ret;
+      return ret;
     }
   }
 
@@ -101,7 +101,7 @@ public class Dart : Weapon
 [Serializable]
 public class Bow : FiringWeapon
 { public Bow()
-  { name="recurved bow"; AmmoName="arrows";
+  { name="recurved bow"; AmmoName="arrows"; AllHandWield=true;
     Color=Color.LightCyan; Weight=20; Delay=25; wClass=WeaponClass.Bow; Exercises=Attr.Dex; Noise=2;
   }
   public Bow(SerializationInfo info, StreamingContext context) : base(info, context) { }

@@ -6,13 +6,13 @@ namespace Chrono
 
 public sealed class App
 { 
-  public class LevelCollection : ArrayList
-  { public new Level this[int i] { get { return (Level)base[i]; } }
+  public class MapCollection : ArrayList
+  { public new Map this[int i] { get { return (Map)base[i]; } }
   }
   
   public static int CurrentLevel;
   public static InputOutput IO;
-  public static LevelCollection Levels = new LevelCollection();
+  public static MapCollection Maps = new MapCollection();
   public static bool Quit;
 
   public static void Main()
@@ -24,19 +24,21 @@ public sealed class App
     Player player = (Player)Creature.MakeCreature(typeof(Player));
     player.Name = IO.Ask("Enter your name:", false, "I need to know what to call you!");
     player.Title = "Grunt";
-    player.MaxHP = 1;
-    Levels.Add(new RoomyLevelGenerator().Generate());
-    Levels[0].Creatures.Add(player);
+    player.HP    = 8;
+    player.MaxHP = 10;
+    player.Speed = 25;
+    Maps.Add(new RoomyMapGenerator().Generate());
+    Maps[0].Creatures.Add(player);
     IO.Render(player);
 
-    for(int y=0; y<Levels[0].Height; y++) // place player on the up staircase of the first level
-      for(int x=0; x<Levels[0].Width; x++)
-        if(Levels[0].Map[x, y].Type==TileType.UpStairs) { player.X = x; player.Y = y; break; }
+    for(int y=0; y<Maps[0].Height; y++) // place player on the up staircase of the first level
+      for(int x=0; x<Maps[0].Width; x++)
+        if(Maps[0][x, y].Type==TileType.UpStairs) { player.X = x; player.Y = y; break; }
 
     while(!Quit)
-    { if(CurrentLevel>0) Levels[CurrentLevel-1].Simulate();
-      if(CurrentLevel<Levels.Count-1) Levels[CurrentLevel+1].Simulate();
-      Levels[CurrentLevel].Simulate();
+    { if(CurrentLevel>0) Maps[CurrentLevel-1].Simulate();
+      if(CurrentLevel<Maps.Count-1) Maps[CurrentLevel+1].Simulate();
+      Maps[CurrentLevel].Simulate();
     }
   }
 

@@ -12,7 +12,7 @@ public sealed class ConsoleIO : InputOutput
     console.InputMode  = NTConsole.InputModes.None;
     console.OutputMode = NTConsole.OutputModes.Processed|NTConsole.OutputModes.WrapAtEOL;
     console.Fill(NTConsole.Blank);
-    console.SetCursorPosition(0, 0);
+    console.SetCursorVisibility(true, 20);
   }
 
   public override bool RedrawStats { get { return redrawStats; } set { redrawStats=value; } }
@@ -78,29 +78,42 @@ public sealed class ConsoleIO : InputOutput
 
   public override Input GetNextInput()
   { while(true)
-    { char c = console.ReadChar();
+    { Input inp = new Input();
+      char c = console.ReadChar();
       if(c=='0') continue;
       if(c!='5' && char.IsDigit(c))
-      { Input mi = new Input(Action.Move);
-        mi.Direction = CharToDirection(c);
-        return mi;
+      { inp.Action = Action.Move;
+        inp.Direction = CharToDirection(c);
+        return inp;
       }
-      Action a = Action.None;
       switch(c)
-      { case (char)('Q'-64): a = Action.Quit; break;
-        case 'c': a = Action.CloseDoor; break;
-        case 'o': a = Action.OpenDoor; break;
+      { case (char)('Q'-64): inp.Action = Action.Quit; break;
+        case '.': case '5': inp.Action = Action.Rest; break;
+        case 'c': inp.Action = Action.CloseDoor; break;
+        case 'o': inp.Action = Action.OpenDoor; break;
+        case '/':
+          c = console.ReadChar();
+          if(c=='0') continue;
+          if(c=='5') { count=100; inp.Action = Action.Rest; }
+          else if(char.IsDigit(c))
+          { inp.Action = Action.MoveToInteresting;
+            inp.Direction = CharToDirection(c);
+          }
+          break;
       }
-      if(a != Action.None) return new Input(a);
+      if(inp.Action != Action.None)
+      { inp.Count = count;
+        count = 0;
+        return inp;
+      }
     }
   }
 
   public override void Render(Creature viewer)
-  { Level level = viewer.Level;
+  { Map map = viewer.Map;
     int width = Math.Min(console.Width, MapWidth), height = Math.Min(console.Height, MapHeight);
     Rectangle rect = new Rectangle(viewer.Position.X-width/2, viewer.Position.Y-height/2, width, height);
     if(buf==null || buf.Length<rect.Width*rect.Height) buf = new NTConsole.CharInfo[rect.Width*rect.Height];
-    Map map = level.Map;
     for(int i=0,y=rect.Top; y<rect.Bottom; y++)
       for(int x=rect.Left; x<rect.Right; i++,x++)
         switch(map[x,y].Type)
@@ -113,13 +126,17 @@ public sealed class ConsoleIO : InputOutput
           case TileType.DownStairs: buf[i] = new NTConsole.CharInfo('>', NTConsole.Attribute.Grey); break;
           default: buf[i] = new NTConsole.CharInfo(' ', NTConsole.Attribute.Black); break;
         }
-    foreach(Creature c in level.Creatures)
+    foreach(Creature c in map.Creatures)
       if(rect.Contains(c.Position))
         buf[(c.Y-rect.Y)*rect.Width + c.X-rect.X] = new NTConsole.CharInfo('@', NTConsole.Attribute.White);
     console.PutBlock(new Rectangle(0, 0, rect.Width, rect.Height), buf);
-    if(redrawStats) { RenderStats(viewer); redrawStats=false; }
+    if(redrawStats)
+    { RenderStats(viewer);
+      console.SetCursorPosition(mapCX=width/2, mapCY=height/2);
+      redrawStats=false;
+    }
   }
-  
+
   public override void SetTitle(string title) { console.Title = title; }
 
   public override bool YesNo(Color color, string prompt, bool defaultYes)
@@ -140,14 +157,8 @@ public sealed class ConsoleIO : InputOutput
   { get { return inputMode; }
     set
     { if(value==inputMode) return;
-      if(value)
-      { console.InputMode = NTConsole.InputModes.LineBuffered|NTConsole.InputModes.Echo;
-        console.SetCursorVisibility(true, 20);
-      }
-      else
-      { console.InputMode = NTConsole.InputModes.None;
-        console.SetCursorVisibility(false, 20);
-      }
+      console.InputMode = value ? NTConsole.InputModes.LineBuffered|NTConsole.InputModes.Echo
+                                : NTConsole.InputModes.None;
       uncleared = 0;
       DrawLines();
       inputMode = value;
@@ -174,6 +185,7 @@ public sealed class ConsoleIO : InputOutput
       console.Attributes = ColorToAttr(line.Color);
       console.WriteLine(line.Text);
     }
+    console.SetCursorPosition(mapCX, mapCY);
   }
   void PutString(int x, int y, string str) { PutString(Color.Normal, x, y, str); }
   void PutString(Color color, int x, int y, string str)
@@ -191,7 +203,6 @@ public sealed class ConsoleIO : InputOutput
   void RenderStats(Creature player)
   { const int x = MapWidth+2;
     int healthpct = player.HP*100/player.MaxHP;
-    console.Fill(x, 0, console.Width-x, Math.Max(MapHeight, console.Height), NTConsole.Blank);
     PutString(x, 0, "{0} the {1} (lv {2})", player.Name, player.Title, player.ExpLevel+1);
     PutString(x, 1, "Human");
     PutString(healthpct<25 ? Color.Dire : healthpct<50 ? Color.Warning : Color.Normal,
@@ -199,19 +210,20 @@ public sealed class ConsoleIO : InputOutput
     PutString(x, 3, "MP:   {0}/{1}", player.MP, player.MaxMP);
     PutString(x, 4, "AC:   {0}", player.AC);
     PutString(x, 5, "EV:   {0}", player.EV);
-    PutString(x, 6, "Str:  {0}", player.GetAttr(Attr.Strength));
-    PutString(x, 7, "Int:  {0}", player.GetAttr(Attr.Intelligence));
-    PutString(x, 8, "Dex:  {0}", player.GetAttr(Attr.Dexterity));
-    PutString(x, 9, "Per:  {0}", player.GetAttr(Attr.Perception));
+    PutString(x, 6, "Str:  {0}", player.Str);
+    PutString(x, 7, "Int:  {0}", player.Int);
+    PutString(x, 8, "Dex:  {0}", player.Dex);
+    PutString(x, 9, "Per:  {0}", player.Per);
     PutString(x,10, "Gold: {0}", 0);
     PutString(x,11, "Exp:  {0}/{0}", player.Exp, player.NextExp);
-    PutString(x,12, "Dungeon level {0}", App.CurrentLevel);
+    PutString(x,12, "Turn: {0}", player.Age);
+    PutString(x,13, "Dungeon map {0}", App.CurrentLevel+1);
   }
 
   NTConsole.CharInfo[] buf;
   NTConsole console = new NTConsole();
   LinkedList lines = new LinkedList(); // a circular array would be better
-  int  uncleared=0, maxLines = 200;
+  int  uncleared=0, maxLines=200, mapCX, mapCY, count;
   bool inputMode, redrawStats=true;
 
   static Direction CharToDirection(char c)

@@ -119,11 +119,6 @@
                     BuildAction = "Compile"
                 />
                 <File
-                    RelPath = "Level.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
                     RelPath = "LevelGenerator.cs"
                     SubType = "Code"
                     BuildAction = "Compile"

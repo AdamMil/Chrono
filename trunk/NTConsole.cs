@@ -225,9 +225,9 @@ public class NTConsole
     Check(SetConsoleWindowInfo(hWrite, true, ref rect));
   }
   
-  public char ReadChar()
+  public char ReadChar() // FIXME: make this use ReadInput so it can handle escape, modkeys, etc
   { InputModes old = inMode;
-    if((inMode&InputModes.LineBuffered)!=0) InputMode = inMode & (~InputModes.LineBuffered&~InputModes.Echo);
+    if((inMode&InputModes.LineBuffered)!=0) InputMode = inMode & ~(InputModes.LineBuffered|InputModes.Echo);
     uint len;
     char c;
     unsafe
@@ -254,7 +254,7 @@ public class NTConsole
     do
     { if(ascii)
       { Check(ReadConsoleInputA(hRead, out rec, 1, out read));
-        if(rec.Type==InputType.Keyboard) rec.Key.Char = (char)((ushort)rec.Key.Char&0xFF);
+        if(rec.Type==InputType.Keyboard) rec.Key.Char = (char)((ushort)rec.Key.Char&0xFF); // FIXME: rework this
       }
       else Check(ReadConsoleInputW(hRead, out rec, 1, out read));
     } while(rec.Type>InputType.BufferResize);

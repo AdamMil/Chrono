@@ -7,7 +7,7 @@ namespace Chrono
 public enum Action { None, Quit, Rest, Move, MoveToInteresting, MoveToDanger, MoveAFAP, OpenDoor, CloseDoor }
 
 public struct Input
-{ public Input(Action action) { Action=action; Direction=Direction.Invalid; Count=1; }
+{ public Input(Action action) { Action=action; Direction=Direction.Invalid; Count=0; }
   public Action Action;
   public Direction Direction;
   public int    Count;

@@ -161,6 +161,7 @@ public abstract class Entity : UniqueObject
                            : level<20 ? 100*Math.Pow(1.3, level+10)-3000 : 100*Math.Pow(1.18, level+25)+50000) - 25;
     }
   }
+  public bool OnOverworld { get { return Map.Dungeon is Overworld && Map.Index==(int)Overworld.Place.Overworld; } }
   public int Poison
   { get // only one effect can be Poison
     { for(int i=0; i<numEffects; i++) if(effects[i].Attr==Attr.Poison) return effects[i].Value;
@@ -474,6 +475,7 @@ public abstract class Entity : UniqueObject
     { if(val<0) val=0;
       if(val>10) val=10;
     }
+    else if(attribute==Attr.Light && OnOverworld) val = val/2+1;
     return val;
   }
 
@@ -607,6 +609,7 @@ public abstract class Entity : UniqueObject
   public virtual void OnHitBy(Entity attacker, object item, Damage damage) { }
   public virtual void OnInvoke(Item item) { }
   public virtual void OnKill(Entity killed) { }
+  public virtual void OnMapChanged() { } // called when the creature is added to or removed from a map
   public virtual void OnMiss(Entity hit, object item) { }
   public virtual void OnMissBy(Entity attacker, object item) { }
   public virtual void OnNoise(Entity source, Noise type, int volume) { }
@@ -1053,9 +1056,6 @@ public abstract class Entity : UniqueObject
   { Exp += killed.KillExp;
     ExpPool += Global.NdN(2, killed.baseKillExp)-2; // TODO: this probably needs revision
   }
-
-  // called when the creature is added to or removed from a map
-  protected internal virtual void OnMapChanged() { }
 
   protected void UpdateMemory() // updates Memory using the visible area
   { if(Memory==null) return;

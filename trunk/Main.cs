@@ -9,7 +9,7 @@ namespace Chrono
 
 public sealed class App
 { 
-  public static Dungeon Dungeon = new Dungeon();
+  public static Overworld World = new Overworld();
   public static Player Player;
   public static InputOutput IO;
   public static bool Quit;
@@ -28,15 +28,14 @@ public sealed class App
       App.IO.Print("Welcome back to Chrono, {0}!", Player.Name);
     }
     else
-    { Map map = Dungeon[0];
+    { Map map = World[0];
 
       char c = IO.CharChoice("(w)izard or (f)ighter?", "wf");
       Player = Player.Generate(c=='w' ? EntityClass.Wizard : EntityClass.Fighter, Race.Human);
       Player.Name = IO.Ask("Enter your name:", false, "I need to know what to call you!");
 
-      /*for(int y=0; y<map.Height; y++) // place Player on the up staircase of the first level
-        for(int x=0; x<map.Width; x++)
-          if(map[x, y].Type==TileType.UpStairs) { Player.X = x; Player.Y = y; break; }*/
+      for(int i=0; i<map.Links.Length; i++)
+        if(map.Links[i].ToLevel==(int)Overworld.Place.Town1) { Player.Position = map.Links[i].FromPoint; break; }
 
       if(Player.Class==EntityClass.Fighter)
       { Player.SetSkill(Skill.Fighting, 1);
@@ -64,14 +63,8 @@ public sealed class App
     }
 
     IO.Render(Player);
+    while(!Quit) Player.Map.Simulate();
 
-    while(!Quit)
-    { int level = Player.Map.Index;
-      if(level>0) Dungeon[level-1].Simulate();
-      if(level<Dungeon.Count-1) Dungeon[level+1].Simulate();
-      Dungeon[level].Simulate();
-    }
-    
     if(Player.HP>0)
     { FileStream f = File.Open("c:/chrono.sav", FileMode.Create);
       Save(f);
@@ -97,8 +90,8 @@ public sealed class App
     Scroll.Deserialize(s, f);
     Wand.Deserialize(s, f);
 
-    Dungeon = (Dungeon)f.Deserialize(s);
-    Player  = (Player)f.Deserialize(s);
+    World  = (Overworld)f.Deserialize(s);
+    Player = (Player)f.Deserialize(s);
 
     Global.ObjHash = null;
   }
@@ -115,7 +108,7 @@ public sealed class App
     Scroll.Serialize(s, f);
     Wand.Serialize(s, f);
 
-    f.Serialize(s, Dungeon);
+    f.Serialize(s, World);
     f.Serialize(s, Player);
 
     Global.ObjHash = null;

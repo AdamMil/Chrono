@@ -32,4 +32,8 @@ speed up item cloning!
 clone entities into memory as well as items
 add ways to raise natural resistances
 improve AI's RunAway() so it will go through doors more often
-make Open and Close (and maybe other commands) target automatically if only one door is around
+make time seem to pass in maps the player has not visited in a while
+add other tiles like Town (eg. Cave)
+make lava burn entities, ice freeze them, etc (on base think?)
+move items burning/freezing/bursting etc to TrySpellDamage
+make player unable to climb mountains without appropriate gear

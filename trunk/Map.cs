@@ -46,8 +46,17 @@ public struct Tile
 
 [Serializable]
 public struct Link
-{ public Link(Point from, bool down) { From=from; To=new Point(-1, -1); ToLevel=-1; Down=down; }
-  public Point From, To;
+{ public Link(Point from, bool down)
+  { FromPoint=from; ToPoint=new Point(-1, -1); ToDungeon=null; ToLevel=-1; Down=down;
+  }
+  public Link(Point from, MapCollection to, bool down)
+  { FromPoint=from; ToPoint=new Point(-1, -1); ToDungeon=to; ToLevel=0; Down=down;
+  }
+  public Link(Point from, MapCollection to, int level, bool down)
+  { FromPoint=from; ToPoint=new Point(-1, -1); ToDungeon=to; ToLevel=level; Down=down;
+  }
+  public Point FromPoint, ToPoint;
+  public MapCollection ToDungeon;
   public int  ToLevel;
   public bool Down;
 }
@@ -150,10 +159,15 @@ public sealed class PathFinder // FIXME: having this latch onto the .Node bits o
 
 #region Map
 [Serializable]
-public sealed class Map : UniqueObject
+public class Map : UniqueObject
 { // maximum scent on a tile, maximum scent add on a single call (maximum entity smelliness), maximum sound on a tile
   public const int MaxScent=1200, MaxScentAdd=800, MaxSound=255;
   
+  [Flags] public enum Space
+  { None=0, Items=1, Entities=2, Links=4, All=Items|Entities|Links,
+    NoItems=All&~Items, NoEntities=All&~Entities, NoLinks=All&~Links
+  };
+
   #region EntityCollection
   [Serializable]
   public class EntityCollection : ArrayList
@@ -201,14 +215,15 @@ public sealed class Map : UniqueObject
   }
   #endregion
 
+  public Map(Size size) : this(size.Width, size.Height, TileType.SolidRock, true) { }
+  public Map(Size size, TileType fill, bool seen) : this(size.Width, size.Height, fill, seen) { }
   public Map(int width, int height) : this(width, height, TileType.SolidRock, true) { }
   public Map(int width, int height, TileType fill, bool seen)
   { this.width  = width;
     this.height = height;
     map = new Tile[height, width];
     entities = new EntityCollection(this);
-    if(fill!=TileType.Border)
-      for(int y=0; y<height; y++) for(int x=0; x<width; x++) map[y,x].Type=fill;
+    if(fill!=TileType.Border) Fill(fill);
     if(seen) for(int y=0; y<height; y++) for(int x=0; x<width; x++) map[y,x].Flags=(byte)Tile.Flag.Seen;
   }
   public Map(SerializationInfo info, StreamingContext context) : base(info, context) { }
@@ -244,10 +259,13 @@ public sealed class Map : UniqueObject
   public void ClearLinks() { links = new Link[0]; }
 
   public void AddScent(int x, int y, int amount)
-  { map[y,x].Scent = (ushort)Math.Min(map[y,x].Scent+Math.Min(amount, MaxScentAdd), MaxScent);
+  { if(!IsDungeon) return;
+    map[y,x].Scent = (ushort)Math.Min(map[y,x].Scent+Math.Min(amount, MaxScentAdd), MaxScent);
   }
 
   public bool Contains(int x, int y) { return y>=0 && y<height && x>=0 && x<width; }
+
+  public void Fill(TileType type) { for(int y=0; y<height; y++) for(int x=0; x<width; x++) map[y,x].Type=type; }
 
   public Entity GetEntity(Point pt)
   { for(int i=0; i<entities.Count; i++) if(entities[i].Position==pt) return entities[i];
@@ -260,16 +278,17 @@ public sealed class Map : UniqueObject
   public void SetFlag(Point pt, Tile.Flag flag, bool on) { map[pt.Y,pt.X].SetFlag(flag, on); }
   public void SetFlag(int x, int y, Tile.Flag flag, bool on) { map[y,x].SetFlag(flag, on); }
   
-  public Link GetLink(Point pt)
+  public Link GetLink(Point pt) { return GetLink(pt, true); }
+  public Link GetLink(Point pt, bool autoGenerate)
   { for(int i=0; i<links.Length; i++)
-    { if(links[i].From==pt)
-      { if(links[i].To.X==-1)
-        { Map nm = App.Dungeon[links[i].ToLevel];
-          for(int ml=0,ol=0; ml<links.Length; ml++)
-          { if(links[ml].ToLevel!=nm.Index) continue;
+    { if(links[i].FromPoint==pt)
+      { if(autoGenerate && links[i].ToPoint.X==-1) // if the link hasn't been initialized yet
+        { Map nm = links[i].ToDungeon[links[i].ToLevel];
+          for(int ml=0,ol=0; ml<links.Length; ml++) // initialize all links going to the same level
+          { if(links[ml].ToLevel!=nm.Index || links[ml].ToDungeon!=nm.Dungeon) continue; // skip ones going elsewhere
             while(ol<nm.links.Length && nm.links[ol].ToLevel!=Index) ol++;
-            links[ml].To = nm.links[ol].From;
-            nm.links[ol].To = links[ml].From;
+            links[ml].ToPoint = nm.links[ol].FromPoint;
+            nm.links[ol].ToPoint = links[ml].FromPoint;
           }
         }
         return links[i];
@@ -279,7 +298,7 @@ public sealed class Map : UniqueObject
   }
 
   public bool HasItems(Point pt) { return HasItems(pt.X, pt.Y); }
-  public bool HasItems(int x, int y) { return map[y,x].Items!=null && map[y,x].Items.Count>0; }
+  public bool HasItems(int x, int y) { return this[x,y].Items!=null && map[y,x].Items.Count>0; }
 
   public void SetNode(Point pt, PathNode node) { map[pt.Y,pt.X].Node = node; }
   public void SetNode(int x, int y, PathNode node) { map[y,x].Node = node; }
@@ -289,6 +308,9 @@ public sealed class Map : UniqueObject
 
   public bool IsDangerous(Point pt) { return IsDangerous(this[pt.X, pt.Y].Type); }
   public bool IsDangerous(int x, int y) { return IsDangerous(this[x,y].Type); }
+
+  public bool IsLink(Point pt) { return IsLink(this[pt.X, pt.Y].Type); }
+  public bool IsLink(int x, int y) { return IsLink(this[x,y].Type); }
 
   public bool IsPassable(Point pt) { return IsPassable(pt.X, pt.Y); }
   public bool IsPassable(int x, int y)
@@ -302,33 +324,34 @@ public sealed class Map : UniqueObject
   public bool IsDoor(Point pt) { return IsDoor(this[pt.X,pt.Y].Type); }
   public bool IsDoor(int x, int y) { return IsDoor(this[x,y].Type); }
 
-  public Point FreeSpace() { return FreeSpace(true, false); }
-  public Point FreeSpace(bool allowItems) { return FreeSpace(allowItems, false); }
-  public Point FreeSpace(bool allowItems, bool allowEntities)
+  public Point FreeSpace() { return FreeSpace(Space.Items); }
+  public Point FreeSpace(Space allow)
   { int tries = width*height;
     while(tries-->0)
     { Point pt = new Point(Global.Rand(width), Global.Rand(height));
-      if(!IsFreeSpace(pt, allowItems, allowEntities)) continue;
+      if(!IsFreeSpace(pt, allow)) continue;
       return pt;
     }
     for(int y=0; y<height; y++)
       for(int x=0; x<width; x++)
-        if(IsFreeSpace(x, y, allowItems, allowEntities)) return new Point(x, y);
+        if(IsFreeSpace(x, y, allow)) return new Point(x, y);
     throw new ArgumentException("No free space found on this map!");
   }
 
-  public bool IsFreeSpace(Point pt, bool allowItems, bool allowEntities)
-  { return IsFreeSpace(pt.X, pt.Y, allowItems, allowEntities);
-  }
-  public bool IsFreeSpace(int x, int y, bool allowItems, bool allowEntities)
+  public bool IsFreeSpace(Point pt, Space allow) { return IsFreeSpace(pt.X, pt.Y, allow); }
+  public bool IsFreeSpace(int x, int y, Space allow)
   { Tile tile = this[x, y];
-    if(!IsPassable(tile.Type) || !allowItems && tile.Items!=null && tile.Items.Count>0) return false;
-    if(!allowEntities) for(int i=0; i<entities.Count; i++) if(entities[i].X==x && entities[i].Y==y) return false;
+    if(!IsPassable(tile.Type) || (allow&Space.Items)==0 && tile.Items!=null && tile.Items.Count>0) return false;
+    if((allow&Space.Entities)==0)
+      for(int i=0; i<entities.Count; i++) if(entities[i].X==x && entities[i].Y==y) return false;
+    if((allow&Space.Links)==0)
+      for(int i=0; i<links.Length; i++) if(links[i].FromPoint.X==x && links[i].FromPoint.Y==y) return false;
     return true;
   }
 
   public void MakeNoise(Point pt, Entity source, Noise type, byte volume)
-  { for(int y=0; y<height; y++) for(int x=0; x<width; x++) map[y,x].Sound=0;
+  { if(!IsDungeon) return;
+    for(int y=0; y<height; y++) for(int x=0; x<width; x++) map[y,x].Sound=0;
     if(soundStack==null) soundStack=new Point[256];
     int slen, nslen=1;
     bool changed;
@@ -372,6 +395,9 @@ public sealed class Map : UniqueObject
       }
   }
 
+  // called when the map is first created (can be overridden for the initial item spawn, etc)
+  public virtual void OnInit() { }
+
   public Point RandomTile(TileType type)
   { int tries = width*height;
     while(tries-->0)
@@ -407,15 +433,7 @@ public sealed class Map : UniqueObject
         }
         if(timer>=100)
         { timer -= 100;
-          for(int i=0; i<entities.Count; i++) entities[i].ItemThink();
-          for(int y=0; y<height; y++)
-            for(int x=0; x<width; x++)
-            { ItemPile items = map[y,x].Items;
-              if(items!=null) for(int i=0; i<items.Count; i++) if(items[i].Think(null)) items.RemoveAt(i--);
-            }
-          age++;
-          int level = App.Player.Map.Index;
-          if(numCreatures<50 && (Index==level && age%75==0 || Index!=level && age%150==0)) SpawnMonster();
+          Think();
         }
         if(entities.Count==0) return;
       }
@@ -433,28 +451,9 @@ public sealed class Map : UniqueObject
     if(--thinking==0) removedEntities.Clear();
   }
   
-  public Item SpawnItem()
-  { SpawnInfo s = Global.NextSpawn();
-    Item item = (Item)s.ItemType.GetConstructor(Type.EmptyTypes).Invoke(null);
-    item.Count = Global.Rand(s.SpawnMax-s.SpawnMin)+s.SpawnMin;
-
-    if(Global.Rand(100)<15) item.Curse(); // TODO: make these improve weapon/armor
-    else if(Global.Rand(100)<10) item.Bless();
-
-    AddItem(FreeSpace(true, true), item);
-    return item;
-  }
-
-  public void SpawnMonster()
-  { int idx = entities.Add(Entity.Generate(typeof(Orc), Index+1, EntityClass.Fighter));
-    for(int i=0; i<10; i++)
-    { entities[idx].Position = FreeSpace();
-      if(App.Player==null || !App.Player.CanSee(entities[idx])) break;
-    }
-  }
-
   public void SpreadScent()
-  { if(scentbuf==null || scentbuf.Length<width*height) scentbuf=new ushort[width*height];
+  { if(!IsDungeon) return;
+    if(scentbuf==null || scentbuf.Length<width*height) scentbuf=new ushort[width*height];
     for(int y=0,i=0; y<height; y++)
       for(int x=0; x<width; i++,x++)
       { if(!IsPassable(map[y,x].Type)) continue;
@@ -471,6 +470,7 @@ public sealed class Map : UniqueObject
   }
 
   public static bool IsDangerous(TileType type) { return (tileFlag[(int)type]&TileFlag.Dangerous) != TileFlag.None; }
+  public static bool IsLink(TileType type) { return (tileFlag[(int)type]&TileFlag.Link) != TileFlag.None; }
   public static bool IsPassable(TileType type) { return (tileFlag[(int)type]&TileFlag.Passable) != TileFlag.None; }
   public static bool IsWall(TileType type) { return (tileFlag[(int)type]&TileFlag.Wall) != TileFlag.None; }
   public static bool IsDoor(TileType type) { return (tileFlag[(int)type]&TileFlag.Door) != TileFlag.None; }
@@ -523,7 +523,22 @@ public sealed class Map : UniqueObject
   }
 
   public Map Memory;
+  public MapCollection Dungeon;
   public int Index;
+  public bool IsDungeon; // determines whether we should do things like propogate sound, scent, etc
+
+  protected int Age { get { return age; } }
+  protected int NumCreatures { get { return numCreatures; } }
+
+  protected virtual void Think()
+  { for(int i=0; i<entities.Count; i++) entities[i].ItemThink();
+    for(int y=0; y<height; y++)
+      for(int x=0; x<width; x++)
+      { ItemPile items = map[y,x].Items;
+        if(items!=null) for(int i=0; i<items.Count; i++) if(items[i].Think(null)) items.RemoveAt(i--);
+      }
+    age++;
+  }
 
   [Serializable]
   class EntityComparer : IComparer
@@ -553,14 +568,15 @@ public sealed class Map : UniqueObject
   static Point[] soundStack;
 
   [Flags]
-  enum TileFlag : byte { None=0, Passable=1, Wall=2, Door=4, Dangerous=8 }
+  enum TileFlag : byte { None=0, Passable=1, Wall=2, Door=4, Dangerous=8, Link=16 }
   static readonly TileFlag[] tileFlag = new TileFlag[(int)TileType.NumTypes]
   { TileFlag.None,   // Border
     TileFlag.None,   // SolidRock
     TileFlag.Wall,   // Wall
     TileFlag.Door,   // ClosedDoor
     TileFlag.Door|TileFlag.Passable, // OpenDoor
-    TileFlag.Passable, TileFlag.Passable, TileFlag.Passable, TileFlag.Passable, // RoomFloor, Corridor, stairs
+    TileFlag.Passable, TileFlag.Passable, // RoomFloor, Corridor
+    TileFlag.Passable|TileFlag.Link, TileFlag.Passable|TileFlag.Link, // stairs (up and down)
     TileFlag.Passable, // ShallowWater
     TileFlag.Passable|TileFlag.Dangerous, // DeepWater
     TileFlag.Passable, // Ice
@@ -576,10 +592,49 @@ public sealed class Map : UniqueObject
     TileFlag.Passable, // Hill
     TileFlag.Passable, // Mountain
     TileFlag.Passable, // Road
-    TileFlag.Passable, // Town
-    TileFlag.Passable, // Portal
+    TileFlag.Passable|TileFlag.Link, // Town
+    TileFlag.Passable|TileFlag.Link, // Portal
   };
 }
 #endregion
+
+[Serializable]
+public class TestMap : Map
+{ public TestMap(int width, int height) : base(width, height) { }
+  public TestMap(Size size) : base(size) { }
+  public TestMap(SerializationInfo info, StreamingContext context) : base(info, context) { }
+
+  public override void OnInit()
+  { int max = Width*Height/250, min = Width*Height/500;
+    for(int i=0,num=Global.Rand(max-min)+min+2; i<num; i++) SpawnItem();
+    for(int i=0,num=Global.Rand(max-min)+min; i<num; i++) SpawnMonster();
+  }
+
+  protected override void Think()
+  { base.Think();
+    int level = App.Player.Map.Index;
+    if(NumCreatures<50 && (Index==level && Age%75==0 || Index!=level && Age%150==0)) SpawnMonster();
+  }
+
+  Item SpawnItem()
+  { SpawnInfo s = Global.NextSpawn();
+    Item item = (Item)s.ItemType.GetConstructor(Type.EmptyTypes).Invoke(null);
+    item.Count = Global.Rand(s.SpawnMax-s.SpawnMin)+s.SpawnMin;
+
+    if(Global.Rand(100)<15) item.Curse(); // TODO: make these improve weapon/armor
+    else if(Global.Rand(100)<10) item.Bless();
+
+    AddItem(FreeSpace(Map.Space.All), item);
+    return item;
+  }
+
+  void SpawnMonster()
+  { int idx = Entities.Add(Entity.Generate(typeof(Orc), Index+1, EntityClass.Fighter));
+    for(int i=0; i<10; i++)
+    { Entities[idx].Position = FreeSpace();
+      if(App.Player==null || !App.Player.CanSee(Entities[idx])) break;
+    }
+  }
+}
 
 } // namespace Chrono

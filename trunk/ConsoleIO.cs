@@ -915,21 +915,22 @@ public sealed class ConsoleIO : InputOutput
       Weapon w = e.Weapon;
       if(w!=null) AddLine(string.Format(prefix+" wielding {1} {2}.", "It", Global.AorAn(w.Name), w.Name));
 
-      int healthpct = e.HP*100/e.MaxHP;
-      if(healthpct>=90) AddLine("It looks healthy.");
-      else if(healthpct>=75) AddLine("It looks slightly wounded.");
-      else if(healthpct>=50) AddLine("It looks wounded.");
-      else if(healthpct>=25) AddLine("It looks heavily wounded.");
-      else AddLine("It looks almost dead.");
+      if(e!=viewer)
+      { int healthpct = e.HP*100/e.MaxHP;
+        if(healthpct>=90) AddLine("It looks healthy.");
+        else if(healthpct>=75) AddLine("It looks slightly wounded.");
+        else if(healthpct>=50) AddLine("It looks wounded.");
+        else if(healthpct>=25) AddLine("It looks heavily wounded.");
+        else AddLine("It looks almost dead.");
 
-      if(e!=viewer && e is AI) switch(((AI)e).State)
-      { case AIState.Asleep: AddLine("It appears to be asleep."); break;
-        case AIState.Attacking: AddLine("It looks angry!"); break;
-        case AIState.Escaping: AddLine("It looks frightened."); break;
-        case AIState.Idle: case AIState.Patrolling: case AIState.Wandering: AddLine("It looks bored."); break;
-        default: AddLine("UNKNOWN AI STATE"); break;
+        if(e is AI) switch(((AI)e).State)
+        { case AIState.Asleep: AddLine("It appears to be asleep."); break;
+          case AIState.Attacking: AddLine("It looks angry!"); break;
+          case AIState.Escaping: AddLine("It looks frightened."); break;
+          case AIState.Idle: case AIState.Patrolling: case AIState.Wandering: AddLine("It looks bored."); break;
+          default: AddLine("UNKNOWN AI STATE"); break;
+        }
       }
-
     }
     if(viewer.Map.HasItems(pos)) DisplayTileItems(viewer, map[pos].Items, visible);
     DrawLines();
@@ -1112,6 +1113,7 @@ Ctrl-P - see old messages";
   void RenderMap(Entity viewer, Point pos, Point[] vpts)
   { Rectangle rect = new Rectangle(pos.X-mapW/2, pos.Y-mapH/2, mapW, mapH);
     int size = mapW*mapH;
+    bool showAll = viewer.OnOverworld;
     if(buf==null || buf.Length<size) buf = new NTConsole.CharInfo[size];
     if(vis==null || vis.Length<size) vis = new bool[size];
 
@@ -1120,7 +1122,7 @@ Ctrl-P - see old messages";
     Map map = viewer.Memory==null ? viewer.Map : viewer.Memory;
     if(map==viewer.Map)
     { for(int i=0,y=rect.Top; y<rect.Bottom; y++)
-        for(int x=rect.Left; x<rect.Right; i++,x++) buf[i] = TileToChar(map[x,y], vis[i]);
+        for(int x=rect.Left; x<rect.Right; i++,x++) buf[i] = TileToChar(map[x,y], true);
       RenderMonsters(map.Entities, vpts, rect);
     }
     else
@@ -1131,11 +1133,11 @@ Ctrl-P - see old messages";
         for(int x=rect.Left; x<rect.Right; i++,x++)
         { Tile tile = map[x,y];
           buf[i] = tile.Type==TileType.UpStairs || tile.Type==TileType.DownStairs || tile.Entity==null ?
-                    TileToChar(tile, vis[i]) : CreatureToChar(tile.Entity, vis[i]);
+                    TileToChar(tile, showAll || vis[i]) : CreatureToChar(tile.Entity, vis[i]);
         }
       map = viewer.Map;
       for(int i=0,y=rect.Top; y<rect.Bottom; y++)
-        for(int x=rect.Left; x<rect.Right; i++,x++) if(vis[i]) buf[i] = TileToChar(map[x,y], vis[i]);
+        for(int x=rect.Left; x<rect.Right; i++,x++) if(vis[i]) buf[i] = TileToChar(map[x,y], showAll || vis[i]);
       RenderMonsters(map.Entities, vpts, rect);
     }
     console.PutBlock(new Rectangle(0, 0, rect.Width, rect.Height), buf);

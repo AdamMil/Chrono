@@ -58,7 +58,7 @@ public class Overworld : MapCollection
 
       case Place.GTown: case Place.FTown: case Place.ITown: case Place.MTown:
       { TownGenerator tg = new TownGenerator();
-        tg.Generate(map = new Map(tg.DefaultSize));
+        tg.Generate(map = new TownMap(tg.DefaultSize));
         break;
       }
       

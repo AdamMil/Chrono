@@ -7,7 +7,7 @@ namespace Chrono
 
 [Serializable]
 public class Player : Entity
-{ public Player() { Color=Color.White; Timer=50; SocialGroup = Global.NewSocialGroup(false, true); }
+{ public Player() { Color=Color.White; Timer=50; SocialGroup=Global.NewSocialGroup(false, true); }
   public Player(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override void Die(object killer, Death cause)
@@ -66,8 +66,27 @@ public class Player : Entity
     if(feel==null) return;
     App.IO.Print(Color.Green, "You feel {0}!", feel);
   }
+
   public override void OnDrink(Potion potion) { App.IO.Print("You drink {0}.", potion.GetAName(this)); }
-  public override void OnDrop(Item item) { App.IO.Print("You drop {0}.", item.GetAName(this)); }
+
+  public override void OnDrop(Item item)
+  { App.IO.Print("You drop {0}.", item.GetAName(this));
+    Shop shop = Map.GetShop(Position);
+    if(shop!=null && shop.Shopkeeper!=null)
+    { if(shop.Shopkeeper.IsOnTab(item)) shop.Shopkeeper.PlayerReturned(item);
+      else
+      { int price = shop.Shopkeeper.BuyCost(item);
+        item.Status |= ItemStatus.PlayerOwned;
+        if(price==0) App.IO.Print("{0} seems uninterested in that.", shop.Shopkeeper.TheName);
+        else if(App.IO.YesNo(string.Format("{0} offers you {1} gold for that. Accept?",
+                                           shop.Shopkeeper.TheName, price), true))
+        { item.Status &= ~ItemStatus.PlayerOwned;
+          Pickup(new Gold(price));
+        }
+      }
+    }
+  }
+
   public override void OnEquip(Wieldable item)
   { App.IO.Print("You equip {0}.", item.GetAName(this));
     if(item.Cursed)
@@ -133,6 +152,12 @@ public class Player : Entity
   }
   public override void OnNoise(Entity source, Noise type, int volume)
   { if(type==Noise.Alert) { App.IO.Print("You hear a shout!"); Interrupt(); }
+  }
+  public override void OnPickup(Item item, IInventory from)
+  { if(!item.Is(ItemStatus.PlayerOwned) && from!=null && from==Map[Position].Items)
+    { Shop shop = Map.GetShop(Position);
+      if(shop!=null && shop.Shopkeeper!=null) shop.Shopkeeper.PlayerTook(item);
+    }
   }
   public override void OnReadScroll(Scroll item) { App.IO.Print("You read {0}.", item.GetAName(this)); }
   public override void OnRemove(Wearable item) { App.IO.Print("You remove {0}.", item.GetAName(this)); }
@@ -260,7 +285,7 @@ public class Player : Entity
         Food toEat = (Food)item;
         bool split=false, consumed=false, stopped=false;
         if(toEat.Count>1) { toEat = (Food)toEat.Split(1); split=true; }
-        if(toEat.FoodLeft>Food.MaxFoodPerTurn) App.IO.Print("You begin to eat {0}.", toEat.GetFullName(this));
+        if(toEat.FoodLeft>Food.MaxFoodPerTurn) App.IO.Print("You begin to eat {0}.", toEat.GetAName(this));
         while(true)
         { Map.MakeNoise(Position, this, Noise.Item, toEat.GetNoise(this));
           if(toEat.Eat(this)) { consumed=true; break; }
@@ -269,7 +294,7 @@ public class Player : Entity
         }
         if(consumed && !split) inv.Remove(toEat);
         else if(split && !consumed && inv.Add(toEat)==null)
-        { App.IO.Print("The {0} does not fit in your pack, so you put it down.", toEat);
+        { App.IO.Print("The {0} does not fit in your pack, so you put it down.", toEat.GetFullName(this));
           Map.AddItem(Position, toEat);
         }
         if(consumed) App.IO.Print("You finish eating.");
@@ -792,7 +817,7 @@ public class Player : Entity
         if(spell.Memory<500) App.IO.Print("Your memory of this spell is very faint.");
         else if(spell.Memory<1000) App.IO.Print("Your memory of this spell is faint.");
         if(spell.CastTest(this))
-        { switch(spell.Target)
+        { switch(spell.GetSpellTarget(this))
           { case SpellTarget.Self: spell.Cast(this); break;
             case SpellTarget.Item:
               MenuItem[] items = App.IO.ChooseItem("Cast on which item?", this, MenuFlag.None, ItemClass.Any);
@@ -1091,7 +1116,7 @@ public class Player : Entity
       return true;
     }
     else if(type==TileType.Border && Map.Dungeon is Overworld && Map.Index!=(int)Overworld.Place.Overworld && // town
-            App.IO.YesNo("Leave the town?", true))
+            App.IO.YesNo("Leave the town?", false))
     { Map.SaveMemory(Memory);
       Link link = Map.GetLink(0);
       Map.Entities.Remove(this);
@@ -1117,14 +1142,22 @@ public class Player : Entity
 
   protected int WalkTime(Point pt)
   { TileType type = Map[pt].Type;
-    if(type==TileType.Grass || Map.IsLink(type)) return 75;
-    else if(type==TileType.Forest) return 90;
-    else if(type==TileType.Ice || type==TileType.DirtSand) return 80;
-    else if(type==TileType.Hill) return 100;
-    else if(type==TileType.Mountain) return 200; // TODO: decrease with proper equipment
-    else if(type==TileType.ShallowWater) return 100; // TODO: decrease with proper equipment
-    else if(type==TileType.DeepWater) return 200; // TODO: decrease with proper equipment
+    int time;
+    if(type==TileType.Grass || Map.IsLink(type)) time=75;
+    else if(type==TileType.Forest) time=90;
+    else if(type==TileType.Ice || type==TileType.DirtSand) time=80;
+    else if(type==TileType.Hill) time=100;
+    else if(type==TileType.Mountain) time=200; // TODO: decrease with proper equipment
+    else if(type==TileType.ShallowWater) time=100; // TODO: decrease with proper equipment
+    else if(type==TileType.DeepWater) time=200; // TODO: decrease with proper equipment
     else throw new ApplicationException("Unhandled tile type: "+type);
+    
+    int speed = Speed; // fast characters get a bonus
+    if(speed<10) time/=3;
+    else if(speed<20) time/=2;
+    else if(speed<30) time = time*3/4;
+
+    return time;
   }
 
   protected static readonly ItemClass[] wearableClasses =  new ItemClass[]

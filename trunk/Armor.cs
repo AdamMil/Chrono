@@ -12,7 +12,7 @@ public class Armor : Wearable
   { if(!Identified) return base.GetFullName(e, forceSingular);
     string status = StatusString;
     if(status!="") status += ' ';
-    string ret = status + (AC<baseAC ? '-' : '+') + (AC-baseAC) + ' ' + Name;
+    string ret = status + (AC<baseAC ? "" : "+") + (AC-baseAC) + ' ' + Name;
     if(Title!=null) ret += " named "+Title;
     return ret;
   }

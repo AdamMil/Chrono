@@ -11,6 +11,7 @@ public interface IInventory : ICollection
 
   Item Add(Item item);
   void Clear();
+  bool Contains(Item item);
   Item[] GetItems(params ItemClass[] classes);
   bool Has(params ItemClass[] itemClass);
   void Remove(Item item);
@@ -58,6 +59,8 @@ public sealed class ItemPile : IInventory
   }
 
   public void Clear() { if(items!=null) items.Clear(); }
+
+  public bool Contains(Item item) { return items!=null && items.Contains(item); }
 
   public Item[] GetItems(params Chrono.ItemClass[] classes)
   { if(items==null || items.Count==0) return new Item[0];
@@ -139,6 +142,8 @@ public sealed class Inventory : IKeyedInventory
   }
 
   public void Clear() { if(items!=null) items.Clear(); }
+
+  public bool Contains(Item item) { return items!=null && items.Contains(item); }
 
   public Item[] GetItems(params ItemClass[] classes)
   { if(items==null || items.Count==0) return new Item[0];

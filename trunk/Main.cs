@@ -9,7 +9,7 @@ namespace Chrono
 
 public sealed class App
 { 
-  public static Overworld World = new Overworld();
+  public static Dungeon World = new Dungeon("overworld");
   public static Player Player;
   public static InputOutput IO;
   public static bool Quit;
@@ -24,11 +24,11 @@ public sealed class App
     { FileStream f = File.Open("c:/chrono.sav", FileMode.Open);
       Load(f);
       f.Close();
-      //File.Delete("c:/chrono.sav");
+      File.Delete("c:/chrono.sav");
       App.IO.Print("Welcome back to Chrono, {0}!", Player.Name);
     }
     else
-    { Map map = World[0];
+    { Map map = World[World.StartSection][0];
 
       char c = IO.CharChoice("(w)izard or (f)ighter?", "wf");
       Player = Player.Generate(c=='w' ? EntityClass.Wizard : EntityClass.Fighter, Race.Human);
@@ -57,14 +57,10 @@ public sealed class App
       Player.Pickup(new Gold()).Count = 100;
       foreach(Item i in Player.Inv) Player.AddKnowledge(i);
 
-      for(int i=0; i<map.Links.Length; i++)
-        if(map.Links[i].ToLevel==(int)Overworld.Place.GTown)
-        { Link link = map.GetLink(map.Links[i].FromPoint);
-          link.ToDungeon[link.ToLevel].Entities.Add(Player);
-          break;
-        }
+      map.Entities.Add(Player);
+      Player.Position = map.FreeSpaceNear(map.GetEntity("fatherOfPC"));
 
-      for(int y=0; y<Player.Map.Height; y++)
+      for(int y=0; y<Player.Map.Height; y++) // magic mapping + find items
         for(int x=0; x<Player.Map.Width; x++)
         { Tile tile  = Player.Map[x, y];
           tile.Items = tile.Items==null || tile.Items.Count==0 ? null : tile.Items.Clone();
@@ -92,15 +88,17 @@ public sealed class App
   public static void Load(Stream stream)
   { GZipInputStream s = new GZipInputStream(stream);
     BinaryFormatter f = new BinaryFormatter();
+
     Global.ObjHash = new Hashtable();
 
     Global.Deserialize(s, f);
+    Dungeon.Deserialize(s, f);
     Potion.Deserialize(s, f);
     Ring.Deserialize(s, f);
     Scroll.Deserialize(s, f);
     Wand.Deserialize(s, f);
 
-    World  = (Overworld)f.Deserialize(s);
+    World  = (Dungeon)f.Deserialize(s);
     Player = (Player)f.Deserialize(s);
 
     Global.ObjHash = null;
@@ -110,9 +108,11 @@ public sealed class App
   { App.IO.Print("Saving...");
     GZipOutputStream s = new GZipOutputStream(stream);
     BinaryFormatter f = new BinaryFormatter();
+
     Global.ObjHash = new Hashtable();
 
     Global.Serialize(s, f);
+    Dungeon.Serialize(s, f);
     Potion.Serialize(s, f);
     Ring.Serialize(s, f);
     Scroll.Serialize(s, f);

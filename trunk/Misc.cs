@@ -167,6 +167,14 @@ public sealed class Global
   { return System.IO.File.Open("data/"+path, System.IO.FileMode.Open, System.IO.FileAccess.Read);
   }
 
+  public static System.Xml.XmlDocument LoadXml(string path)
+  { System.IO.Stream stream = LoadData(path);
+    System.Xml.XmlDocument doc = new System.Xml.XmlDocument();
+    doc.Load(stream);
+    stream.Close();
+    return doc;
+  }
+
   // these only accept cardinal directions (eg, not self, up, down, or invalid)
   public static Point Move(Point pt, Direction d) { return Move(pt, (int)d); }
   public static Point Move(Point pt, int d)

@@ -49,7 +49,7 @@ public struct Effect
 
 public enum EntityClass
 { Other=-3, // not a monster (boulder or some other entity)
-  RandomClass=-1, Fighter, Wizard, Worker, NumClasses
+  RandomClass=-1, Fighter, Wizard, Plain, NumClasses
 }
 
 public enum HungerLevel { Normal, Hungry, Starving, Starved };
@@ -90,6 +90,7 @@ public abstract class Entity : UniqueObject
   // all of these apply modifiers from items where applicable
   public int AC { get { return GetAttr(Attr.AC); } }
   public int CarryMax { get { return Str*100; } }
+
   public CarryStress CarryStress
   { get
     { int pct = CarryWeight*100/CarryMax;
@@ -99,15 +100,19 @@ public abstract class Entity : UniqueObject
       return CarryStress.Overtaxed;
     }
   }
+
   public int CarryWeight { get { return Inv.Weight; } }
   public int Dex { get { return GetAttr(Attr.Dex); } }
+
   public int DexBonus // general bonus from dexterity (dex <8 is a penalty, >8 is a bonus)
   { get
     { int dex = Dex;
       return dex<8 ? (dex-9)/2 : dex-8;
     }
   }
+
   public int EV { get { return GetAttr(Attr.EV); } }
+
   public int Exp
   { get { return exp; }
     set
@@ -115,12 +120,15 @@ public abstract class Entity : UniqueObject
       if(value>=NextExp) LevelUp();
     }
   }
+
   public int ExpLevel
   { get { return expLevel; }
     set { expLevel=value; Title=GetTitle(); }
   }
+
   public Flag Flags { get { return flags; } }
   public int Gold { get { return HowMuchGold(Inv); } }
+
   public bool HandsFull
   { get
     { bool full=true;
@@ -130,10 +138,12 @@ public abstract class Entity : UniqueObject
       return full;
     }
   }
+
   public int HP // will be capped to the maximum
   { get { return hp; }
     set { hp = Math.Min(value, MaxHP); }
   }
+
   public HungerLevel HungerLevel
   { get
     { return Hunger<HungryAt ? HungerLevel.Normal
@@ -141,15 +151,18 @@ public abstract class Entity : UniqueObject
                                                  : Hunger<StarveAt ? HungerLevel.Starving : HungerLevel.Starved;
     }
   }
+
   public int Int { get { return GetAttr(Attr.Int); } }
   public int KillExp { get { return baseKillExp; } } // experience given for killing me
   public int Light { get { return GetAttr(Attr.Light); } }
   public int MaxHP { get { return GetAttr(Attr.MaxHP); } }
   public int MaxMP { get { return GetAttr(Attr.MaxMP); } }
+
   public int MP // will be capped to the maximum
   { get { return mp; }
     set { mp = Math.Min(value, MaxMP); }
   }
+
   public int NextExp // next experience level
   { get
     { int level = ExpLevel-1;
@@ -157,29 +170,33 @@ public abstract class Entity : UniqueObject
                            : level<20 ? 100*Math.Pow(1.3, level+10)-3000 : 100*Math.Pow(1.18, level+25)+50000) - 25;
     }
   }
-  public bool OnOverworld { get { return Map.Index==(int)Overworld.Place.Overworld && Map.Dungeon is Overworld; } }
+
   public int Poison
   { get // only one effect can be Poison
     { for(int i=0; i<numEffects; i++) if(effects[i].Attr==Attr.Poison) return effects[i].Value;
       return 0;
     }
   }
+
   public Shield Shield
   { get
     { for(int i=0; i<Hands.Length; i++) if(Hands[i]!=null && Hands[i].Class==ItemClass.Shield) return (Shield)Hands[i];
       return null;
     }
   }
+
   public int Sickness
   { get // only one effect can be Sickness
     { for(int i=0; i<numEffects; i++) if(effects[i].Attr==Attr.Sickness) return effects[i].Value;
       return 0;
     }
   }
+
   public int Smell // player smelliness 0 - Map.MaxScentAdd
   { get { return smell; }
     set { smell = Math.Max(0, Math.Min(value, Map.MaxScentAdd)); }
   }
+
   public int SocialGroup
   { get { return groupID; }
     set
@@ -189,6 +206,7 @@ public abstract class Entity : UniqueObject
       groupID = value;
     }
   }
+
   public int Speed
   { get
     { int div=1, stress=(int)CarryStress;
@@ -196,20 +214,24 @@ public abstract class Entity : UniqueObject
       return GetAttr(Attr.Speed) * div;
     }
   }
+
   public int Stealth { get { return GetAttr(Attr.Stealth); } }
   public int Str { get { return GetAttr(Attr.Str); } }
+
   public int StrBonus // general bonus from strength (str <10 is a penalty, >10 is a bonus)
   { get
     { int str = Str;
       return str<10 ? (str-11)/2 : str-10;
     }
   }
+
   public Weapon Weapon
   { get
     { for(int i=0; i<Hands.Length; i++) if(Hands[i]!=null && Hands[i].Class==ItemClass.Weapon) return (Weapon)Hands[i];
       return null;
     }
   }
+
   public int X { get { return Position.X; } set { Position.X=value; } }
   public int Y { get { return Position.Y; } set { Position.Y=value; } }
 
@@ -489,7 +511,7 @@ public abstract class Entity : UniqueObject
     { if(val<0) val=0;
       if(val>10) val=10;
     }
-    else if(attribute==Attr.Light && OnOverworld) val = val/2+1;
+    else if(attribute==Attr.Light && Map.IsOverworld) val = val/2+1;
     return val;
   }
 
@@ -636,7 +658,7 @@ public abstract class Entity : UniqueObject
   public virtual void OnMapChanged() { } // called when the creature is added to or removed from a map
   public virtual void OnMiss(Entity hit, object item) { }
   public virtual void OnMissBy(Entity attacker, object item) { }
-  public void OnMove(Link link) { OnMove(link.ToPoint, link.ToDungeon[link.ToLevel]); }
+  public void OnMove(Link link) { OnMove(link.ToPoint, link.ToSection[link.ToLevel]); }
   public void OnMove(Point newPos) { OnMove(newPos, null); }
   public virtual void OnMove(Point newPos, Map newMap)
   { if(newMap!=null)
@@ -997,7 +1019,7 @@ public abstract class Entity : UniqueObject
   public Wieldable[] Hands = new Wieldable[2]; // our hands (currently just 2, but maybe more in the future)
   public ArrayList Spells;    // spells we've learned (don't modify this collection manually)
   public Hashtable Knowledge; // hash table of known item classes
-  public string Name, Title;  // Name can be null (our race [eg "orc"] is displayed). Title can be null (no title)
+  public string Name, Title, EntityID; // All three can be null
   public Map    Map, Memory;  // the map and our memory of it
   public Point  Position;     // our position within the map
   public int    Timer;        // when timer >= speed, our turn is up

@@ -187,7 +187,10 @@ public class Shopkeeper : AI
 
   public Shop Shop
   { get
-    { foreach(Shop s in Map.Shops) if(s.Shopkeeper==this) return s;
+    { foreach(Room r in Map.Rooms)
+      { Shop s = r as Shop;
+        if(s!=null && s.Shopkeeper==this) return s;
+      }
       return null;
     }
   }
@@ -267,7 +270,7 @@ public class Shopkeeper : AI
   }
 
   public override void OnHitBy(Entity attacker, object item, Damage damage)
-  { if(SocialGroup!=-1 && Map is TownMap && attacker.SocialGroup==App.Player.SocialGroup &&
+  { if(SocialGroup!=-1 && Map.IsTown && attacker.SocialGroup==App.Player.SocialGroup &&
        !Global.GetSocialGroup(SocialGroup).Hostile)
     { Map.MakeNoise(attacker.Position, attacker, Noise.Alert, Map.MaxSound);
       App.IO.Print("You hear an alarm bell ring!");

@@ -1,106 +1,130 @@
 using System;
 using System.Collections;
-using System.Drawing;
-using System.IO;
+using System.Collections.Specialized;
+using System.Xml;
 using System.Runtime.Serialization;
 
 namespace Chrono
 {
 
-public abstract class MapCollection : UniqueObject
-{ protected MapCollection() { }
-  protected MapCollection(SerializationInfo info, StreamingContext context) : base(info, context) { }
+[Serializable]
+public class Dungeon
+{ public Dungeon(string path) : this(LoadDungeon(path)) { }
+  public Dungeon(XmlDocument dungeon) { node = dungeon.SelectSingleNode("dungeon"); }
 
-  public Map this[int i]
-  { get
-    { if(i>=maps.Count) // FIXME: since dungeons are not all linear now, make this not calculate all the intervening levels
-        for(int mi=maps.Count; mi<=i; mi++)
-        { Map m = Generate(mi);
-          m.Dungeon = this;
-          m.Index   = mi;
-          m.OnInit();
-          for(int j=0; j<m.Links.Length; j++) if(m.Links[j].ToDungeon==null) m.Links[j].ToDungeon=this;
-          maps.Add(m);
+  #region Section
+  [Serializable]
+  public class Section : UniqueObject
+  { public Section(XmlNode section, Dungeon dungeon)
+    { node=section; this.dungeon=dungeon;
+      foreach(XmlNode part in node.SelectNodes("levels")) // convert depth ranges to constant values
+        part.Attributes["depth"].Value = Xml.RangeInt(part.Attributes["depth"].Value).ToString();
+    }
+    public Section(SerializationInfo info, StreamingContext context) : base(info, context) { }
+
+    public Map this[int index]
+    { get
+      { if(index>=maps.Count)
+        { if(index>=Depth) throw new ArgumentOutOfRangeException("index");
+          for(int mi=maps.Count; mi<=index; mi++) AddMap(mi);
         }
-      return (Map)maps[i];
+        return (Map)maps[index];
+      }
     }
-  }
 
-  public int Count { get { return maps.Count; } }
-  public virtual string GetName(int index) { return null; }
+    public int Count { get { return maps.Count; } }
 
-  protected abstract Map Generate(int mi);
+    public int Depth
+    { get
+      { int depth = 0;
+        foreach(XmlNode part in node.SelectNodes("levels")) depth += int.Parse(part.Attributes["depth"].Value);
+        return depth;
+      }
+    }
+    
+    public Section Next
+    { get
+      { XmlNode next = node.NextSibling;
+        return next!=null && next.LocalName=="section" ? dungeon[next.Attributes["name"].Value] : null;
+      }
+    }
 
-  ArrayList maps = new ArrayList(8);
-}
+    public Section Previous
+    { get
+      { XmlNode prev = node.PreviousSibling;
+        return prev!=null && prev.LocalName=="section" ? dungeon[prev.Attributes["name"].Value] : null;
+      }
+    }
 
-[Serializable]
-public class Overworld : MapCollection
-{ public Overworld() { }
-  public Overworld(SerializationInfo info, StreamingContext context) : base(info, context) { }
-  
-  public enum Place { Overworld, GTown, FTown, ITown, MTown }
+    public Dungeon Dungeon { get { return dungeon; } }
 
-  protected override Map Generate(int mi)
-  { Map map;
-    switch((Place)mi)
-    { case Place.Overworld:
-      { Stream f = Global.LoadData("maps/overworld.xml");
-        map = Map.Load(f);
-        f.Close();
+    Map AddMap(int index)
+    { XmlNode levels = null;
+      int mi = index;
 
-        AddLink(map, TileType.Grass, Place.GTown);
-        AddLink(map, TileType.Forest, Place.FTown);
-        AddLink(map, TileType.Mountain, Place.MTown);
-        AddLink(map, TileType.Ice, Place.ITown);
-        break;
+      foreach(XmlNode part in node.SelectNodes("levels")) // find the "levels" node corresponding to this index
+      { int depth = int.Parse(part.Attributes["depth"].Value);
+        if(depth>mi) { levels=part; break; }
+        mi -= depth;
       }
 
-      case Place.GTown: case Place.FTown: case Place.ITown: case Place.MTown:
-      { TownGenerator tg = new TownGenerator();
-        tg.Generate(map = new TownMap(tg.DefaultSize));
-        break;
-      }
+      XmlAttribute attr = levels.Attributes["map"];
+      if(attr==null) attr = node.Attributes["map"];
+      if(attr==null) attr = node.Attributes["name"];
+      string mapName = attr.Value;
       
-      default: throw new ArgumentOutOfRangeException("mi", mi, "No such place!");
+      Map map = Map.Load(mapName, this, index);
+      maps.Add(map);
+      return map;
     }
 
-    return map;
+    ArrayList maps = new ArrayList(8);
+    Dungeon dungeon;
+    XmlNode node;
+  }
+  #endregion
+  
+  public Section this[string name]
+  { get
+    { Section section = (Section)sections[name];
+      if(section==null)
+        sections[name] = section = new Section(node.SelectSingleNode("section[@name="+name+"]"), this);
+      return section;
+    }
+  }
+  
+  public string Name { get { return node.Attributes["name"].Value; } }
+
+  public string StartSection
+  { get
+    { XmlAttribute start = node.Attributes["start"];
+      return (start==null ? node.SelectSingleNode("section").Attributes["name"] : start).Value;
+    }
   }
 
-  public override string GetName(int index) { return index==0 ? "Drogea" : ((Place)index).ToString(); }
-
-  void AddLink(Map map, TileType type, Place place)
-  { Point pt = FreeSpace(map, type);
-    map.AddLink(new Link(pt, this, (int)place, true));
-    map.SetType(pt, TileType.Town);
+  XmlNode node;
+  HybridDictionary sections = new HybridDictionary();
+  
+  public static Dungeon GetDungeon(string name)
+  { Dungeon d = (Dungeon)dungeons[name];
+    if(d==null) dungeons[name] = d = new Dungeon(name);
+    return d;
   }
 
-  void AddLink(Map map, TileType type, MapCollection dungeon)
-  { Point pt = FreeSpace(map, type);
-    map.AddLink(new Link(pt, dungeon, 0, true));
-    map.SetType(pt, TileType.Town); // TODO: change this to something else (Cave, Tower, etc)
+  public static void Deserialize(System.IO.Stream stream, IFormatter formatter)
+  { dungeons = (HybridDictionary)formatter.Deserialize(stream);
+  }
+  public static void Serialize(System.IO.Stream stream, IFormatter formatter)
+  { formatter.Serialize(stream, dungeons);
   }
 
-  Point FreeSpace(Map map, TileType type)
-  { Point pt;
-    do pt=map.FreeSpace(Map.Space.NoLinks); while(map[pt].Type!=type);
-    return pt;
+  static XmlDocument LoadDungeon(string path)
+  { if(path.IndexOf('/')==-1) path = "dungeon/"+path;
+    if(path.IndexOf('.')==-1) path += ".xml";
+    return Global.LoadXml(path);
   }
-}
-
-[Serializable]
-public class TestDungeon : MapCollection
-{ public TestDungeon() { }
-  public TestDungeon(SerializationInfo info, StreamingContext context) : base(info, context) { }
-
-  protected override Map Generate(int mi)
-  { MapGenerator lg = (mi/5&1)==0 ? (MapGenerator)new RoomyMapGenerator() : (MapGenerator)new MetaCaveGenerator();
-    Map map = new TestMap(lg.DefaultSize);
-    lg.Generate(map);
-    for(int i=0; i<map.Links.Length; i++) map.Links[i].ToLevel = map.Links[i].Down ? mi+1 : mi-1;
-    return map;
-  }
+  
+  static HybridDictionary dungeons = new HybridDictionary();
 }
 
 } // namespace Chrono

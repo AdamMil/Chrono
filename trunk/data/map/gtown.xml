@@ -5,9 +5,9 @@
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://www.adammil.net/Chrono/map map.xsd">
 
-  <room id="pcHouse" width="3-5" height="3-5" required="true"/>
+  <room id="pcHouse" width="3:5" height="3:5" required="true"/>
 
-  <npc data="fatherOfPC" ai="fatherOfPC">
+  <npc id="fatherOfPC">
     <location room="pcHouse"/>
   </npc>
 </map:map>

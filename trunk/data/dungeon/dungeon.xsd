@@ -6,9 +6,11 @@
 <!-- intRange -->
 <xs:simpleType name="intRange">
   <xs:restriction base="xs:string">
-    <xs:pattern value="\d+(-\d+)?"/>
+    <xs:pattern value="\d+(:\d+)?"/>
   </xs:restriction>
 </xs:simpleType>
+
+<!--xs:include schemaLocation="../common.xsd"/--> <!-- above definitions should go in common.xsd -->
 
 <!-- levels -->
 <xs:complexType name="levels">
@@ -22,6 +24,7 @@
     <xs:element name="levels" type="levels" maxOccurs="unbounded"/>
   </xs:sequence>
   <xs:attribute name="name" type="xs:string" use="required"/>
+  <xs:attribute name="map" type="xs:string"/>
 </xs:complexType>
 
 <!-- dungeon -->

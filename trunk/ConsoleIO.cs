@@ -1152,7 +1152,7 @@ Ctrl-P - see old messages";
   void RenderMap(Entity viewer, Point pos, Point[] vpts)
   { Rectangle rect = new Rectangle(pos.X-mapW/2, pos.Y-mapH/2, mapW, mapH);
     int size = mapW*mapH;
-    bool showAll = viewer.OnOverworld;
+    bool showAll = viewer.Map.IsOverworld;
     if(buf==null || buf.Length<size) buf = new NTConsole.CharInfo[size];
     if(vis==null || vis.Length<size) vis = new bool[size];
 

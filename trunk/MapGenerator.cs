@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Drawing;
+using System.Xml;
 
 namespace Chrono
 {
@@ -11,63 +12,120 @@ public class UnableToGenerateException : ApplicationException
 
 public abstract class MapGenerator
 { public virtual Size DefaultSize { get { return new Size(60, 60); } }
-  public abstract void Generate(Map map);
-  public void Reseed(int s) { Rand = new Random(s); }
 
-  protected Random Rand = new Random();
+  public static Map Generate(XmlNode root, Dungeon.Section section, int index)
+  { Type type = Type.GetType("Chrono."+root.Attributes["generator"].Value);
+    if(type==null) throw new UnableToGenerateException("No such generator "+root.Attributes["generator"].Value);
+    MapGenerator gen = (MapGenerator)type.GetConstructor(Type.EmptyTypes).Invoke(null);
+    
+    Map map;
+    XmlNode opts = root.SelectSingleNode("generatorOptions");
+    if(opts==null)
+    { gen.Rand = new Random();
+      map = new Map(gen.DefaultSize);
+    }
+    else
+    { XmlAttribute attr = opts.Attributes["seed"];
+      gen.Rand    = attr==null ? new Random() : new Random(int.Parse(attr.Value));
+      Size size   = gen.DefaultSize;
+      size.Width  = Xml.RangeInt(opts.Attributes["width"], size.Width);
+      size.Height = Xml.RangeInt(opts.Attributes["height"], size.Height);
+      map = new Map(size);
+    }
+
+    map.Section = section;
+    map.Index   = index;
+    
+    gen.Generate(map, root);
+    return map;
+  }
+
+  protected abstract void Generate(Map map, XmlNode root);
+
+  protected Random Rand;
 }
 
 #region RoomyMapGenerator
 public class RoomyMapGenerator : MapGenerator
-{ public Size MaxRoomSize { get { return maxRoomSize; } set { maxRoomSize=value; } }
-
-  public override void Generate(Map map)
-  { int size = map.Width*map.Height;
-    Generate(map, Math.Max(size/900, 1), Math.Max(size/300, 1));
-  }
-  public void Generate(Map map, int minrooms, int maxrooms)
+{ protected override void Generate(Map map, XmlNode root)
   { this.map = map;
-    maxRoomSize = new Size(20, 20);
+    int minRooms, maxRooms;
+
+    { int size = map.Width*map.Height;
+      minRooms = Math.Max(size/900, 1);
+      maxRooms = Math.Max(size/300, 1);
+      maxRoomSize = new Size(20, 20);
+    }
+
+    XmlNode opts = root.SelectSingleNode("generatorOptions");
+    if(opts!=null)
+    { maxRoomSize.Width  = Xml.RangeInt(opts.Attributes["maxRoomWidth"], maxRoomSize.Width);
+      maxRoomSize.Height = Xml.RangeInt(opts.Attributes["maxRoomHeight"], maxRoomSize.Height);
+      minRooms = Xml.IntValue(opts.Attributes["minRooms"], minRooms);
+      maxRooms = Xml.IntValue(opts.Attributes["maxRooms"], maxRooms);
+    }
+
     rooms.Clear();
-    while(rooms.Count<minrooms) if(!AddRoom()) break; //throw new UnableToGenerateException("Couldn't add enough rooms.");
-    while(rooms.Count<maxrooms) if(!AddRoom()) break;
+    foreach(XmlNode room in root.SelectNodes("room[@required=true]"))
+      if(!AddRoom(room)) throw new UnableToGenerateException("Couldn't add required rooms.");
+    foreach(XmlNode room in root.SelectNodes("room[@required!=true]")) if(!AddRoom(room)) break;
+
+    while(rooms.Count<minRooms) if(!AddRoom()) throw new UnableToGenerateException("Couldn't add enough rooms.");
+    while(rooms.Count<maxRooms) if(!AddRoom()) break;
 
     for(int i=1; i<rooms.Count; i++) Connect((Room)rooms[i-1], (Room)rooms[i]);
 
-    AddStairs(false);
-    AddStairs(true);
+    if(map.Index>0) AddStairs(false);
+    if(map.Index<map.Section.Depth-1) AddStairs(true);
   }
 
   struct Room
-  { public Rectangle Area;
+  { public Room(Rectangle area) { Area=area; Connected=false; }
+    public Rectangle Area;
     public bool Connected;
   }
 
-  bool AddRoom()
-  { Room room = new Room();
-    int tri, r;
+  bool AddRoom() { return AddRoom(null); }
+  bool AddRoom(XmlNode room)
+  { Rectangle area;
+    if(FindRoom(room, out area))
+    { DigRoom(area);
+      Room r = new Room(area);
+      rooms.Add(r);
+      map.AddRoom(r.Area, Xml.Attr(room, "id"));
+      return true;
+    }
+    return false;
+  }
+
+  void AddStairs(bool down)
+  { Point point = map.RandomTile(TileType.RoomFloor);
+    map.SetType(point, down ? TileType.DownStairs : TileType.UpStairs);
+    map.AddLink(new Link(point, down, map.Section, map.Index + (down ? 1 : -1)));
+  }
+
+  bool FindRoom(XmlNode room, out Rectangle area)
+  { int tri, r;
+    Size min=new Size(4, 4), max=maxRoomSize;
+
+    if(room!=null)
+    { int mw=min.Width, mh=min.Height, Mw=max.Width, Mh=max.Height;
+      Xml.Range(room.Attributes["width"], ref mw, ref Mw);
+      Xml.Range(room.Attributes["height"], ref mh, ref Mh);
+      min = new Size(mw, mh); max = new Size(Mw, Mh);
+    }
+
+    area = new Rectangle();
     for(tri=0; tri<50; tri++)
-    { room.Area = new Rectangle(Rand.Next(map.Width-4), Rand.Next(map.Height-4),
-                                Rand.Next(4, maxRoomSize.Width), Rand.Next(4, maxRoomSize.Height));
-      if(room.Area.Right>map.Width || room.Area.Bottom>map.Height) continue; // size/location
-      if(room.Area.Height*3<=room.Area.Width || room.Area.Width*3<=room.Area.Height) continue; // aspect ratio
-      Rectangle bounds = room.Area; bounds.Inflate(2, 2);
+    { area = new Rectangle(Rand.Next(map.Width-min.Width), Rand.Next(map.Height-min.Height),
+                           Rand.Next(min.Width, max.Width), Rand.Next(min.Height, max.Height));
+      if(area.Right>map.Width || area.Bottom>map.Height) continue; // size/location
+      if(area.Height*3<=area.Width || area.Width*3<=area.Height) continue; // aspect ratio
+      Rectangle bounds = area; bounds.Inflate(2, 2);
       for(r=0; r<rooms.Count; r++) if(bounds.IntersectsWith(((Room)rooms[r]).Area)) break;
       if(r==rooms.Count) break;
     }
-    if(tri==50) return false;
-
-    for(int x=room.Area.X; x<room.Area.Right; x++)
-    { map.SetType(x, room.Area.Top, TileType.Wall);
-      map.SetType(x, room.Area.Bottom-1, TileType.Wall);
-    }
-    for(int y=room.Area.Y+1; y<room.Area.Bottom-1; y++)
-    { map.SetType(room.Area.Left, y, TileType.Wall);
-      for(int x=room.Area.X+1; x<room.Area.Right-1; x++) map.SetType(x, y, TileType.RoomFloor);
-      map.SetType(room.Area.Right-1, y, TileType.Wall);
-    }
-    rooms.Add(room);
-    return true;
+    return tri<50;
   }
 
   bool Connect(Room r1, Room r2)
@@ -94,6 +152,18 @@ public class RoomyMapGenerator : MapGenerator
     }
     r1.Connected = r2.Connected = true;
     return true;
+  }
+
+  void DigRoom(Rectangle area)
+  { for(int x=area.X; x<area.Right; x++)
+    { map.SetType(x, area.Top, TileType.Wall);
+      map.SetType(x, area.Bottom-1, TileType.Wall);
+    }
+    for(int y=area.Y+1; y<area.Bottom-1; y++)
+    { map.SetType(area.Left, y, TileType.Wall);
+      for(int x=area.X+1; x<area.Right-1; x++) map.SetType(x, y, TileType.RoomFloor);
+      map.SetType(area.Right-1, y, TileType.Wall);
+    }
   }
 
   bool TryDig(ref Point p1, Point p2, Direction dir)
@@ -157,12 +227,6 @@ public class RoomyMapGenerator : MapGenerator
     else map.SetType(x, y, TileType.Corridor);
   }
 
-  void AddStairs(bool down)
-  { Point point = map.RandomTile(TileType.RoomFloor);
-    map.SetType(point, down ? TileType.DownStairs : TileType.UpStairs);
-    map.AddLink(new Link(point, down));
-  }
-
   bool IsWallJunction(int x, int y)
   { return map.IsWall(x, y) &&
            (map.IsWall(x-1, y) || map.IsWall(x+1, y)) &&
@@ -189,9 +253,10 @@ public class RoomyMapGenerator : MapGenerator
 
 #region MetaCaveGenerator
 public class MetaCaveGenerator : MapGenerator
-{ public override void Generate(Map map) { Generate(map, 50); }
-  public void Generate(Map map, int ncircles)
-  { Point[] centers = new Point[ncircles];
+{ protected override void Generate(Map map, XmlNode root)
+  { int ncircles = Xml.IntValue(Xml.AttrNode(root.SelectSingleNode("generatorOptions"), "circles"), 50);
+
+    Point[] centers = new Point[ncircles];
     PathFinder path = new PathFinder();
     int width = map.Width, height = map.Height;
 
@@ -216,19 +281,24 @@ public class MetaCaveGenerator : MapGenerator
         map.SetType(width-1, y, TileType.Wall);
       }
         
-      Point up=AddStairs(map, false), down=AddStairs(map, true);
-      if(!path.Plan(map, up, down) || path.GetPathFrom(up).Cost>=1000)
-      { map.ClearLinks();
-        map.Fill(TileType.SolidRock);
+      if(map.Index==0) AddStairs(map, true);
+      else if(map.Index>=map.Section.Depth) AddStairs(map, false);
+      else
+      { Point up=AddStairs(map, false), down=AddStairs(map, true);
+        if(!path.Plan(map, up, down) || path.GetPathFrom(up).Cost>=1000)
+        { map.ClearLinks();
+          map.Fill(TileType.SolidRock);
+          continue;
+        }
       }
-      else return;
+      break;
     }
   }
 
   Point AddStairs(Map map, bool down)
   { Point point = map.RandomTile(TileType.RoomFloor);
     map.SetType(point, down ? TileType.DownStairs : TileType.UpStairs);
-    map.AddLink(new Link(point, down));
+    map.AddLink(new Link(point, down, map.Section, map.Index + (down ? 1 : -1)));
     return point;
   }
 }
@@ -238,11 +308,16 @@ public class MetaCaveGenerator : MapGenerator
 public class TownGenerator : MapGenerator
 { public override Size DefaultSize { get { return new Size(100, 60); } }
 
-  public override void Generate(Map map)
+  protected override void Generate(Map map, XmlNode root)
   { this.map = map;
     if(map.GroupID==-1) map.GroupID = Global.NewSocialGroup(false, true);
 
     map.Fill(TileType.Grass);
+
+    foreach(XmlNode room in root.SelectNodes("room[@required=true]"))
+      if(!AddRoom(room)) throw new UnableToGenerateException("Couldn't add required rooms.");
+    foreach(XmlNode room in root.SelectNodes("room[@required!=true]")) if(!AddRoom(room)) break;
+
     int size = map.Width*map.Height;
     for(int ntrees=size/50; ntrees>0; ntrees--) map.SetType(map.FreeSpace(), TileType.Tree);
 
@@ -253,29 +328,68 @@ public class TownGenerator : MapGenerator
 
     while(AddRandomRoom());
     
+    // TODO: this could cause problems because of its randomness... (eg, a room may fill up with people and then
+    // FreeSpace(Rectangle) may fail, or something similar)
     for(int npeople=size/200; npeople>0; npeople--)
-    { Entity peon = Entity.Generate(typeof(Townsperson), Global.Rand(0, 3), EntityClass.Worker);
+    { Entity peon = Entity.Generate(typeof(Townsperson), Global.Rand(0, 3), EntityClass.Plain);
       peon.Position = map.FreeSpace();
       peon.SocialGroup = map.GroupID;
       map.Entities.Add(peon);
     }
-
-    map.AddLink(new Link(new Point(), null, 0, false));
   }
-  
-  int AddRoom(int minsize, int maxsize)
-  { Rectangle rect = new Rectangle(), bounds = rect;
+
+  bool AddRoom(XmlNode room)
+  { Size min=new Size(5, 5), max=new Size(12, 12);
+    int mw=min.Width, mh=min.Height, Mw=max.Width, Mh=max.Height;
+    Xml.Range(room.Attributes["width"], ref mw, ref Mw);
+    Xml.Range(room.Attributes["height"], ref mh, ref Mh);
+    min = new Size(mw, mh); max = new Size(Mw, Mh);
+
+    Rectangle rect;
+    if(DigRoom(min, max, out rect))
+    { map.AddRoom(rect, Xml.Attr(room, "id"));
+      return true;
+    }
+    return false;
+  }
+
+  bool AddRandomRoom()
+  { Rectangle rect;
+    if(Rand.Next(8)==7) // 1 in 8 buildings are shops
+    { if(!DigRoom(5, 10, out rect)) return false;
+      map.AddShop(rect, (ShopType)Rand.Next((int)ShopType.NumTypes));
+    }
+    else
+    { if(!DigRoom(5, 12, out rect)) return false;
+      map.AddRoom(rect);
+    }
+    return true;
+  }
+
+  void AddShop(ShopType type)
+  { Rectangle rect;
+    if(!DigRoom(5, 10, out rect)) throw new UnableToGenerateException("Couldn't add enough shops");
+    map.AddShop(rect, type);
+  }
+
+  bool DigRoom(int min, int max, out Rectangle rect)
+  { return DigRoom(new Size(min, min), new Size(max, max), out rect);
+  }
+  bool DigRoom(Size min, Size max, out Rectangle rect)
+  { Rectangle bounds;
+    rect = bounds = new Rectangle();
+
     int tri, r;
     for(tri=0; tri<50; tri++)
-    { rect = new Rectangle(Rand.Next(map.Width-4)+2, Rand.Next(map.Height-4)+2,
-                           Rand.Next(minsize, maxsize+1), Rand.Next(minsize, maxsize+1));
+    { rect = new Rectangle(Rand.Next(map.Width-min.Width)+2, Rand.Next(map.Height-min.Height)+2,
+                           Rand.Next(min.Width, max.Width), Rand.Next(min.Height, max.Height));
       if(rect.Right>map.Width-2 || rect.Bottom>map.Height-2) continue; // size/location
       if(rect.Height*3<=rect.Width || rect.Width*3<=rect.Height) continue; // aspect ratio
       bounds = rect; bounds.Inflate(3, 2);
-      for(r=0; r<rooms.Count; r++) if(bounds.IntersectsWith((Rectangle)rooms[r])) break; // spacing
-      if(r==rooms.Count) break;
+      for(r=0; r<map.Rooms.Length; r++) if(bounds.IntersectsWith(map.Rooms[r].OuterArea)) break; // spacing
+      if(r==map.Rooms.Length) break;
     }
-    if(tri==50) return -1;
+    if(tri==50) return false;
 
     for(int x=rect.X; x<rect.Right; x++)
     { map.SetType(x, rect.Top, TileType.Wall);
@@ -310,33 +424,14 @@ public class TownGenerator : MapGenerator
       else if(pt.Y==rect.Bottom-1) pt.Y--;
     }
     map.SetType(pt, Rand.Next(100)<50 ? TileType.ClosedDoor : TileType.OpenDoor);
-
-    return rooms.Add(rect);
+    return true;
   }
 
-  bool AddRandomRoom()
-  { int i;
-    if(Rand.Next(8)==7) // shop
-    { i = AddRoom(5, 10);
-      if(i!=-1) MakeShop(i, (ShopType)Rand.Next((int)ShopType.NumTypes));
-    }
-    else i = AddRoom(5, 12);
-    return i!=-1;
-  }
-
-  void AddShop(ShopType type)
-  { int i = AddRoom(5, 10);
-    if(i==-1) throw new UnableToGenerateException("Couldn't add enough rooms");
-    MakeShop(i, type);
-  }
   
   TraceAction DoorTrace(Point pt, object context)
   { return ((Rectangle)context).Contains(pt) && map[pt].Type==TileType.Wall ? TraceAction.Stop : TraceAction.Go;
   }
 
-  void MakeShop(int i, ShopType type) { map.AddShop((Rectangle)rooms[i], type); }
-
-  ArrayList rooms = new ArrayList();
   Map map;
 }
 #endregion

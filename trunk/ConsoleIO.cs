@@ -1327,7 +1327,7 @@ Ctrl-P - see old messages";
       case TileType.Trap: ci = new NTConsole.CharInfo('^', NTConsole.Attribute.LightCyan); break;
       case TileType.Altar: ci = new NTConsole.CharInfo('_', NTConsole.Attribute.Grey); break;
       case TileType.Tree: case TileType.Forest: ci = new NTConsole.CharInfo('T', NTConsole.Attribute.Green); break;
-      case TileType.Sand: ci = new NTConsole.CharInfo((char)0xFA, NTConsole.Attribute.Brown); break;
+      case TileType.DirtSand: ci = new NTConsole.CharInfo((char)0xFA, NTConsole.Attribute.Brown); break;
       case TileType.Grass: ci = new NTConsole.CharInfo('\"', NTConsole.Attribute.LightGreen); break;
       case TileType.Hill: ci = new NTConsole.CharInfo('^', NTConsole.Attribute.Brown); break;
       case TileType.Mountain: ci = new NTConsole.CharInfo('^', NTConsole.Attribute.White); break;

@@ -48,8 +48,8 @@ public struct Effect
 }
 
 public enum EntityClass
-{ Other=-2, // not a monster (boulder or some other entity)
-  RandomClass=-1, Fighter, Wizard, NumClasses
+{ Other=-3, // not a monster (boulder or some other entity)
+  RandomClass=-1, Fighter, Wizard, Worker, NumClasses
 }
 
 public enum HungerLevel { Normal, Hungry, Starving, Starved };
@@ -210,16 +210,16 @@ public abstract class Entity : UniqueObject
 
   public string Prefix // "a " or "an "
   { get
-    { if(prefix!=null) return prefix;
-      if(Name!=null) return "";
-      string name = Race.ToString();
+    { if(Name!=null) return "";
+      string name = BaseName;
       return Global.AorAn(name)+' ';
     }
   }
-  public virtual string AName { get { return Global.Cap1(aName); } }
-  public virtual string aName { get { return Name==null ? Prefix+Race.ToString().ToLower() : Name; } }
-  public virtual string TheName { get { return Name==null ? "The "+Race.ToString().ToLower() : Name; } }
-  public virtual string theName { get { return Name==null ? "the "+Race.ToString().ToLower() : Name; } }
+  public string AName { get { return Global.Cap1(aName); } }
+  public string aName { get { return Name==null ? Prefix+BaseName : Name; } }
+  public string TheName { get { return Name==null ? "The "+BaseName : Name; } }
+  public string theName { get { return Name==null ? "the "+BaseName : Name; } }
+  public virtual string BaseName { get { return Race.ToString().ToLower(); } }
 
   public void AddEffect(object source, Attr attr, int value, int timeout)
   { AddEffect(new Effect(source, attr, value, timeout));
@@ -503,6 +503,11 @@ public abstract class Entity : UniqueObject
     while(--level>0) LevelUp();
   }
 
+  public int AlterBaseAttr(Attr attribute, int amount)
+  { int value = GetBaseAttr(attribute)+amount;
+    SetBaseAttr(attribute, value);
+    return value;
+  }
   public int GetBaseAttr(Attr attribute) { return attr[(int)attribute]; } // gets a raw attribute value (no modifiers)
   public void SetBaseAttr(Attr attribute, int val) // sets a base attribute value
   { attr[(int)attribute]=val;
@@ -1077,7 +1082,6 @@ public abstract class Entity : UniqueObject
     }
   }
 
-  protected string prefix;       // my name prefix (usually null)
   protected int baseKillExp;     // the base experience gotten for killing me
   protected bool interrupt;      // true if we've been interrupted
 
@@ -1230,9 +1234,10 @@ public abstract class Entity : UniqueObject
     new AttrMods(9, 4, 3)  // Orc   - 16
   };
   static readonly AttrMods[] classAttrs = new AttrMods[(int)EntityClass.NumClasses] // stat modifiers per class
-  {                                            // CLASS   - Str+Dex+Int, HP/MP, Speed, AC/EV, Stealth
-    new AttrMods(7, 3, -1, 15, 2, 40, 0, 1),   // Fighter - 9, 15/2=17, 40, 0/1, 0
-    new AttrMods(-1, 3, 7, 9, 8, 45, 0, 0, 1), // Wizard  - 9, 9/8=17,  45, 0/0, 1
+  {                                            // CLASS    - Str+Dex+Int, HP/MP, Speed, AC/EV, Stealth
+    new AttrMods(7, 3, -1, 15, 2, 40, 0, 1),   // Fighter  - 9, 15/2=17, 40, 0/1, 0
+    new AttrMods(-1, 3, 7, 9, 8, 45, 0, 0, 1), // Wizard   - 9, 9/8=17,  45, 0/0, 1
+    new AttrMods(1, 1, 1, 10, 4, 45),          // Worker   - 3, 10/4=14, 45, 0/0, 0 (used for farmers, townspeople, etc)
   };
 
   // titles per exp level per class
@@ -1243,6 +1248,9 @@ public abstract class Entity : UniqueObject
     },
     new ClassLevel[]
     { new ClassLevel(1, "Neophyte"),
+    },
+    new ClassLevel[]
+    { new ClassLevel(1, "Peon"), new ClassLevel(2, "Worker"), new ClassLevel(3, "Craftsman"),
     },
   };
 }

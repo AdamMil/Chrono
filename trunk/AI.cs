@@ -195,7 +195,7 @@ public abstract class AI : Entity
           else if(discard) bestWand=null;
           return true;
         }
-        if(combat!=Combat.Ranged && PrepareRanged(true)) return true; // switch to ranged weapon
+        if(combat!=Combat.Ranged && PrepareRanged(true)) return true; // switch to ranged weapon if possible
         // TODO: check to make sure the enemy is in range of our weapon
         Weapon w = Weapon;
         Ammo   a = SelectAmmo(w);
@@ -426,8 +426,8 @@ public abstract class AI : Entity
     int quality=0;
     Weapon w = Weapon;
     if(forceEval || w==null || w.Ranged)
-    { EvaluateMelee(null, ref item, ref quality);
-      foreach(Item i in Inv) if(i.Class==ItemClass.Weapon) EvaluateMelee((Weapon)i, ref item, ref quality);
+    { foreach(Item i in Inv) if(i.Class==ItemClass.Weapon) EvaluateMelee((Weapon)i, ref item, ref quality);
+      EvaluateMelee(null, ref item, ref quality);
       if(item!=w && (item!=null && TryEquip((Wieldable)item) || item==null && (w==null || TryUnequip(w))))
       { combat=Combat.Melee; return true;
       }
@@ -598,8 +598,27 @@ public abstract class AI : Entity
   }
 
   protected virtual bool Wander()
-  { attacker = null;
-    return RunAway();
+  { if(lastDir==Direction.Invalid)
+    { for(int i=0; i<8; i++) if(Map.IsPassable(Global.Move(Position, i))) { lastDir=(Direction)i; goto move; }
+      return false;
+    }
+    else if(Global.OneIn(4))
+    { if(Global.Coinflip()) lastDir++;
+      else lastDir--;
+    }
+
+    if(!Map.IsPassable(Global.Move(Position, lastDir)))
+    { for(int i=1; i<=4; i++)
+      { if(Map.IsPassable(Global.Move(Position, (int)lastDir+i))) { lastDir=(Direction)((int)lastDir+i); goto move; }
+        else if(Map.IsPassable(Global.Move(Position, (int)lastDir-i)))
+        { lastDir=(Direction)((int)lastDir-i);
+          goto move;
+        }
+      }
+      return false;
+    }
+    move: Position = Global.Move(Position, lastDir);
+    return true;
   }
 
   protected Entity attacker;      // the entity that last attacked us
@@ -620,7 +639,8 @@ public abstract class AI : Entity
   protected byte maxNoise;        // the loudest noise we've heard so far (reset at the end of every turn)
 
   void AddSkills(int points, Skill[] skills)
-  { int[] skillTable = RaceSkills[(int)Race];
+  { if(skills==null) return;
+    int[] skillTable = RaceSkills[(int)Race];
     int min=int.MaxValue, max=0, range;
 
     for(int i=0; i<skills.Length; i++)
@@ -647,6 +667,7 @@ public abstract class AI : Entity
   static readonly Skill[][] classSkills = new Skill[(int)EntityClass.NumClasses][]
   { new Skill[] { Skill.Fighting, Skill.Armor, Skill.Dodge, Skill.Shields }, // Fighter
     new Skill[] { Skill.Casting, Skill.Elemental, Skill.Telekinesis, Skill.Translocation, Skill.Staff }, // Wizard
+    null
   };
 }
 

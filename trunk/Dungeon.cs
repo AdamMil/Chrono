@@ -39,7 +39,7 @@ public class Overworld : MapCollection
 { public Overworld() { }
   public Overworld(SerializationInfo info, StreamingContext context) : base(info, context) { }
   
-  public enum Place { Overworld, Town1, Town2, Town3, Town4 }
+  public enum Place { Overworld, GTown, FTown, ITown, MTown }
 
   protected override Map Generate(int mi)
   { Map map;
@@ -49,25 +49,37 @@ public class Overworld : MapCollection
         map = Map.Load(f);
         f.Close();
 
-        AddLink(map, TileType.Grass, Place.Town1);
-        AddLink(map, TileType.Forest, Place.Town2);
-        AddLink(map, TileType.Mountain, Place.Town3);
-        AddLink(map, TileType.Ice, Place.Town4);
+        AddLink(map, TileType.Grass, Place.GTown);
+        AddLink(map, TileType.Forest, Place.FTown);
+        AddLink(map, TileType.Mountain, Place.MTown);
+        AddLink(map, TileType.Ice, Place.ITown);
         break;
       }
 
+      case Place.GTown: case Place.FTown: case Place.ITown: case Place.MTown:
+      { TownGenerator tg = new TownGenerator();
+        tg.Generate(map = new Map(tg.DefaultSize));
+        break;
+      }
+      
       default: throw new ArgumentOutOfRangeException("mi", mi, "No such place!");
     }
 
     return map;
   }
-  
+
   public override string GetName(int index) { return index==0 ? "Drogea" : ((Place)index).ToString(); }
 
   void AddLink(Map map, TileType type, Place place)
   { Point pt = FreeSpace(map, type);
     map.AddLink(new Link(pt, this, (int)place, true));
     map.SetType(pt, TileType.Town);
+  }
+
+  void AddLink(Map map, TileType type, MapCollection dungeon)
+  { Point pt = FreeSpace(map, type);
+    map.AddLink(new Link(pt, dungeon, 0, true));
+    map.SetType(pt, TileType.Town); // TODO: change this to something else (Cave, Tower, etc)
   }
 
   Point FreeSpace(Map map, TileType type)

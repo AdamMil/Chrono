@@ -9,21 +9,22 @@ namespace Chrono
 {
 
 #region Types and Enums
+public enum Noise { Walking, Bang, Combat, Alert, NeedHelp, Item, Zap }
+
+public enum ShopType { General, Magic, Food, Armor, Weapons, ArmorWeapons };
+
 public enum TileType : byte
 { Border,
 
   SolidRock, Wall, ClosedDoor, OpenDoor, RoomFloor, Corridor, UpStairs, DownStairs,
   ShallowWater, DeepWater, Ice, Lava, Pit, Hole, Trap, Altar,
   
-  Tree, Forest, Sand, Grass, Hill, Mountain, Road, Town, Portal,
+  Tree, Forest, DirtSand, Grass, Hill, Mountain, Road, Town, Portal,
 
   NumTypes
 }
 
 public enum Trap : byte { Dart, PoisonDart, Magic, MpDrain, Teleport, Pit }
-public enum God : byte { God1, God2, God3 }
-
-public enum Noise { Walking, Bang, Combat, Alert, NeedHelp, Item, Zap }
 
 [Serializable]
 public struct Tile
@@ -280,23 +281,24 @@ public class Map : UniqueObject
   
   public Link GetLink(Point pt) { return GetLink(pt, true); }
   public Link GetLink(Point pt, bool autoGenerate)
-  { for(int i=0; i<links.Length; i++)
-    { if(links[i].FromPoint==pt)
-      { if(autoGenerate && links[i].ToPoint.X==-1) // if the link hasn't been initialized yet
-        { Map nm = links[i].ToDungeon[links[i].ToLevel];
-          for(int ml=0,ol=0; ml<links.Length; ml++) // initialize all links going to the same level
-          { if(links[ml].ToLevel!=nm.Index || links[ml].ToDungeon!=nm.Dungeon) continue; // skip ones going elsewhere
-            while(ol<nm.links.Length && nm.links[ol].ToLevel!=Index) ol++;
-            links[ml].ToPoint = nm.links[ol].FromPoint;
-            nm.links[ol].ToPoint = links[ml].FromPoint;
-          }
-        }
-        return links[i];
-      }
-    }
+  { for(int i=0; i<links.Length; i++) if(links[i].FromPoint==pt) return GetLink(i, autoGenerate);
     throw new ApplicationException("No such link");
   }
-
+  public Link GetLink(int index) { return GetLink(index, true); }
+  public Link GetLink(int index, bool autoGenerate)
+  { if(autoGenerate && links[index].ToPoint.X==-1) // if the link hasn't been initialized yet
+    { Map nm = links[index].ToDungeon[links[index].ToLevel];
+      for(int ml=0,ol=0; ml<links.Length; ml++)    // initialize all links going to the same level
+      { if(links[ml].ToLevel!=nm.Index || links[ml].ToDungeon!=nm.Dungeon) continue; // skip ones going elsewhere
+        while(ol<nm.links.Length && nm.links[ol].ToLevel!=Index) ol++;
+        if(ol==nm.Links.Length) { links[ml].ToPoint = new Point(); continue; }
+        links[ml].ToPoint = nm.links[ol].FromPoint;
+        nm.links[ol].ToPoint = links[ml].FromPoint;
+      }
+    }
+    return links[index];
+  }
+  
   public bool HasItems(Point pt) { return HasItems(pt.X, pt.Y); }
   public bool HasItems(int x, int y) { return this[x,y].Items!=null && map[y,x].Items.Count>0; }
 
@@ -507,7 +509,7 @@ public class Map : UniqueObject
           case '_': type=TileType.Altar; break;
           case 'T': type=TileType.Tree; break;
           case 'F': type=TileType.Forest; break;
-          case 'S': type=TileType.Sand; break;
+          case 'S': type=TileType.DirtSand; break;
           case 'G': type=TileType.Grass; break;
           case 'm': type=TileType.Hill; break;
           case 'M': type=TileType.Mountain; break;
@@ -587,7 +589,7 @@ public class Map : UniqueObject
     TileFlag.Passable, // Altar
     TileFlag.Passable, // Tree
     TileFlag.Passable, // Forest
-    TileFlag.Passable, // Sand
+    TileFlag.Passable, // DirtSand
     TileFlag.Passable, // Grass
     TileFlag.Passable, // Hill
     TileFlag.Passable, // Mountain

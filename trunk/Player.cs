@@ -313,7 +313,6 @@ public class Player : Entity
         Point  np = Global.Move(Position, inp.Direction);
         int noise = (10-Stealth)*12; // stealth = 0 to 10
         if(!ManualMove(np)) return false;
-        if(OnOverworld) PassTime(OverworldMoveTime-1); // minus one because returning true means we took 1 turn
 
         int options=0;
         Direction dir = inp.Direction;
@@ -336,7 +335,7 @@ public class Player : Entity
 
           np = Global.Move(Position, inp.Direction);
           if(Map.IsPassable(np) && !Map.IsDangerous(np))
-          { if(OnOverworld) PassTime(OverworldMoveTime);
+          { if(OnOverworld) PassTime(WalkTime(np));
             Position = np;
             if(noise>0) Map.MakeNoise(np, this, Noise.Walking, (byte)noise);
           }
@@ -539,7 +538,7 @@ public class Player : Entity
           TileType type = Map[od].Type;
           if(Map.IsPassable(type))
           { if(OnOverworld)
-            { PassTime(OverworldMoveTime);
+            { PassTime(WalkTime(od));
               if(first)
               { if(Map.HasItems(Position)) Map[Position].Items.Clear();
                 first = false;
@@ -1042,8 +1041,7 @@ public class Player : Entity
     { case Action.Move:
       { Point np = Global.Move(Position, inp.Direction);
         if(ManualMove(np))
-        { PassTime(OverworldMoveTime-1);
-          if(count<=1) DescribeTile(np);
+        { if(count<=1) DescribeTile(np);
           inp.Count = count;
           break;
         }
@@ -1074,10 +1072,22 @@ public class Player : Entity
     { if(Map.IsDangerous(type) && Map[Position].Type!=type &&
          !App.IO.YesNo(string.Format("Are you sure you want to move into {0}?", type.ToString().ToLower()), false))
         return false;
-      if(OnOverworld && Map.HasItems(Position)) Map[Position].Items.Clear();
+      if(OnOverworld)
+      { if(Map.HasItems(Position)) Map[Position].Items.Clear();
+        PassTime(WalkTime(pt));
+      }
       Position = pt;
       int noise = (10-Stealth)*12; // stealth = 0 to 10
       if(noise>0) Map.MakeNoise(pt, this, Noise.Walking, (byte)noise);
+      return true;
+    }
+    else if(type==TileType.Border && Map.Dungeon is Overworld && Map.Index!=(int)Overworld.Place.Overworld && // town
+            App.IO.YesNo("Leave the town?", true))
+    { Map.SaveMemory(Memory);
+      Link link = Map.GetLink(0);
+      Map.Entities.Remove(this);
+      link.ToDungeon[link.ToLevel].Entities.Add(this);
+      Position = link.ToPoint;
       return true;
     }
     else return false;
@@ -1094,6 +1104,18 @@ public class Player : Entity
     OnAge();
     if(interrupt) { interrupt=false; return true; }
     return false;
+  }
+
+  protected int WalkTime(Point pt)
+  { TileType type = Map[pt].Type;
+    if(type==TileType.Grass || Map.IsLink(type)) return 75;
+    else if(type==TileType.Forest) return 90;
+    else if(type==TileType.Ice || type==TileType.DirtSand) return 80;
+    else if(type==TileType.Hill) return 100;
+    else if(type==TileType.Mountain) return 200;
+    else if(type==TileType.ShallowWater) return 100;
+    else if(type==TileType.DeepWater) return 200;
+    else throw new ApplicationException("Unhandled tile type: "+type);
   }
 
   protected static readonly ItemClass[] wearableClasses =  new ItemClass[]

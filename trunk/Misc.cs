@@ -161,10 +161,15 @@ public sealed class Global
     return ret;
   }
 
+  public static object ChangeType(object value, Type type)
+  { if(type.IsSubclassOf(typeof(Enum))) return Enum.Parse(type, value.ToString());
+    return Convert.ChangeType(value, type);
+  }
+
   public static bool Coinflip() { return Random.Next(100)<50; }
 
   public static System.IO.Stream LoadData(string path)
-  { return System.IO.File.Open("data/"+path, System.IO.FileMode.Open, System.IO.FileAccess.Read);
+  { return System.IO.File.Open("../../data/"+path, System.IO.FileMode.Open, System.IO.FileAccess.Read);
   }
 
   public static System.Xml.XmlDocument LoadXml(string path)

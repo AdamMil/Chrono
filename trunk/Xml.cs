@@ -21,6 +21,38 @@ public class Xml
 
   public static XmlAttribute AttrNode(XmlNode node, string attr) { return node==null ? null : node.Attributes[attr]; }
 
+  public static string[] BlockToArray(string block) { return BlockToArray(block, false); }
+  public static string[] BlockToArray(string block, bool collapseLines)
+  { if(block==null || block=="") return new string[0];
+
+    block = ltbl.Replace(block.Replace("\r", ""), ""); // remove CRs, and leading and trailing blank lines
+    Match m = lspc.Match(block); // TODO: this should be the amount that can be removed uniformly from nonblank lines
+    Regex trim = new Regex(@"^\s{0,"+m.Length+@"}|\s+$",
+                           collapseLines ? RegexOptions.Singleline : RegexOptions.Multiline);
+    if(!collapseLines) return trim.Replace(block, "").Split('\n');
+
+    System.Collections.ArrayList list = new System.Collections.ArrayList();
+    int pos, oldPos=0;
+    string last=null;
+    do
+    { string temp;
+      pos = block.IndexOf('\n', oldPos);
+
+      if(pos==oldPos)
+      { list.Add("");
+        last = null;
+      }
+      else
+      { temp = trim.Replace(pos==-1 ? block.Substring(oldPos) : block.Substring(oldPos, pos-oldPos), "");
+        if(last==null) list.Add(last=temp);
+        else list[list.Count-1] = (last += temp);
+      }
+      oldPos = pos+1;
+    } while(pos!=-1);
+
+    return (string[])list.ToArray(typeof(string));
+  }
+
   public static int IntValue(XmlAttribute attr, int defaultValue)
   { return attr==null ? defaultValue : int.Parse(attr.Value);
   }
@@ -48,6 +80,9 @@ public class Xml
   
   public static string String(XmlAttribute str) { return str==null ? null : str.Value; }
   public static string String(XmlAttribute str, string defaultValue) { return str==null ? defaultValue : str.Value; }
+  
+  static Regex ltbl = new Regex(@"^(?:\s*\n)+|\s+$", RegexOptions.Singleline);
+  static Regex lspc = new Regex(@"^\s+", RegexOptions.Singleline);
 }
 
 } // namespace Chrono

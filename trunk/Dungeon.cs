@@ -10,7 +10,11 @@ namespace Chrono
 [Serializable]
 public class Dungeon
 { public Dungeon(string path) : this(LoadDungeon(path)) { }
-  public Dungeon(XmlDocument dungeon) { node = dungeon.SelectSingleNode("dungeon"); }
+  public Dungeon(XmlDocument dungeon)
+  { XmlNamespaceManager xmlns = new XmlNamespaceManager(dungeon.NameTable);
+    xmlns.AddNamespace("dg", "http://www.adammil.net/Chrono/dungeon");
+    node = dungeon.SelectSingleNode("dg:dungeon", xmlns);
+  }
 
   #region Section
   [Serializable]
@@ -88,7 +92,7 @@ public class Dungeon
   { get
     { Section section = (Section)sections[name];
       if(section==null)
-        sections[name] = section = new Section(node.SelectSingleNode("section[@name="+name+"]"), this);
+        sections[name] = section = new Section(node.SelectSingleNode("section[@name='"+name+"']"), this);
       return section;
     }
   }

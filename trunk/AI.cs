@@ -1,7 +1,9 @@
 using System;
 using System.Collections;
 using System.Drawing;
+using System.Reflection;
 using System.Runtime.Serialization;
+using System.Xml;
 
 namespace Chrono
 {
@@ -30,7 +32,8 @@ public abstract class AI : Entity
   }
 
   public override void Generate(int level, EntityClass myClass)
-  { base.Generate(level, myClass);
+  { if(level==0) level=1;
+    base.Generate(level, myClass);
 
     int si = (int)Race*3;
     Eyesight = raceSenses[si]; Hearing = raceSenses[si+1]; Smelling = raceSenses[si+2];
@@ -172,6 +175,66 @@ public abstract class AI : Entity
   public byte CorpseChance=30; // chance of leaving a corpse, 0-100%
   public bool HasInventory=true; // whether the monster will pick up and use items
   
+  public static AI Load(XmlNode npc)
+  { string   id = Xml.Attr(npc, "id");
+    string data = Xml.Attr(npc, "data", id);
+    string   ai = Xml.Attr(npc, "ai");
+
+    if(data.IndexOf('/')==-1) data = "ai/"+data; // TODO: cache AI .xml files with a weak references
+    if(data.IndexOf('.')==-1) data += ".xml";
+
+    XmlDocument doc = Global.LoadXml(data);
+    XmlNamespaceManager xmlns = new XmlNamespaceManager(doc.NameTable);
+    xmlns.AddNamespace("ai", "http://www.adammil.net/Chrono/ai");
+
+    AI e = AI.Load(doc.SelectSingleNode("ai:ai/charData", xmlns), null); // FIXME: second shouldn't be "null"
+    e.EntityID = id;
+    return e;
+  }
+
+  public static AI Load(XmlNode data, XmlNode ai)
+  { string av = data.Attributes["type"].Value;
+    Type type = Type.GetType("Chrono."+av);
+    AI      e = (AI)MakeEntity(type);
+
+    EntityClass ec = EntityClass.Random;
+    int level      = Xml.IntValue(data.Attributes["level"], 0);
+    if((av=Xml.Attr(data, "class")) != null) ec = (EntityClass)Enum.Parse(typeof(EntityClass), av);
+    e.Generate(level, ec);
+
+    if((av=Xml.Attr(data, "gender")) != null) e.Male = av=="male";
+    if((av=Xml.Attr(data, "STR")) != null) e.SetBaseAttr(Attr.Str, int.Parse(av));
+    if((av=Xml.Attr(data, "INT")) != null) e.SetBaseAttr(Attr.Int, int.Parse(av));
+    if((av=Xml.Attr(data, "DEX")) != null) e.SetBaseAttr(Attr.Dex, int.Parse(av));
+    if((av=Xml.Attr(data, "EV"))  != null) e.SetBaseAttr(Attr.EV, int.Parse(av));
+    if((av=Xml.Attr(data, "AC"))  != null) e.SetBaseAttr(Attr.AC, int.Parse(av));
+    
+    foreach(XmlAttribute attr in data.Attributes)
+    { string n=attr.Name, v=attr.Value;
+      switch(n)
+      { case "type": case "level": case "class": continue;
+        case "gender": e.Male = v=="male"; break;
+        case "STR": e.SetBaseAttr(Attr.Str, int.Parse(v)); break;
+        case "INT": e.SetBaseAttr(Attr.Int, int.Parse(v)); break;
+        case "DEX": e.SetBaseAttr(Attr.Dex, int.Parse(v)); break;
+        case "EV":  e.SetBaseAttr(Attr.EV,  int.Parse(v)); break;
+        case "AC":  e.SetBaseAttr(Attr.AC,  int.Parse(v)); break;
+        default:
+          PropertyInfo pi = type.GetProperty(n, BindingFlags.Public|BindingFlags.NonPublic|BindingFlags.Instance|BindingFlags.IgnoreCase);
+          if(pi!=null && pi.CanWrite) pi.SetValue(e, Global.ChangeType(v, pi.PropertyType), null);
+          else
+          { FieldInfo fi = type.GetField(n, BindingFlags.Public|BindingFlags.NonPublic|BindingFlags.Instance|BindingFlags.IgnoreCase);
+            if(fi==null) throw new ArgumentException("Tried to set nonexistant property "+n+" on "+type);
+            fi.SetValue(e, Global.ChangeType(v, fi.FieldType));
+          }
+          break;
+      }
+    }
+
+    return e;
+  }
+
+
   protected enum Combat { None, Melee, Ranged };
 
   protected Item AddItem(Item item)

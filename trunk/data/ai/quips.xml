@@ -1,8 +1,6 @@
-﻿<?xml version="1.0" encoding="utf-8" ?> 
+<?xml version="1.0" encoding="utf-8" ?> 
 
-<quips
-  xmlns="http://www.adammil.net/Chrono/quips"
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+<quips:quips xmlns:quips="http://www.adammil.net/Chrono/quips" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://www.adammil.net/Chrono/quips quips.xsd">
 
   <list appliesTo="Other Worker Farmer Housewife Fighter Shopkeeper">
@@ -160,4 +158,4 @@
     <quip>All my products come with a limited, lifetime guarantee!</quip>
     <quip>{NAME}! I've got just the thing you need! Take a look at my stock.</quip>
   </list>
-</quips>
+</quips:quips>

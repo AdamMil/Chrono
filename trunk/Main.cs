@@ -58,7 +58,7 @@ public sealed class App
       foreach(Item i in Player.Inv) Player.AddKnowledge(i);
 
       map.Entities.Add(Player);
-      Player.Position = map.FreeSpaceNear(map.GetEntity("fatherOfPC"));
+      Player.Position = map.FreeSpaceNear(map.GetEntity("fatherOfPC").Position);
 
       for(int y=0; y<Player.Map.Height; y++) // magic mapping + find items
         for(int x=0; x<Player.Map.Width; x++)

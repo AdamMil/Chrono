@@ -40,7 +40,7 @@ public class Townsperson : AI
     { case 0: case 1: case 2: Race=Race.Human; break;
       case 3: Race=Race.Orc; break;
     }
-    Color = Global.Coinflip() ? Color.Cyan : Color.LightCyan; // light cyan is a child, cyan is an adult
+    IsAdult = Global.Coinflip();
     GotoState(defaultState = Global.OneIn(4) ? AIState.Wandering : AIState.Idle);
 
     if(IsAdult)
@@ -146,7 +146,7 @@ public class Townsperson : AI
     else if(!IsAdult) Say(GetQuip(Quips.Kid));
     else switch(baseName)
     { case "hunter": Say(GetQuip(Quips.Fighter)); break;
-      case "blacksmith": case "tailor": case "tinkerer": case "carpenter": case "shepherd":
+      case "blacksmith": case "tailor": case "tinkerer": case "carpenter": case "shepherd": case "clerk":
         Say(GetQuip(Quips.Worker));
         break;
       case "farmer": Say(GetQuip(Quips.Farmer)); break;
@@ -158,7 +158,10 @@ public class Townsperson : AI
     }
   }
 
-  protected bool IsAdult { get { return Color==Color.Cyan; } }
+  protected bool IsAdult
+  { get { return Color==Color.Cyan; }
+    set { Color = value ? Color.Cyan : Color.LightCyan; } // light cyan is a child, cyan is an adult
+  }
 
   static readonly string[] jobs = new string[]
   { // female jobs

@@ -12,4 +12,4 @@ using System.Security.Permissions;
 [assembly: AssemblyProduct("Chrono")]
 [assembly: AssemblyCopyright("Copyright 2004 Adam Milazzo")]
 
-[assembly: AssemblyVersion("0.1.*")]
+[assembly: AssemblyVersion("0.05.*")]

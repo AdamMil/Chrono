@@ -325,6 +325,28 @@ public sealed class ConsoleIO : InputOutput
     }
     finally { RestoreLines(); }
   }
+  
+  public override int ConversationChoice(Entity talkingTo, string prompt, string[] options)
+  { ClearScreen();
+
+    console.SetCursorPosition(0, 0);
+    WriteLine(Color.White, talkingTo.AName);
+    WriteLine();
+    WriteWrapped(Color.Green, prompt, MapWidth);
+    WriteLine();
+    for(int i=0; i<options.Length; i++) WriteWrapped(Color.Normal, (i+1).ToString()+". "+options[i], MapWidth);
+    WriteLine();
+    Write(Color.White, "Your choice: ");
+    
+    while(true)
+    { char c=ReadChar();
+      if(char.IsNumber(c))
+      { int ret = c-'0';
+        if(ret>0 && ret<=options.Length) return ret-1;
+      }
+    }
+  }
+
 
   public override void DisplayInventory(Entity entity, params ItemClass[] classes)
   { SetupMenu(entity.Inv, MenuFlag.None, classes);
@@ -471,6 +493,8 @@ public sealed class ConsoleIO : InputOutput
     return ret;
   }
 
+  public override void EndConversation() { RestoreScreen(); }
+
   public override void ExamineItem(Entity viewer, Item item)
   { ClearScreen();
     console.SetCursorPosition(0, 0);
@@ -540,8 +564,18 @@ public sealed class ConsoleIO : InputOutput
       console.WriteLine("This item is made of {0}.", ((Wearable)item).Material.ToString().ToLower());
 
     if(item.Count>1)
-      console.WriteLine("They weigh about {0} mt. each ({1} total).", item.Weight, item.FullWeight);
-    else console.WriteLine("It weighs about {0} mt.", item.Weight);
+    { console.WriteLine("They weigh about {0} mt. each ({1} total).", item.Weight, item.FullWeight);
+      if(item.Shop!=null && item.Shop.Shopkeeper!=null)
+        console.WriteLine("They have not been paid for, and are valued at {0} gold for all of them.",
+                          item.Shop.Shopkeeper.SellCost(item));
+    }
+    else
+    { console.WriteLine("It weighs about {0} mt.", item.Weight);
+      if(item.Shop!=null && item.Shop.Shopkeeper!=null)
+        console.WriteLine("This item has not been paid for, and is valued at {0} gold.",
+                          item.Shop.Shopkeeper.SellCost(item));
+    }
+
     if(longDesc!=null)
     { console.WriteLine();
       WriteWrapped(longDesc, MapWidth);
@@ -743,6 +777,7 @@ public sealed class ConsoleIO : InputOutput
         case 'R': inp.Action = Action.Remove; break;
         case 'S': inp.Action = Action.ManageSkills; break;
         case 't': inp.Action = Action.Throw; break;
+        case 'T': inp.Action = Action.TalkTo; break;
         case 'v': inp.Action = Action.ViewItem; break;
         case 'w': inp.Action = Action.Wield; break;
         case 'W': inp.Action = Action.Wear; break;
@@ -874,10 +909,11 @@ public sealed class ConsoleIO : InputOutput
 
   void ClearLines() { oldLines = lines; lines = new LinkedList(); }
 
-  void ClearScreen() // doesn't clear stat area
+  void ClearScreen()
   { int width=Math.Min(MapWidth, console.Width), height=console.Height, mheight=MapHeight;
     console.Fill(0, 0, width, height); // clear map area
     console.Fill(0, mheight, console.Width, height-mheight); // clear message area
+    console.Attributes = ColorToAttr(Color.Normal);
   }
 
   void DescribeEntity(Entity entity)
@@ -947,7 +983,7 @@ a - use/apply item
 c - close door              C - carve up a corpse
 d - drop item(s)            D - drop items by type
 e - eat food
-f - fire weapon/attack
+f - fire weapon/attack      (item 'q' is preferred ammunition)
 i - inventory listing       I - invoke a wielded item's power
 o - open door
 m - use special ability     M - list special abilities/mutations
@@ -955,7 +991,7 @@ p - pray
 q - quaff a potion
 r - read a scroll or book   R - remove a worn item
 s - search adjacent tiles   S - manage skills
-t - throw an item
+t - throw an item           T - talk to somebody
 v - view item description   V - version info
 w - wield a weapon          W - wear an item
 x - examine surroundings    X - examine level map
@@ -1264,6 +1300,7 @@ Ctrl-P - see old messages";
     return str.Length;
   }
 
+  void WriteLine() { console.WriteLine(); }
   void WriteLine(Color color, string str)
   { console.Attributes = ColorToAttr(color);
     console.WriteLine(str);
@@ -1273,6 +1310,10 @@ Ctrl-P - see old messages";
     console.WriteLine(string.Format(format, parms));
   }
 
+  void WriteWrapped(Color color, string text, int width)
+  { console.Attributes = ColorToAttr(color);
+    WriteWrapped(text, width);
+  }
   void WriteWrapped(string text, int width)
   { int height = WordWrap(text, width);
     for(int i=0; i<height; i++) console.WriteLine(wrapped[i]);

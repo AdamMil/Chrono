@@ -163,6 +163,11 @@ public sealed class Global
 
   public static bool Coinflip() { return Random.Next(100)<50; }
 
+  public static System.IO.Stream LoadData(string path)
+  { return System.IO.File.Open("data/"+path, System.IO.FileMode.Open, System.IO.FileAccess.Read);
+  }
+
+  // these only accept cardinal directions (eg, not self, up, down, or invalid)
   public static Point Move(Point pt, Direction d) { return Move(pt, (int)d); }
   public static Point Move(Point pt, int d)
   { if(d<0) { d=d%8; if(d!=0) d+=8; }

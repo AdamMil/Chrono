@@ -56,15 +56,6 @@ public class Townsperson : AI
   }
   public Townsperson(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
-  public override void OnHitBy(Entity attacker, object item, Damage damage)
-  { if(SocialGroup!=-1 && attacker.SocialGroup==App.Player.SocialGroup && !Global.GetSocialGroup(SocialGroup).Hostile)
-    { Map.MakeNoise(attacker.Position, attacker, Noise.Alert, Map.MaxSound);
-      App.IO.Print("You hear an alarm bell ring!");
-      Global.UpdateSocialGroup(SocialGroup, true);
-    }
-    base.OnHitBy(attacker, item, damage);
-  }
-
   public override void Generate(int level, EntityClass myClass)
   { base.Generate(level, myClass);
 
@@ -139,6 +130,32 @@ public class Townsperson : AI
     }
   }
 
+  public override void OnHitBy(Entity attacker, object item, Damage damage)
+  { if(SocialGroup!=-1 && attacker.SocialGroup==App.Player.SocialGroup && !Global.GetSocialGroup(SocialGroup).Hostile)
+    { Map.MakeNoise(attacker.Position, attacker, Noise.Alert, Map.MaxSound);
+      App.IO.Print("You hear an alarm bell ring!");
+      Global.UpdateSocialGroup(SocialGroup, true);
+    }
+    base.OnHitBy(attacker, item, damage);
+  }
+
+  public override void TalkTo()
+  { if(HostileTowards(App.Player)) Say(GetQuip(IsAdult ? Quips.Attacking : Quips.KidAttacking));
+    else if(!IsAdult) Say(GetQuip(Quips.Kid));
+    else switch(baseName)
+    { case "hunter": Say(GetQuip(Quips.Fighter)); break;
+      case "blacksmith": case "tailor": case "tinkerer": case "carpenter": case "shepherd":
+        Say(GetQuip(Quips.Worker));
+        break;
+      case "farmer": Say(GetQuip(Quips.Farmer)); break;
+      case "cleric": case "priest": Say(GetQuip(Quips.Holyman)); break;
+      case "hobo": Say(GetQuip(Quips.Hobo)); break;
+      case "housewife": Say(GetQuip(Quips.Housewife)); break;
+      case "prostitute": Say(GetQuip(Quips.Prostitute)); break;
+      default: throw new NotImplementedException("Unhandled job: "+baseName);
+    }
+  }
+
   protected bool IsAdult { get { return Color==Color.Cyan; } }
 
   static readonly string[] jobs = new string[]
@@ -178,6 +195,8 @@ public class Shopkeeper : AI
     int baseCost = (int)item.GetType().GetField("ShopValue", BindingFlags.Static|BindingFlags.Public).GetValue(item);
     return (int)Math.Round(baseCost*item.Count / (priceMod*2));
   }
+
+  public void ClearUnpaidItems(Inventory inv) { ClearUnpaidItems(Shop, inv); }
 
   public override void Generate(int level, EntityClass myClass)
   { base.Generate(level, myClass);
@@ -285,7 +304,10 @@ public class Shopkeeper : AI
     }
   }
 
-  public int GetPlayerBill(Entity player) { return (credit<0 ? -credit : 0) + ContainsMyItems(Shop, player.Inv); }
+  public int GetPlayerBill(Entity player) { return GetPlayerBill(player, true); }
+  public int GetPlayerBill(Entity player, bool includeItems)
+  { return (includeItems ? Math.Max(-credit, 0) : 0) + ContainsMyItems(Shop, player.Inv);
+  }
 
   public void PlayerTook(Item item)
   { if(item.Class!=ItemClass.Gold)
@@ -296,17 +318,22 @@ public class Shopkeeper : AI
   public void PlayerUsed(Item item, bool standardMessage)
   { int cost = SellCost(item);
     item.Shop = null;
+    if(cost==0) return;
 
-    if(credit>=cost) { Say("I'm deducting {0} gold from your credit.", cost); return; }
-    if(credit>0) { cost-=credit; credit=0; }
+    int take = Math.Min(Math.Max(credit, 0), cost);
+    credit -= cost;
+    if(HostileTowards(App.Player)) return;
+    cost -= take;
 
     string yell = "Hey";
     if(!standardMessage)
     { if(item.Class==ItemClass.Food) yell = "You bit it, you bought it";
     }
 
-    Say("{0}! You owe me {1} gold for {2}!", yell, cost, item.GetThatName(App.Player));
-    credit -= cost;
+    if(cost>0)
+      Say("{0}! {1}ou owe me {2} gold for {3}!", yell,
+          (take>0 ? "I'm deducting "+take+" from your credit and y" : "Y"), cost, item.GetThatName(App.Player));
+    else Say("I'm deducting {0} from your credit.", take);
   }
 
   public int SellCost(Item item)
@@ -315,10 +342,64 @@ public class Shopkeeper : AI
     return (int)Math.Round(baseCost*item.Count * priceMod);
   }
 
-  protected int ContainsMyItems(Shop shop, IInventory inv)
+  public override void TalkTo()
+  { if(HostileTowards(App.Player))
+    { Say(GetQuip(Quips.Attacking)); // TODO: allow player to pay the shopkeeper to calm him down
+    }
+    else
+    { System.Collections.ArrayList list = new System.Collections.ArrayList();
+      int debt = -Math.Min(credit, 0), itemcost = ContainsMyItems(Shop, App.Player.Inv, list);
+      if(debt==0 && itemcost==0) { Say(GetQuip(Quips.Shopkeeper)); return; }
+
+      bool paidSome = false;
+      if(debt>0)
+      { Say("First, there's the matter of your debt. You owe me {0} gold.", debt);
+        if(App.IO.YesNo("Pay your debt?", true))
+        { Gold gold = App.Player.GetGold(debt, false);
+          if(gold==null)
+          { Say("It seems you don't have enough gold. You'd better get some, and quickly.");
+            App.IO.Print("[The shopkeeper eyes your equipment.]");
+            return;
+          }
+          else
+          { Inv.Add(gold);
+            credit=0;
+            Say("Okay, that's taken care of.");
+            paidSome = true;
+          }
+        }
+      }
+      
+      int playerGold = App.Player.Gold;
+      bool freeToGo  = true;
+
+      foreach(Item item in list)
+      { int cost = SellCost(item);
+        if(cost>playerGold)
+        { App.IO.Print("You owe {0} gold for {1}, but you can't afford it.", cost, item.GetAName(App.Player));
+          freeToGo = false;
+        }
+        else if(App.IO.YesNo(string.Format("You owe {0} gold for {1}. Pay?", cost, item.GetAName(App.Player)), true))
+        { Inv.Add(App.Player.GetGold(cost, false));
+          playerGold -= cost;
+          item.Shop   = null;
+          paidSome    = true;
+        }
+        else freeToGo = false;
+      }
+      
+      if(paidSome) Say(freeToGo ? "Thanks. That covers everything." : "Thanks. You still owe me some money, though.");
+    }
+  }
+
+  protected int ContainsMyItems(Shop shop, IInventory inv) { return ContainsMyItems(shop, inv, null); }
+  protected int ContainsMyItems(Shop shop, IInventory inv, System.Collections.IList addTo)
   { int total=0;
     foreach(Item i in inv)
-    { if(i.Shop==shop) total += SellCost(i);
+    { if(i.Shop==shop)
+      { if(addTo!=null) addTo.Add(i);
+        total += SellCost(i);
+      }
       IInventory ni = i as IInventory;
       if(ni!=null) total += ContainsMyItems(shop, ni);
     }
@@ -349,7 +430,7 @@ public class Shopkeeper : AI
     { if(App.Player.Map==Map) // move around to get out of the player's way
       { int dist = DistanceTo(App.Player.Position);
         Direction d;
-        if(dist<=1) d = App.Player.LookAt(Position);
+        if(dist<=1) d = Global.Coinflip() ? App.Player.LookAt(Position) : Direction.Self; // move half of the time
         else d = LookAt(Shop.FrontOfDoor);
 
         if(d!=Direction.Self)

@@ -69,34 +69,73 @@ public class Player : Entity
 
   public override void OnDrink(Potion potion) { App.IO.Print("You drink {0}.", potion.GetAName(this)); }
 
-  public override void OnDrop(Item item)
+  public override bool OnDrop(Item item)
   { App.IO.Print("You drop {0}.", item.GetAName(this));
     if(item.Shop==null)
     { Shop shop = Map.GetShop(Position);
       if(shop!=null && shop.Shopkeeper!=null)
-      { int price = shop.Shopkeeper.BuyCost(item);
-        if(price==0) App.IO.Print("{0} seems uninterested in that.", shop.Shopkeeper.TheName);
-        else if(App.IO.YesNo(string.Format("{0} offers you {1} gold for that. Accept?",
-                                            shop.Shopkeeper.TheName, price), true))
-        { if(shop.Shopkeeper.Credit<0)
-          { int take = Math.Min(-shop.Shopkeeper.Credit, price);
-            shop.Shopkeeper.Say("{0}I'll cancel {1} gold from your debt.", take==price ? "" : "First, ", take);
+      { if(item.Class==ItemClass.Gold)
+        { int itemcost = shop.Shopkeeper.GetPlayerBill(this, false);
+          if(shop.Shopkeeper.Credit<0)
+          { int take = Math.Min(-shop.Shopkeeper.Credit, item.Count);
+            shop.Shopkeeper.Say("{0}I'll cancel {1} gold from your debt.", itemcost==0 ? "" : "First, ", take);
+
             shop.Shopkeeper.GiveCredit(take);
-            price -= take;
+            if(take<item.Count) shop.Shopkeeper.Pickup(item.Split(take));
+            else { shop.Shopkeeper.Pickup(item); return false; }
+            if(itemcost==0) return true;
           }
 
-          Gold gold = shop.Shopkeeper.GetGold(price, true);
-          int count = gold==null ? 0 : gold.Count;
-          if(gold!=null) Pickup(gold);
-          if(count<price)
-          { shop.Shopkeeper.Say("Sorry, I don't have enough money, but I'll give you {0} gold "+
-                                "and {1} additional credit at my shop.", count, price-count);
-            shop.Shopkeeper.GiveCredit(price-count);
+          if(itemcost==0)
+          { if(App.IO.YesNo("Would you like me to take that money and give you credit?", false))
+            { shop.Shopkeeper.Pickup(item);
+              shop.Shopkeeper.Say("Okay, you have {0} credit.", shop.Shopkeeper.Credit);
+              return false;
+            }
           }
-          item.Shop = shop;
+          else if(itemcost>item.Count)
+            shop.Shopkeeper.Say("That's not enough to cover your debt. Here, take your money back. Either give me "+
+                                "the full amount, or talk to me and we'll work something out.");
+          else
+          { shop.Shopkeeper.ClearUnpaidItems(Inv);
+            if(itemcost==item.Count)
+            { shop.Shopkeeper.Pickup(item);
+              shop.Shopkeeper.Say("Thanks, that covers everything.");
+              return false;
+            }
+            else
+            { shop.Shopkeeper.Pickup(item.Split(itemcost));
+              shop.Shopkeeper.Say("Thanks, that covers everything. Don't forget to pick up your change!");
+            }
+          }
+        }
+        else
+        { int price = shop.Shopkeeper.BuyCost(item);
+          if(price==0) App.IO.Print("{0} seems uninterested in that.", shop.Shopkeeper.TheName);
+          else if(App.IO.YesNo(string.Format("{0} offers you {1} gold for that. Accept?",
+                                              shop.Shopkeeper.TheName, price), true))
+          { if(shop.Shopkeeper.Credit<0)
+            { int take = Math.Min(-shop.Shopkeeper.Credit, price);
+              shop.Shopkeeper.Say("{0}I'll cancel {1} gold from your debt.", take==price ? "" : "First, ", take);
+              shop.Shopkeeper.GiveCredit(take);
+              price -= take;
+            }
+
+            Gold gold = shop.Shopkeeper.GetGold(price, true);
+            int count = gold==null ? 0 : gold.Count;
+            if(gold!=null) Pickup(gold);
+            if(count<price)
+            { shop.Shopkeeper.Say("Sorry, I don't have enough money, but I'll give you {0} gold "+
+                                  "and {1} additional credit at my shop.", count, price-count);
+              shop.Shopkeeper.GiveCredit(price-count);
+            }
+            item.Shop = shop;
+          }
         }
       }
     }
+
+    return true;
   }
 
   public override void OnEquip(Wieldable item)
@@ -184,7 +223,7 @@ public class Player : Entity
       { int bill = oldShop.Shopkeeper.GetPlayerBill(this);
         if(bill>0)
         { int credit = oldShop.Shopkeeper.Credit;
-          oldShop.Shopkeeper.Say("{0}! You owe {1} gold. Please pay before you leave{2}.",
+          oldShop.Shopkeeper.Say("{0}! You owe me {1} gold. Please pay before you leave{2}.",
                                  Name, bill, credit>0 ? " (you have "+credit+" credit)" : "");
         }                         
       }
@@ -214,6 +253,8 @@ public class Player : Entity
 
   public void Quit() { HP=0; App.Quit=true; Die(Death.Quit); }
   public void Save() { App.Quit=true; }
+
+  public override void TalkTo() { App.IO.Print("Talking to yourself again?"); }
 
   public override void Think()
   { if(OnOverworld) OverworldThink();
@@ -501,9 +542,9 @@ public class Player : Entity
           if(scroll.Count>1) scroll = (Scroll)scroll.Split(1);
           else inv.Remove(scroll);
           OnReadScroll(scroll);
+          Use(scroll);
           scroll.Read(this);
           Map.MakeNoise(Position, this, Noise.Item, scroll.GetNoise(this));
-          Use(scroll);
         }
         else // read spellbook
         { Spellbook book = (Spellbook)read;
@@ -661,6 +702,18 @@ public class Player : Entity
           }
         }
         done: break;
+      }
+
+      case Action.TalkTo:
+      { Direction d = App.IO.ChooseDirection(true, false);
+        if(d==Direction.Invalid) goto nevermind;
+        if(d==Direction.Self) TalkTo();
+        else
+        { Entity e = Map.GetEntity(Global.Move(Position, d));
+          if(e==null || !CanSee(e)) { App.IO.Print("There's nothing there!"); return false; }
+          e.TalkTo();
+        }
+        break;
       }
 
       case Action.UseItem:

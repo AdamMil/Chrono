@@ -16,8 +16,8 @@ public sealed class App
 
   public static void Main()
   { IO = new ConsoleIO();
-    IO.SetTitle("Chrono 0.02");
-    IO.Print("Chrono 0.02 by Adam Milazzo");
+    IO.SetTitle("Chrono 0.05");
+    IO.Print("Chrono 0.05 by Adam Milazzo");
     IO.Print();
     
     if(false&&File.Exists("c:/chrono.sav"))
@@ -40,7 +40,6 @@ public sealed class App
         Player.SetSkill(Skill.Bow, 1);
         Player.SetSkill(Skill.ShortBlade, 1);
         Player.Pickup(new ShortSword());
-        Player.SetBaseAttr(Attr.Str, 1000);
       }
       else
       { Player.SetSkill(Skill.Casting, 1);
@@ -55,6 +54,7 @@ public sealed class App
       Player.Pickup(new TeleportScroll());
       Player.Pickup(new HealPotion()).Count = 2;
       Player.Pickup(new Deodorant());
+      Player.Pickup(new Gold()).Count = 100;
       foreach(Item i in Player.Inv) Player.AddKnowledge(i);
 
       for(int i=0; i<map.Links.Length; i++)

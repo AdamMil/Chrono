@@ -241,8 +241,6 @@ public class TownGenerator : MapGenerator
   { this.map = map;
     if(map.GroupID==-1) map.GroupID = Global.NewSocialGroup(false, true);
 
-Rand = new Random(2);
-
     map.Fill(TileType.Grass);
     int size = map.Width*map.Height;
     for(int ntrees=size/50; ntrees>0; ntrees--) map.SetType(map.FreeSpace(), TileType.Tree);

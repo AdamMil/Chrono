@@ -19,7 +19,7 @@ public class Player : Creature
     Point[] vis = VisibleTiles();
     next:
     int count = inp.Count;
-    if(count==0)
+    if(count==0) // inp.Count drops to zero unless set to 'count' by an action
     { UpdateMemory(vis);
       App.IO.Render(this);
       inp = App.IO.GetNextInput();
@@ -29,10 +29,45 @@ public class Player : Creature
       inp.Count = 0;
     }
     switch(inp.Action)
-    { case Action.Rest:
-        if(IsMonsterVisible(vis)) goto next;
-        inp.Count = count;
+    { case Action.CloseDoor:
+      { Direction dir = App.IO.ChooseDirection(false, false);
+        if(dir!=Direction.Invalid)
+        { Point newpos = Global.Move(Position, dir);
+          Tile tile = Map[newpos];
+          if(tile.Type==TileType.ClosedDoor) App.IO.Print("That door is already closed.");
+          else if(tile.Type!=TileType.OpenDoor) App.IO.Print("There is no door there.");
+          else { Map.SetType(newpos, TileType.ClosedDoor); break;  }
+        }
+        goto next;
+      }
+
+      case Action.Drop:
+      { if(Inv.Count==0) { App.IO.Print("You're not carrying anything."); goto next; }
+        char c = App.IO.CharChoice("Drop which item?", Inv.CharString()+"?");
+        if(c==0) { App.IO.Print("Never mind."); goto next; }
+        Drop(c);
         break;
+      }
+
+      case Action.Eat:
+      { Item toEat=null;
+        if(Map.HasItems(Position))
+        { Item[] items = Map[Position].Items.GetItems(ItemClass.Food);
+          foreach(Item i in items)
+            if(App.IO.YesNo(string.Format("There {0} {1} here. Eat {2}?", i.AreIs, i.FullName, i.ItOne),
+                            false))
+            { toEat=i;
+              break;
+            }
+        }
+        if(toEat==null)
+        { string chars = Inv.CharString(ItemClass.Food);
+          chars += chars.Length==0 ? "*" : "?*";
+          char c = App.IO.CharChoice("Eat what?", chars);
+          if(c==0) { App.IO.Print("Never mind."); goto next; }
+        }
+        break;
+      }
 
       case Action.Move:
       { Point newpos = Global.Move(Position, inp.Direction);
@@ -72,29 +107,6 @@ public class Player : Creature
         break;
       }
 
-      case Action.Pickup:
-      { if(!Map.HasItems(Position)) { App.IO.Print("There are no items here."); goto next; }
-        Inventory inv = Map[Position].Items;
-        if(inv.Count==1)
-        { Item item = Pickup(inv, 0);
-          App.IO.Print("{0} - {1}", item.Char, item.FullName);
-        }
-        else
-          foreach(MenuItem item in App.IO.Menu(inv, MenuFlag.AllowNum|MenuFlag.Multi))
-          { if(item.Count==item.Item.Count) Pickup(inv, item.Item);
-            else Pickup(item.Item.Split(item.Count));
-          }
-        break;
-      }
-      
-      case Action.Drop:
-      { if(Inv==null || Inv.Count==0) { App.IO.Print("You're not carrying anything."); goto next; }
-        char c = App.IO.CharChoice("Drop which item?", Inv.CharString()+"?");
-        if(c==0) { App.IO.Print("Never mind."); goto next; }
-        Drop(c);
-        break;
-      }
-
       case Action.OpenDoor:
       { Direction dir = App.IO.ChooseDirection(false, false);
         if(dir!=Direction.Invalid)
@@ -108,20 +120,28 @@ public class Player : Creature
         goto next;
       }
 
-      case Action.CloseDoor:
-      { Direction dir = App.IO.ChooseDirection(false, false);
-        if(dir!=Direction.Invalid)
-        { Point newpos = Global.Move(Position, dir);
-          Tile tile = Map[newpos];
-          if(tile.Type==TileType.ClosedDoor) App.IO.Print("That door is already closed.");
-          else if(tile.Type!=TileType.OpenDoor) App.IO.Print("There is no door there.");
-          else { Map.SetType(newpos, TileType.ClosedDoor); break;  }
+      case Action.Pickup:
+      { if(!Map.HasItems(Position)) { App.IO.Print("There are no items here."); goto next; }
+        ItemPile inv = Map[Position].Items;
+        if(inv.Count==1)
+        { Item item = Pickup(inv, 0);
+          App.IO.Print("{0} - {1}", item.Char, item.FullName);
         }
-        goto next;
+        else
+          foreach(MenuItem item in App.IO.Menu(inv, MenuFlag.AllowNum|MenuFlag.Multi))
+          { if(item.Count==item.Item.Count) Pickup(inv, item.Item);
+            else Pickup(item.Item.Split(item.Count));
+          }
+        break;
       }
-
+      
       case Action.Quit: 
         if(App.IO.YesNo(Color.Warning, "Do you really want to quit?", false)) App.Quit=true;
+        break;
+
+      case Action.Rest:
+        if(IsMonsterVisible(vis)) goto next;
+        inp.Count = count;
         break;
     }
   }

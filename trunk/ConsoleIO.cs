@@ -162,12 +162,13 @@ public sealed class ConsoleIO : InputOutput
             break;
           case '.': inp.Action = Action.Rest; break;
           case ',': inp.Action = Action.Pickup; break;
+          case 'c': inp.Action = Action.CloseDoor; break;
           case 'd': inp.Action = Action.Drop; break;
           case 'D': inp.Action = Action.DropType; break;
+          case 'e': inp.Action = Action.Eat; break;
+          case 'o': inp.Action = Action.OpenDoor; break;
           case '<': inp.Action = Action.GoUp; break;
           case '>': inp.Action = Action.GoDown; break;
-          case 'c': inp.Action = Action.CloseDoor; break;
-          case 'o': inp.Action = Action.OpenDoor; break;
           case '/':
             inp.Direction = CharToDirection(ReadChar());
             if(inp.Direction==Direction.Self) { count=100; inp.Action=Action.Rest; }

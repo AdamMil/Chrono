@@ -6,7 +6,7 @@ namespace Chrono
 
 public enum Action
 { None, Quit, Rest, Move, MoveToInteresting, MoveToDanger, MoveAFAP, OpenDoor, CloseDoor, Pickup, Drop, DropType,
-  GoUp, GoDown,
+  GoUp, GoDown, Eat,
 }
 
 public struct Input

@@ -101,7 +101,7 @@ public abstract class Spell : UniqueObject
   public SpellClass  Class;
   public SpellTarget Target;
   public int Difficulty; // 1-18, 1,2=level 1, 3,4=level 2, etc
-  public int Memory; // memory of this spell, decreased every turn that the spell isn't cast, forgotten at zero
+  public int Memory; // decreased every turn that the spell isn't cast, forgotten at zero. -1 means never forget
   public int Power;  // MP usage
   public int Range;  // the approximate range of the wand, in tiles, if applicable
   public bool AutoIdentify;
@@ -119,6 +119,9 @@ public abstract class Spell : UniqueObject
 
     toHit   -= (toHit  *((int)user.HungerLevel*10)+99)/100; // effects of hunger -10% per hunger level (rounded up)
     toEvade -= (toEvade*((int)target.HungerLevel*10)+99)/100;
+
+    if(toHit<0) toHit=0;
+    if(toEvade<0) toEvade=0;
 
     int n = Global.Rand(toHit+toEvade);
     App.IO.Print(Color.DarkGrey, "SpHIT: (toHit: {0}, EV: {1}, roll: {2} = {3})", toHit, toEvade, n, n>=toEvade ? "hit" : "miss");

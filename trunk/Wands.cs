@@ -89,6 +89,7 @@ public class WandOfFire : Wand
   public WandOfFire(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public static readonly int SpawnChance=10; // 0.1% chance
+  public static readonly int ShopValue=200;
 }
 
 } // namespace Chrono

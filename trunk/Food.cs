@@ -80,6 +80,7 @@ public class FortuneCookie : Food
   }
 
   public static readonly int SpawnChance=50; // 0.5% chance
+  public static readonly int ShopValue=2;
 }
 
 [Serializable]
@@ -88,6 +89,7 @@ public class Hamburger : Food
   public Hamburger(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public static readonly int SpawnChance=250; // 2.5% chance
+  public static readonly int ShopValue=10;
 }
 
 [Serializable]

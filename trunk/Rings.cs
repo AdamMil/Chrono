@@ -59,6 +59,7 @@ public class InvisibilityRing : Ring
   }
 
   public static readonly int SpawnChance=50; // 0.5% chance
+  public static readonly int ShopValue=400;
 }
 
 [Serializable]
@@ -67,6 +68,7 @@ public class SeeInvisibleRing : Ring
   public SeeInvisibleRing(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public static readonly int SpawnChance=50; // 0.5% chance
+  public static readonly int ShopValue=250;
 }
 
 } // namespace Chrono

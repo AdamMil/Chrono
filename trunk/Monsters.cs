@@ -40,15 +40,29 @@ public class Townsperson : AI
       case 3: Race=Race.Orc; break;
     }
     Color = Global.Coinflip() ? Color.Cyan : Color.LightCyan; // light cyan is a child, cyan is an adult
-    defaultState = Global.Coinflip() ? AIState.Idle : AIState.Wandering;
-    baseKillExp = 3;
-    
-    if(IsAdult) name = jobs[Global.Rand(jobs.Length)];
-    else name += Race.ToString().ToLower() + (Global.Coinflip() ? " boy" : " girl");
+    GotoState(defaultState = Global.OneIn(4) ? AIState.Wandering : AIState.Idle);
+
+    if(IsAdult)
+    { baseName = jobs[Global.Rand(jobs.Length)];
+      baseKillExp = 3;
+    }
+    else
+    { baseName = Race.ToString().ToLower() + (Global.Coinflip() ? " boy" : " girl");
+      baseKillExp = 1;
+    }
+
+    alwaysHostile=false;
   }
   public Townsperson(SerializationInfo info, StreamingContext context) : base(info, context) { }
-  
-  public override string BaseName { get { return name; } }
+
+  public override void OnHitBy(Entity attacker, object item, Damage damage)
+  { base.OnHitBy(attacker, item, damage);
+    if(SocialGroup!=-1 && attacker.SocialGroup==App.Player.SocialGroup && !Global.GetSocialGroup(SocialGroup).Hostile)
+    { App.IO.Print("You hear an alarm bell ring!");
+      Global.UpdateSocialGroup(SocialGroup, true);
+      Map.MakeNoise(attacker.Position, attacker, Noise.Alert, Map.MaxSound);
+    }
+  }
 
   public override void Generate(int level, EntityClass myClass)
   { base.Generate(level, myClass);
@@ -57,7 +71,7 @@ public class Townsperson : AI
     { SetSkill(Skill.Fighting, 1);
       SetSkill(Skill.UnarmedCombat, 1);
       
-      switch(name)
+      switch(baseName)
       { case "hunter":
           SetSkill(Skill.Fighting, 2);
           SetSkill(Skill.Bow, 3);
@@ -72,7 +86,7 @@ public class Townsperson : AI
           SetSkill(Skill.ShortBlade, 1);
           SetSkill(Skill.LongBlade, 1);
           AlterBaseAttr(Attr.Str, 3);
-          AddItem(new ShortSword());
+          // TODO: give long blade
           // TODO: give armor
           break;
         case "tailor": case "tinkerer":
@@ -80,22 +94,29 @@ public class Townsperson : AI
           AlterBaseAttr(Attr.Dex, 2);
           // TODO: give weapon
           break;
-        case "cleric": case "priestess": case "priest":
+        case "cleric": case "priest":
           SetSkill(Skill.Casting, 3);
           SetSkill(Skill.Channeling, 3);
-          AlterBaseAttr(Attr.Int, 5);
+          AlterBaseAttr(Attr.Int, 4);
+          MP = AlterBaseAttr(Attr.MaxMP, 8);
+
           // TODO: give spells
-          if(name=="cleric")
+          SetSkill(Skill.Telekinesis, 3); // TODO: remove this
+          MemorizeSpell(ForceBolt.Default, -1); // TODO: and this
+
+          if(baseName=="cleric")
           { SetSkill(Skill.Fighting, 2);
             SetSkill(Skill.MaceFlail, 1);
             AlterBaseAttr(Attr.Str, 1);
+            AlterBaseAttr(Attr.Int, 2);
+            MP = AlterBaseAttr(Attr.MaxMP, 8);
             // TODO: give weapon
           }
           break;
         case "carpenter": case "farmer": AlterBaseAttr(Attr.Str, 2); break;
         case "hobo": case "prostitute": case "housewife":
           AlterBaseAttr(Attr.Str, -1);
-          if(name!="hobo" && Global.Coinflip())
+          if(baseName!="hobo" && Global.Coinflip())
           { // TODO: give dagger
           }
           break;
@@ -108,23 +129,33 @@ public class Townsperson : AI
     else
     { AlterBaseAttr(Attr.Str, -1);    // children are weak,
       AlterBaseAttr(Attr.Dex, -1);    // clumsy,
-      AlterBaseAttr(Attr.MaxHP, -5);  // frail,
+      HP = SetBaseAttr(Attr.MaxHP, GetBaseAttr(Attr.MaxHP)/2);  // frail,
       AlterBaseAttr(Attr.Speed, 10);  // and slow
+      if(baseName.IndexOf(" boy")!=-1)
+      { SetSkill(Skill.Dagger, 1);
+        // TODO: give him a knife
+      }
     }
   }
 
   protected bool IsAdult { get { return Color==Color.Cyan; } }
-  
-  protected string name;
-  
+
   static readonly string[] jobs = new string[]
   { // female jobs
-    "housewife", "housewife", "housewife", "prostitute", "priestess", // "housewife"s get selected more often
+    "housewife", "housewife", "housewife", "prostitute", // "housewife"s get selected more often
     // male jobs
-    "farmer", "blacksmith", "tanner", "tinkerer", "carpenter", "hunter", "shepherd", "priest",
+    "farmer", "blacksmith", "tanner", "tinkerer", "carpenter", "hunter", "shepherd",
     // either sex
-    "clerk", "hobo", "tailor", "cleric",
+    "clerk", "hobo", "tailor", "cleric", "priest",
   };
+}
+#endregion
+
+#region Shopkeeper
+[Serializable]
+public class Shopkeeper : AI
+{ public Shopkeeper() { Race=Race.Human; }
+  public Shopkeeper(SerializationInfo info, StreamingContext context) : base(info, context) { }
 }
 #endregion
 

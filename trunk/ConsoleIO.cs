@@ -180,8 +180,8 @@ public sealed class ConsoleIO : InputOutput
         WriteLine(Color.Normal, "{0} (lv{1}, {2})", selected.Name, selected.Level, selected.Class);
         console.WriteLine();
 
-        FieldInfo f = selected.GetType().GetField("Description", BindingFlags.DeclaredOnly|BindingFlags.Public|BindingFlags.Static);
-        if(f!=null) WriteWrapped((string)f.GetValue(null), mapW);
+        string desc = GetString(selected, "Description");
+        if(desc!=null) WriteWrapped(desc, mapW);
         else console.WriteLine("THIS SPELL IS MISSING A DESCRIPTION.");
         console.WriteLine();
 
@@ -291,8 +291,7 @@ public sealed class ConsoleIO : InputOutput
           case '+':
             if(mons.Length>0)
             { monsi = (monsi+1)%mons.Length;
-              lastTarget = mons[monsi];
-              pos = MapToDisplay(lastTarget.Position, viewer.Position);
+              pos = MapToDisplay(mons[monsi].Position, viewer.Position);
               arbitrary=true;
             }
             else goto nextChar;
@@ -300,8 +299,7 @@ public sealed class ConsoleIO : InputOutput
           case '-':
             if(mons.Length>0)
             { monsi = (monsi+mons.Length-1)%mons.Length;
-              lastTarget = mons[monsi];
-              pos = MapToDisplay(lastTarget.Position, viewer.Position);
+              pos = MapToDisplay(mons[monsi].Position, viewer.Position);
               arbitrary=true;
             }
             else goto nextChar;
@@ -316,7 +314,10 @@ public sealed class ConsoleIO : InputOutput
             }
             break;
           case ' ': case '\r': case '\n':
-            if(arbitrary || mpos!=viewer.Position) return new RangeTarget(mpos);
+            if(arbitrary || mpos!=viewer.Position)
+            { if(mpos==mons[monsi].Position) lastTarget = mons[monsi];
+              return new RangeTarget(mpos);
+            }
             else goto nextChar;
           default: goto nextChar;
         }
@@ -475,9 +476,9 @@ public sealed class ConsoleIO : InputOutput
     console.SetCursorPosition(0, 0);
     console.WriteLine("{0} - {1}", item.Char, item.GetInvName(viewer));
     console.WriteLine();
-    string noiseStr=null;
-    if(item.ShortDesc!=null)
-    { WriteWrapped(item.ShortDesc, MapWidth);
+    string noiseStr=null, shortDesc=GetString(item, "ShortDesc"), longDesc=GetString(item, "LongDesc");
+    if(shortDesc!=null)
+    { WriteWrapped(shortDesc, MapWidth);
       console.WriteLine();
     }
     if(item is Modifying)
@@ -541,9 +542,9 @@ public sealed class ConsoleIO : InputOutput
     if(item.Count>1)
       console.WriteLine("They weigh about {0} mt. each ({1} total).", item.Weight, item.FullWeight);
     else console.WriteLine("It weighs about {0} mt.", item.Weight);
-    if(item.LongDesc!=null)
+    if(longDesc!=null)
     { console.WriteLine();
-      WriteWrapped(item.LongDesc, MapWidth);
+      WriteWrapped(longDesc, MapWidth);
     }
     ReadChar();
     RestoreScreen();
@@ -885,9 +886,9 @@ public sealed class ConsoleIO : InputOutput
     console.WriteLine("{0}, Race: {1}", entity.AName, entity.Race);
     console.WriteLine();
 
-    FieldInfo f = entity.GetType().GetField("Description", BindingFlags.DeclaredOnly|BindingFlags.Public|BindingFlags.Static);
-    if(f!=null)
-    { WriteWrapped((string)f.GetValue(null), MapWidth);
+    string desc = GetString(entity, "Description");
+    if(desc!=null)
+    { WriteWrapped(desc, MapWidth);
       console.WriteLine();
     }
     WriteWrapped(Entity.RaceDescs[(int)entity.Race], MapWidth);
@@ -1122,7 +1123,8 @@ Ctrl-P - see old messages";
     Map map = viewer.Memory==null ? viewer.Map : viewer.Memory;
     if(map==viewer.Map)
     { for(int i=0,y=rect.Top; y<rect.Bottom; y++)
-        for(int x=rect.Left; x<rect.Right; i++,x++) buf[i] = TileToChar(map[x,y], true);
+        for(int x=rect.Left; x<rect.Right; i++,x++)
+          buf[i] = TileToChar(map[x,y], true);
       RenderMonsters(map.Entities, vpts, rect);
     }
     else
@@ -1297,6 +1299,11 @@ Ctrl-P - see old messages";
 
   static NTConsole.CharInfo CreatureToChar(Entity c, bool visible)
   { return new NTConsole.CharInfo(raceMap[(int)c.Race], visible ? ColorToAttr(c.Color) : NTConsole.Attribute.DarkGrey);
+  }
+
+  static string GetString(object o, string field)
+  { FieldInfo f = o.GetType().GetField(field, BindingFlags.DeclaredOnly|BindingFlags.Public|BindingFlags.Static);
+    return f==null ? null : (string)f.GetValue(null);
   }
 
   static NTConsole.CharInfo ItemToChar(Item item)

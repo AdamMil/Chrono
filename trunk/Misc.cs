@@ -69,6 +69,16 @@ public class UniqueObject : ISerializable
   public ulong ID;
 }
 
+[Serializable]
+public struct SocialGroup
+{ public SocialGroup(int id, bool hostile, bool permanent)
+  { Entities=new ArrayList(); ID=id; Hostile=hostile; Permanent=permanent;
+  }
+  public ArrayList Entities;
+  public int  ID;
+  public bool Hostile, Permanent;
+}
+
 public struct SpawnInfo
 { public SpawnInfo(Type t)
   { ItemType=t;
@@ -82,10 +92,13 @@ public struct SpawnInfo
 
     f = t.GetField("SpawnMax", flags);
     SpawnMax = f==null ? SpawnMin : (int)f.GetValue(null);
+    
+    f = t.GetField("ShopValue", flags);
+    ShopValue = f==null ? 0 : (int)f.GetValue(null);
   }
 
   public Type ItemType;
-  public int SpawnChance, SpawnMin, SpawnMax;
+  public int SpawnChance, SpawnMin, SpawnMax, ShopValue;
 }
 
 public sealed class Global
@@ -100,6 +113,40 @@ public sealed class Global
   }
 
   public static ulong NextID { get { return nextID++; } }
+
+  #region Social groups
+  public static void AddToSocialGroup(int id, Entity e)
+  { socialGroups[id].Entities.Add(e);
+  }
+
+  public static void RemoveFromSocialGroup(int id, Entity e)
+  { socialGroups[id].Entities.Remove(e);
+    if(!socialGroups[id].Permanent && socialGroups[id].Entities.Count==0)
+    { socialGroups[id].Entities = null;
+      socialGroups[id].ID = -1;
+    }
+  }
+
+  public static SocialGroup GetSocialGroup(int id) { return socialGroups[id]; }
+
+  public static int NewSocialGroup(bool hostile, bool permanent)
+  { int i;
+    for(i=0; i<numSocials; i++) if(socialGroups[i].ID==-1) break;
+
+    if(i==numSocials)
+    { SocialGroup[] narr = new SocialGroup[numSocials==0 ? 8 : numSocials*2];
+      if(numSocials>0) Array.Copy(socialGroups, narr, numSocials);
+      for(int j=numSocials; j<narr.Length; j++) narr[j].ID = -1;
+      socialGroups = narr;
+      numSocials++;
+    }
+
+    socialGroups[i] = new SocialGroup(i, hostile, permanent);
+    return i;
+  }
+
+  public static void UpdateSocialGroup(int id, bool hostile) { socialGroups[id].Hostile = hostile; }
+  #endregion
 
   public static string AorAn(string s)
   { char fc = char.ToLower(s[0]);
@@ -163,6 +210,44 @@ public sealed class Global
     }
   }
 
+  public static Item SpawnItem(SpawnInfo s)
+  { Item item = (Item)s.ItemType.GetConstructor(Type.EmptyTypes).Invoke(null);
+    item.Count = Global.Rand(s.SpawnMax-s.SpawnMin)+s.SpawnMin;
+
+    // (x/10)^0.5 where x=0 to 100, truncated towards 0. bonus = 0 to 3
+    int bonus = (int)Math.Sqrt(Global.Random.NextDouble()*10);
+    if(Global.Rand(100)<15) { item.Curse(); bonus = -bonus; }
+    else if(Global.Rand(100)<8) item.Bless();
+    
+    if(!item.Uncursed) // cursed or blessed
+    { switch(item.Class)
+      { case ItemClass.Armor: case ItemClass.Shield: ((Modifying)item).AC += bonus; break;
+        case ItemClass.Spellbook:
+        { Spellbook book = (Spellbook)item;
+          book.Reads += bonus*2;
+          if(book.Reads<1) book.Reads=1;
+          break;
+        }
+        case ItemClass.Weapon:
+        { Weapon w = (Weapon)item;
+          if(Global.OneIn(10)) w.DamageMod = w.ToHitMod = bonus;
+          else if(Global.Coinflip()) w.DamageMod = bonus;
+          else w.ToHitMod = bonus;
+          break;
+        }
+        default:
+          if(item is Chargeable)
+          { Chargeable c = (Chargeable)item;
+            c.Charges += bonus + Math.Sign(bonus);
+            if(c.Charges<0) c.Charges=0;
+          }
+          break;
+      }
+    }
+
+    return item;
+  }
+
   // bouncing is incompatible with stopAtDest
   public static TraceResult TraceLine(Point start, Point dest, int maxDist, bool stopAtDest,
                                       LinePoint func, object context)
@@ -210,12 +295,18 @@ public sealed class Global
   public static string WithAorAn(string str) { return char.IsDigit(str[0]) ? str : AorAn(str) + ' ' + str; }
 
   public static void Deserialize(System.IO.Stream stream, IFormatter formatter)
-  { Random = (Random)formatter.Deserialize(stream);
+  { socialGroups = (SocialGroup[])formatter.Deserialize(stream);
+    Random = (Random)formatter.Deserialize(stream);
     nextID = (ulong)formatter.Deserialize(stream);
+    spawnIndex = (int)formatter.Deserialize(stream);
+    numSocials = (int)formatter.Deserialize(stream);
   }
   public static void Serialize(System.IO.Stream stream, IFormatter formatter)
-  { formatter.Serialize(stream, Random);
+  { formatter.Serialize(stream, socialGroups);
+    formatter.Serialize(stream, Random);
     formatter.Serialize(stream, nextID);
+    formatter.Serialize(stream, spawnIndex);
+    formatter.Serialize(stream, numSocials);
   }
 
   public static readonly Point[] DirMap = new Point[8]
@@ -226,9 +317,10 @@ public sealed class Global
   public static Hashtable ObjHash;
 
   static SpawnInfo[] objSpawns;
+  static SocialGroup[] socialGroups;
   static Random Random = new Random();
   static ulong nextID=1;
-  static int spawnIndex;
+  static int spawnIndex, numSocials;
 }
 
 } // namespace Chrono

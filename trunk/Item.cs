@@ -150,7 +150,7 @@ public abstract class Item : UniqueObject, ICloneable
     return newItem;
   }
 
-  public string Title, Prefix, PluralPrefix, PluralSuffix, ShortDesc, LongDesc;
+  public string Title, Prefix, PluralPrefix, PluralSuffix;
   public int Age, Count, Weight; // age in map ticks, number in the stack, weight (5 = approx. 1 pound)
   public short Durability;       // 0 - 100 (chance of breaking if thrown), or -1, which uses the default
   public char Char;

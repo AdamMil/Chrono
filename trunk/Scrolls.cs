@@ -83,6 +83,7 @@ public class TeleportScroll : Scroll
   public TeleportScroll(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public static readonly int SpawnChance=100; // 1% chance
+  public static readonly int ShopValue=75;
 }
 
 [Serializable]
@@ -108,6 +109,7 @@ public class IdentifyScroll : Scroll
   }
 
   public static readonly int SpawnChance=250; // 2.5% chance
+  public static readonly int ShopValue=40;
 }
 
 } // namespace Chrono

@@ -26,6 +26,7 @@ public class FoolsBook : Spellbook
   public FoolsBook(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public static readonly int SpawnChance = 10; // 0.1% chance
+  public static readonly int ShopValue = 250;
 }
 
 } // namespace Chrono

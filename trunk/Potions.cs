@@ -59,8 +59,14 @@ public class HealPotion : Potion
 
   public override void Drink(Entity user)
   { user.OnDrink(this);
-    if(user.MaxHP-user.HP>0)
-    { user.HP += Global.NdN(4, 6);
+    if(Cursed)
+    { Damage d = new Damage();
+      d.Poison = 1;
+      user.DoDamage(this, Death.Sickness, d);
+      if(user==App.Player) App.IO.Print("Eww, this tastes putrid!");
+    }
+    else if(user.MaxHP-user.HP>0)
+    { user.HP += Global.NdN(4, 6) * (Blessed ? 2 : 1);
       if(user==App.Player) App.IO.Print("You feel better.");
       else if(App.Player.CanSee(user)) App.IO.Print("{0} looks better.", user.TheName);
     }
@@ -71,6 +77,7 @@ public class HealPotion : Potion
   public override bool Hit(Entity user, Entity hit) { return true; }
 
   public static readonly int SpawnChance=200; // 2% chance
+  public static readonly int ShopValue=50;
 }
 
 } // namespace Chrono

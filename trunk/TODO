@@ -25,7 +25,6 @@ save when moving between levels, load levels on demand, unload unused levels
 redo formula for MaxHP/MaxMP gain (make based somewhat on race)
 make the AI affected by carry weight (unable to move, etc)
 fix bug where if an orc is on the up stairs, you'll be placed over it (prevent enemies from being spawned on stairs?)
-improve AI's Wander()
 in places where SPACE means page down, make it mean page down or close the menu/etc if we're already on the last page
 make pressing characters representing an item class toggle all items of that class in menus (ie '!' toggles potions)
 speed up item cloning!
@@ -37,6 +36,9 @@ add other tiles like Town (eg. Cave)
 make lava burn entities, ice freeze them, etc (on base think?)
 move items burning/freezing/bursting etc to TrySpellDamage
 make the map generators use only their own random number generators. or else make them all use Global.*
-add HP base values for races (ie, stronger races get more)?
+add HP (and MP?) base values for races (ie, stronger races get more)?
 add animals to the town
-make AI use spells
+allow stealthy kills (if attacking an unalerted creature and the blow is fatal, the creature doesn't scream.
+  or, just make creatures scream on their turn [which should have the same effect])
+amplify damage against unalerted creatures
+add ability to jump to monsters in DisplayMap (like in ChooseTarget)

@@ -27,10 +27,9 @@ public sealed class App
         if(map[x, y].Type==TileType.UpStairs) { Player.X = x; Player.Y = y; break; }
     Player.SetRawAttr(Attr.AC, 7);
     Player.SetRawAttr(Attr.EV, 6);
-    Player.SetRawAttr(Attr.Stealth, 5);
-    //Player.Pickup(new ShortSword());
+    Player.SetRawAttr(Attr.Stealth, 10);
     Player.Pickup(new Dart()).Count = 20;
-    Player.Pickup(new TwigOfDeath());
+    Player.Pickup(new ShortSword());
     Player.Pickup(new Buckler());
     Player.Pickup(new PaperBag());
     Player.Pickup(new Hamburger());

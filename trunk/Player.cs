@@ -351,6 +351,17 @@ public class Player : Entity
         done: break;
       }
 
+      case Action.Throw:
+      { MenuItem[] items = App.IO.ChooseItem("Throw which item?", Inv, MenuFlag.None, ItemClass.Any);
+        if(items.Length==0) goto nevermind;
+        if(Wearing(items[0].Item)) { App.IO.Print("You can't throw something you're wearing!"); goto next; }
+        RangeTarget rt = App.IO.ChooseTarget(this, true);
+        if(rt.Dir!=Direction.Invalid) ThrowItem(items[0].Item, rt.Dir);
+        else if(rt.Point.X!=-1) ThrowItem(items[0].Item, rt.Point);
+        else goto nevermind;
+        break;
+      }
+
       case Action.UseItem:
       { Inventory inv = new Inventory();
         foreach(Item ii in Inv) if(ii.Usability!=ItemUse.NoUse) inv.Add(ii);
@@ -487,17 +498,22 @@ public class Player : Entity
   public override void OnDrink(Potion potion) { App.IO.Print("You drink {0}.", potion); }
   public override void OnDrop(Item item) { App.IO.Print("You drop {0}.", item); }
   public override void OnEquip(Wieldable item) { App.IO.Print("You equip {0}.", item); }
-  public override void OnHit(Entity hit, Weapon w, int damage)
-  { App.IO.Print(damage>0 ? "You hit {0}." : "You hit {0}, but do no damage.", hit.theName);
+  public override void OnHit(Entity hit, Item item, int damage)
+  { if(item==null || item is Weapon)
+      App.IO.Print(damage>0 ? "You hit {0}." : "You hit {0}, but do no damage.", hit.theName);
   }
-  public override void OnHitBy(Entity hit, Weapon w, int damage)
+  public override void OnHitBy(Entity hit, Item item, int damage)
   { Interrupt();
     App.IO.Print(damage>0 ? "{0} hits you!" : "{0} hits you, but does no damage.", hit.TheName);
   }
   public override void OnInvoke(Item item) { App.IO.Print("You invoke {0}.", item); }
   public override void OnKill(Entity killed) { App.IO.Print("You kill {0}!", killed.TheName); }
-  public override void OnMiss(Entity hit, Weapon w) { App.IO.Print("You miss {0}.", hit.theName); }
-  public override void OnMissBy(Entity hit, Weapon w) { App.IO.Print("{0} misses you.", hit.TheName); }
+  public override void OnMiss(Entity hit, Item item)
+  { if(item==null || item is Weapon) App.IO.Print("You miss {0}.", hit.theName);
+  }
+  public override void OnMissBy(Entity hit, Item item)
+  { App.IO.Print("{0} misses you.", hit.TheName);
+  }
   public override void OnNoise(Entity source, Noise type, int volume)
   { if(type==Noise.Alert) { App.IO.Print("You hear a shout!"); Interrupt(); }
   }

@@ -10,7 +10,11 @@ public abstract class AI : Entity
 { public AIState State { get { return state; } }
 
   public override void Die(Entity killer, Item impl) { Die(); }
-  public override void Die(Death cause) { Die(); }
+  public override void Die(Death cause)
+  { if((cause==Death.Sickness || cause==Death.Starvation) && App.Player.CanSee(this))
+      App.IO.Print(TheName+" falls to the ground, dead.");
+    Die();
+  }
 
   public override void Generate(int level, EntityClass myClass)
   { base.Generate(level, myClass);
@@ -36,7 +40,7 @@ public abstract class AI : Entity
   }
   public override void OnDrop(Item item) { if(App.Player.CanSee(this)) App.IO.Print("{0} drops {1}.", TheName, item); }
   public override void OnEquip(Wieldable item)
-  { if(App.Player.CanSee(this)) App.IO.Print("{0} equips {1}.", TheName, item.FullName);
+  { if(App.Player.CanSee(this)) App.IO.Print("{0}{1}.", TheName, item.FullName);
   }
   public override void OnPickup(Item item)
   { if(App.Player.CanSee(this)) App.IO.Print("{0} picks up {1}.", TheName, item.FullName);
@@ -47,7 +51,9 @@ public abstract class AI : Entity
   public override void OnRemove(Wearable item)
   { if(App.Player.CanSee(this)) App.IO.Print("{0} removes {1}.", TheName, item.FullName);
   }
-  public override void OnSick(string howSick) { if(App.Player.CanSee(this)) App.IO.Print("{0} looks {1}.", TheName); }
+  public override void OnSick(string howSick)
+  { if(App.Player.CanSee(this)) App.IO.Print("{0} looks {1}.", TheName, howSick);
+  }
   public override void OnSkillUp(Skill skill)
   { if(App.Player.CanSee(this)) App.IO.Print("{0} looks more experienced.", TheName);
   }

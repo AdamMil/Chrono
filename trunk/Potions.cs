@@ -1,4 +1,5 @@
 using System;
+using System.Drawing;
 
 namespace Chrono
 {
@@ -29,6 +30,9 @@ public class HealPotion : Potion
     }
     else if(user==App.Player) App.IO.Print("Nothing seems to happen.");
   }
+
+  public override bool Hit(Entity user, Point pos) { return true; }
+  public override bool Hit(Entity user, Entity hit) { return true; }
 }
 
 } // namespace Chrono

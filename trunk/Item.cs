@@ -1,4 +1,5 @@
 using System;
+using System.Drawing;
 
 namespace Chrono
 {
@@ -13,13 +14,13 @@ public enum ItemClass
 #region Item
 public abstract class Item : ICloneable
 { public Item()
-  { Prefix="a "; PluralPrefix=string.Empty; PluralSuffix="s"; Count=1; Color=Color.White;
+  { Prefix="a "; PluralPrefix=string.Empty; PluralSuffix="s"; Count=1; Color=Color.White; Durability=-1;
   }
   protected Item(Item item)
   { name=item.name; Title=item.Title; Class=item.Class;
     Prefix=item.Prefix; PluralPrefix=item.PluralPrefix; PluralSuffix=item.PluralSuffix;
     Age=item.Age; Count=item.Count; Weight=item.Weight; Color=item.Color; Char=item.Char;
-    Usability=item.Usability;
+    Usability=item.Usability; Durability=item.Durability;
   }
 
   public virtual bool Think(Entity holder) { Age++; return false; }
@@ -43,24 +44,29 @@ public abstract class Item : ICloneable
   public virtual object Clone() { return GetType().GetConstructor(copyCons).Invoke(new object[] { this }); }
   #endregion
 
+  public virtual bool CanStackWith(Item item)
+  { if(item.Title!=null || Title!=null || item.GetType() != GetType()) return false;
+    if(Class==ItemClass.Food || Class==ItemClass.Potion || Class==ItemClass.Scroll || Class==ItemClass.Ammo ||
+       Class==ItemClass.Weapon && Class==ItemClass.Treasure)
+      return true;
+    return false;
+  }
+
+  // item is thrown at or bashed on an entity. returns true if item should be destroyed
+  public virtual bool Hit(Entity user, Point pos) { return false; }
+  public virtual bool Hit(Entity user, Entity hit) { return false; }
+
+  public virtual bool Invoke(Entity user)
+  { if(user==App.Player) App.IO.Print("Nothing seems to happen.");
+    return false;
+  }
+
   public virtual bool Use(Entity user, Direction dir) // returns true if item should be consumed
   { if((Usability&ItemUse.UseDirection)==0 && (int)dir<8) return Use(user, Global.Move(user.Position, dir));
     if(user==App.Player) App.IO.Print("Nothing seems to happen.");
     return false;
   }
   public virtual bool Use(Entity user, System.Drawing.Point target) // returns true item should be consumed
-  { if(user==App.Player) App.IO.Print("Nothing seems to happen.");
-    return false;
-  }
-
-  public virtual bool CanStackWith(Item item)
-  { if(item.Title!=null || Title!=null || item.GetType() != GetType()) return false;
-    if(Class==ItemClass.Food || Class==ItemClass.Potion || Class==ItemClass.Scroll || Class==ItemClass.Treasure)
-      return true;
-    return false;
-  }
-
-  public virtual bool Invoke(Entity user)
   { if(user==App.Player) App.IO.Print("Nothing seems to happen.");
     return false;
   }
@@ -80,6 +86,7 @@ public abstract class Item : ICloneable
 
   public string Title, Prefix, PluralPrefix, PluralSuffix, ShortDesc, LongDesc;
   public int Age, Count, Weight; // age in map ticks, number in the stack, weight (5 = approx. 1 pound)
+  public int Durability;         // 0 - 100 (chance of breaking if thrown), or -1, which uses the default
   public ItemClass Class;
   public Color Color;
   public char Char;
@@ -93,7 +100,7 @@ public abstract class Item : ICloneable
 
 public abstract class Modifying : Item
 { protected Modifying() { }
-  protected Modifying(Item item)
+  protected Modifying(Item item) : base(item)
   { Modifying mi = (Modifying)item; Mods=(int[])mi.Mods.Clone(); FlagMods=mi.FlagMods;
   }
 
@@ -139,7 +146,7 @@ public abstract class Wearable : Modifying
 
 public abstract class Wieldable : Modifying
 { protected Wieldable() { }
-  protected Wieldable(Item item)
+  protected Wieldable(Item item) : base(item)
   { Wieldable wi = (Wieldable)item; Exercises=wi.Exercises; AllHandWield=wi.AllHandWield;
   }
   public override string InvName

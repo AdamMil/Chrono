@@ -8,7 +8,7 @@ public class Corpse : Item
   { Class = ItemClass.Corpse; Color = of.Color; Weight=raceWeight[(int)of.Race];
     name  = of.Race.ToString().ToLower() + " corpse"; Prefix = Global.AorAn(name)+' ';
     CorpseOf = of;
-    if(of.Sickness>0) Tainted=true;
+    if(of.Sickness>1) Tainted=true;
   }
 
   public override bool Think(Entity holder)

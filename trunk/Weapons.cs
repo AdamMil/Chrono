@@ -14,6 +14,11 @@ public abstract class Weapon : Wieldable
     wClass=ow.wClass; Delay=ow.Delay; Noise=ow.Noise; ToHitBonus=ow.ToHitBonus; Ranged=ow.Ranged;
   }
 
+  public override bool CanStackWith(Item item)
+  { return wClass==WeaponClass.Thrown && item.Title==null && Title==null && item.GetType()==GetType() &&
+           ((Weapon)item).wClass==wClass;
+  }
+
   public abstract int CalculateDamage(Entity user, Entity target); // target can be null
 
   public WeaponClass wClass;
@@ -24,10 +29,15 @@ public abstract class Weapon : Wieldable
 }
 
 public class Dart : Weapon
-{ public Dart() { wClass=WeaponClass.Thrown; Ranged=true; name="dart"; Weight=1; }
+{ public Dart() { wClass=WeaponClass.Thrown; Ranged=true; name="poisoned dart"; Weight=2; }
   public Dart(Item item) : base(item) { }
   
-  public override int CalculateDamage(Entity user, Entity target) { return Global.NdN(1, 3) + user.StrBonus; }
+  public override bool Hit(Entity user, Entity hit)
+  { if(Global.Rand(100)<100/(hit.Sickness+1)) hit.Sickness++;
+    return false;
+  }
+
+  public override int CalculateDamage(Entity user, Entity target) { return Global.NdN(1, 3) + user.StrBonus/2; }
 }
 
 public class ShortSword : Weapon

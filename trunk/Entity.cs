@@ -43,7 +43,7 @@ public enum Slot // where an item can be worn
 }
 
 public abstract class Entity
-{ public Entity() { ExpLevel=1; }
+{ public Entity() { ExpLevel=1; Smell=Map.MaxScentAdd/2; }
   [Flags] public enum Flag { None=0, Confused=1, Hallucinating=2, Asleep=4, Invisible=8, SeeInvisible=16 }
 
   // all of these apply modifiers from items where applicable
@@ -664,7 +664,7 @@ public abstract class Entity
   protected const int HungryAt=500, StarvingAt=800, StarveAt=1000;
 
   // calculates our unarmed combat damage without skill bonuses
-  protected virtual int CalculateDamage() { return Global.NdN(1, (Str*2+2)/3); }
+  protected virtual int CalculateDamage() { return Global.NdN(1, 5)+StrBonus; }
 
   // called when the creature is added to or removed from a map
   protected internal virtual void OnMapChanged() { }

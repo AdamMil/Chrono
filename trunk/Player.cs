@@ -341,21 +341,23 @@ public class Player : Entity
 
       case Action.UseItem:
       { Inventory inv = new Inventory();
-        foreach(Item ii in Inv) if(ii.UseDirection || ii.UseTarget) inv.Add(ii);
+        foreach(Item ii in Inv) if(ii.Usability!=ItemUse.NoUse) inv.Add(ii);
+        if(inv.Count==0) { App.IO.Print("You have no useable items."); goto next; }
         MenuItem[] items = App.IO.ChooseItem("Use which item?", inv, MenuFlag.None, ItemClass.Any);
         if(items.Length==0) goto nevermind;
         Item i = items[0].Item;
         bool consume;
-        if(i.UseTarget)
-        { RangeTarget r = App.IO.ChooseTarget(this, i.UseDirection);
+        if((i.Usability&ItemUse.UseTarget)!=0)
+        { RangeTarget r = App.IO.ChooseTarget(this, (i.Usability&ItemUse.UseDirection)!=0);
           if(r.Dir==Direction.Invalid && r.Point.X==-1) goto nevermind;
           consume = r.Dir==Direction.Invalid ? i.Use(this, r.Point) : i.Use(this, r.Dir);
         }
-        else
+        else if(i.Usability==ItemUse.UseDirection)
         { Direction d = App.IO.ChooseDirection();
           if(d==Direction.Invalid) goto nevermind;
           consume = i.Use(this, d);
         }
+        else consume = i.Use(this, Direction.Self);
         if(consume)
         { if(i.Count>1) i.Count--;
           else Inv.Remove(i.Char);
@@ -450,7 +452,7 @@ public class Player : Entity
       Interrupt();
     }
     
-    Smell += Map.MaxScentAdd/100; // smelliness refills from 0 over 100 turns
+    Smell += Map.MaxScentAdd/200; // smelliness refills from 0 over 200 turns
     Map.AddScent(X, Y, Smell);
     Map.SpreadScent();
   }

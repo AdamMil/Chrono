@@ -28,3 +28,4 @@ add the ability to break wands
 alert AI when any damage is taken
 make some spells hit doors, etc (generalize the code to damage tiles)
 handing choosing an above/below directional target
+make ESC skip all --more-- prompts

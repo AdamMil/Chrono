@@ -306,6 +306,7 @@ public abstract class Entity
   public bool CanRemove(Slot slot) { return true; }
   public bool CanRemove(Wearable item) { return true; }
   // true if there's a line of sight to the given creature/tile
+  // FIXME: there's a disparity here. if creature==this, LookAt() says we can't see it, but CanSee says we can
   public bool CanSee(Entity creature) { return this==creature || LookAt(creature) != Direction.Invalid; }
   public bool CanSee(Point point) { return Position==point || LookAt(point) != Direction.Invalid; }
   // true if item can be unequipped (not cursed, etc) or hand is empty

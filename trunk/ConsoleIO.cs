@@ -31,8 +31,8 @@ public sealed class ConsoleIO : InputOutput
     bool doRebuke=false;
     TextInput = true;
     while(true)
-    { if(doRebuke) AddLine(color, rebuke, false);
-      AddLine(color, sprompt);
+    { if(doRebuke) AddLine(color, rebuke);
+      AddLine(color, sprompt, true);
       SetCursorAtEOBL();
       string answer = console.ReadLine();
       AppendToBL(answer);
@@ -48,8 +48,8 @@ public sealed class ConsoleIO : InputOutput
     TextInput = true;
     if(rebuke==null) rebuke = "Invalid selection!";
     while(true)
-    { if(doRebuke) AddLine(color, rebuke, false);
-      AddLine(color, sprompt);
+    { if(doRebuke) AddLine(color, rebuke);
+      AddLine(color, sprompt, true);
       SetCursorAtEOBL();
       char c = ReadChar(true);
       if(c=='\r' || c=='\n' || rec.Key.VirtualKey==NTConsole.Key.Escape) c = defaultChar;
@@ -91,8 +91,8 @@ public sealed class ConsoleIO : InputOutput
     TextInput = true;
     while(true)
     { int num=-1;
-      if(doRebuke) AddLine("Invalid selection!", false);
-      AddLine(sprompt);
+      if(doRebuke) AddLine("Invalid selection!");
+      AddLine(sprompt, true);
       SetCursorAtEOBL();
       char c = ReadChar(true);
       if(c=='\r' || c=='\n' || rec.Key.VirtualKey==NTConsole.Key.Escape) return new MenuItem[0];
@@ -102,7 +102,7 @@ public sealed class ConsoleIO : InputOutput
         while(char.IsDigit(c=ReadChar(true))) num = c-'0' + num*10;
       }
       if(num<-1 || num==0 || chars.IndexOf(c)==-1) { doRebuke=true; continue; }
-      if(char.IsLetter(c) && num>items[c].Count) { AddLine("You don't have that many!"); continue; }
+      if(char.IsLetter(c) && num>items[c].Count) { AddLine("You don't have that many!", true); continue; }
       TextInput = false;
       if(c=='-') return new MenuItem[1] { new MenuItem(null, 0) };
       if(c=='?') return Menu(items, flags, classes);
@@ -126,7 +126,7 @@ public sealed class ConsoleIO : InputOutput
         if(pos.Y<0) pos.Y=0;
         else if(pos.Y>=mapH) pos.X=mapH-1;
         mpos = DisplayToMap(pos, viewer.Position);
-        if(first) { AddLine("Choose target [direction or *+-= to target creatures]:"); first=false; }
+        if(first) { AddLine("Choose target [direction or *+-= to target creatures]:", true); first=false; }
         else DescribeTile(viewer, mpos, vpts);
         
         if(spell!=null)
@@ -134,12 +134,10 @@ public sealed class ConsoleIO : InputOutput
           if(affected!=null && affected.Count>0)
           { RenderMap(viewer, viewer.Position, vpts);
             foreach(Point ap in affected)
-              for(int i=0; i<vpts.Length; i++)
-                if(vpts[i]==ap)
-                { Point pt = MapToDisplay(ap, viewer.Position);
-                  buf[pt.Y*mapW+pt.X].Attributes |= NTConsole.ForeToBack(NTConsole.Attribute.Red);
-                  break;
-                }
+              if(viewer.Memory[ap].Type!=TileType.Border)
+              { Point pt = MapToDisplay(ap, viewer.Position);
+                buf[pt.Y*mapW+pt.X].Attributes |= NTConsole.ForeToBack(NTConsole.Attribute.Red);
+              }
             console.PutBlock(0, 0, 0, 0, mapW, mapH, buf);
           }
         }
@@ -188,7 +186,7 @@ public sealed class ConsoleIO : InputOutput
           case '@': pos = new Point(mapW/2, mapH/2); break;
           case '<': if(!arbitrary) return new RangeTarget(Direction.Above); break;
           case '>': if(!arbitrary) return new RangeTarget(Direction.Below); break;
-          case '*': AddLine("Move cursor to target position."); arbitrary=true; goto nextChar;
+          case '*': AddLine("Move cursor to target position.", true); arbitrary=true; goto nextChar;
           case '+':
             if(mons.Length>0)
             { monsi = (monsi+1)%mons.Length;
@@ -596,6 +594,7 @@ public sealed class ConsoleIO : InputOutput
     RenderStats(viewer);
     SetCursorToPlayer();
     uncleared = 0;
+    DrawLines();
   }
 
   public override void SetTitle(string title) { console.Title = title; }
@@ -618,7 +617,7 @@ public sealed class ConsoleIO : InputOutput
 
   int LineSpace { get { return console.Height-MapHeight-1; } }
   int MapWidth  { get { return Math.Max(console.Width-30, 50); } }
-  int MapHeight { get { return Math.Max(console.Height-16, 40); } }
+  int MapHeight { get { return 1; } } //Math.Max(console.Height-16, 40); } }
 
   bool TextInput
   { get { return inputMode; }
@@ -632,9 +631,9 @@ public sealed class ConsoleIO : InputOutput
     }
   }
 
-  void AddLine(string line) { AddLine(Color.Normal, line, true); }
+  void AddLine(string line) { AddLine(Color.Normal, line, false); }
   void AddLine(string line, bool redraw) { AddLine(Color.Normal, line, redraw); }
-  void AddLine(Color color, string line) { AddLine(color, line, true); }
+  void AddLine(Color color, string line) { AddLine(color, line, false); }
   void AddLine(Color color, string line, bool redraw)
   { uncleared += LineHeight(line);
     if(!TextInput && uncleared >= LineSpace-1)
@@ -706,20 +705,20 @@ public sealed class ConsoleIO : InputOutput
     lines.Clear(); uncleared=0;
     if(!visible)
     { if(viewer.Memory[pos].Type==TileType.Border) { AddLine("You can't see that position."); return; }  
-      AddLine("You can't see that position, but here's what you remember:", false);
+      AddLine("You can't see that position, but here's what you remember:");
     }
     Map map = visible ? viewer.Map : viewer.Memory;
 
-    AddLine(map[pos].Type.ToString()+'.', false);
+    AddLine(map[pos].Type.ToString()+'.');
     Entity e = visible ? map.GetEntity(pos) : map[pos].Entity;
     if(e!=null)
     { string prefix = e==viewer ? "You are" : "{0} is";
-      AddLine(string.Format(prefix+" here.", e.AName), false);
+      AddLine(string.Format(prefix+" here.", e.AName));
       Weapon w = e.Weapon;
-      if(w!=null) AddLine(string.Format(prefix+" wielding {1} {2}.", "It", Global.AorAn(w.Name), w.Name), false);
+      if(w!=null) AddLine(string.Format(prefix+" wielding {1} {2}.", "It", Global.AorAn(w.Name), w.Name));
       if(e!=viewer && e is AI)
       { AI ai = (AI)e;
-        if(ai.State != AIState.Alerted) AddLine("It doesn't appear to have noticed you.", false);
+        if(ai.State != AIState.Alerted) AddLine("It doesn't appear to have noticed you.");
       }
     }
     if(viewer.Map.HasItems(pos)) DisplayTileItems(map[pos].Items, visible);

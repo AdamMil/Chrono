@@ -52,8 +52,12 @@ public sealed class ConsoleIO : InputOutput
       AddLine(color, sprompt);
       console.SetCursorPosition(sprompt.Length, Math.Min(uncleared, LineSpace)+MapHeight-1);
       char c = ReadChar();
-      if(c=='\r') c = defaultChar;
-      if(chars==null || (caseInsensitive ? chars.ToLower() : chars).IndexOf(c) != -1) { TextInput = false; return c; }
+      if(c=='\r' || rec.Key.VirtualKey==NTConsole.Key.Escape) c = defaultChar;
+      if(chars==null || c==defaultChar ||
+         (caseInsensitive ? chars.ToLower() : chars).IndexOf(c) != -1)
+      { TextInput = false;
+        return c;
+      }
       doRebuke = true;
     }
   }
@@ -158,6 +162,10 @@ public sealed class ConsoleIO : InputOutput
             break;
           case '.': inp.Action = Action.Rest; break;
           case ',': inp.Action = Action.Pickup; break;
+          case 'd': inp.Action = Action.Drop; break;
+          case 'D': inp.Action = Action.DropType; break;
+          case '<': inp.Action = Action.GoUp; break;
+          case '>': inp.Action = Action.GoDown; break;
           case 'c': inp.Action = Action.CloseDoor; break;
           case 'o': inp.Action = Action.OpenDoor; break;
           case '/':
@@ -216,7 +224,8 @@ public sealed class ConsoleIO : InputOutput
   public override void SetTitle(string title) { console.Title = title; }
 
   public override bool YesNo(Color color, string prompt, bool defaultYes)
-  { return Char.ToLower(CharChoice(color, prompt, defaultYes ? "Yn" : "yN", defaultYes ? 'y' : 'n', true, null))=='y';
+  { char c = CharChoice(color, prompt, defaultYes ? "Yn" : "yN", defaultYes ? 'y' : 'n', true, null);
+    return c==0 ? defaultYes : Char.ToLower(c)=='y';
   }
 
   struct Line

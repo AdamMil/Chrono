@@ -35,7 +35,19 @@ public sealed class Inventory : ICollection
     ret.items = (SortedList)items.Clone();
     return ret;
   }
-  
+
+  public string CharString()
+  { string ret=string.Empty;
+    foreach(Item i in items.Values) ret += i.Char;
+    return ret;
+  }
+
+  public string CharString(ItemClass itemClass)
+  { string ret=string.Empty;
+    foreach(Item i in items.Values) if(i.Class==itemClass) ret += i.Char;
+    return ret;
+  }
+
   public void Remove(Item item) { items.RemoveAt(items.IndexOfValue(item)); }
   public void RemoveAt(int index) { items.RemoveAt(index); }
 

@@ -32,3 +32,4 @@ speed up item cloning!
 clone entities into memory as well as items
 add ways to raise natural resistances
 improve AI's RunAway() so it will go through doors more often
+make Open and Close (and maybe other commands) target automatically if only one door is around

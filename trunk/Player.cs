@@ -112,10 +112,22 @@ public class Player : Entity
         break;
       }
 
+      case Action.ExamineTile: App.IO.ExamineTile(this, Position); goto next;
+
       case Action.Fire:
-      { Direction d = App.IO.ChooseDirection(false, false);
-        if(d==Direction.Invalid) goto nevermind;
-        Attack(d);
+      { Weapon w = Weapon;
+        if(w==null) { App.IO.Print("You have no weapon equipped!"); goto next; }
+        else if(w.Ranged)
+        { RangeTarget rt = App.IO.ChooseTarget(this, true);
+          if(rt.Dir!=Direction.Invalid) Attack(rt.Dir);
+          else if(rt.Point.X!=-1) Attack(rt.Point);
+          else goto nevermind;
+        }
+        else
+        { Direction d = App.IO.ChooseDirection(false, false);
+          if(d==Direction.Invalid) goto nevermind;
+          Attack(d);
+        }
         break;
       }
 
@@ -160,7 +172,7 @@ public class Player : Entity
       case Action.Move:
       { Point np = Global.Move(Position, inp.Direction);
         Entity c = Map.GetEntity(np);
-        if(c!=null) Attack(c);
+        if(c!=null) Attack(np); // FIXME: this sucks
         else if(Map.IsPassable(np))
         { Position = np;
           int noise = (10-Stealth)*12; // stealth = 0 to 10
@@ -368,7 +380,7 @@ public class Player : Entity
       case Action.ViewItem:
       { MenuItem[] items = App.IO.ChooseItem("Examine which item?", Inv, MenuFlag.None, ItemClass.Any);
         if(items.Length==0) goto nevermind;
-        App.IO.ViewItem(items[0].Item);
+        App.IO.ExamineItem(this, items[0].Item);
         goto next;
       }
 
@@ -496,10 +508,7 @@ public class Player : Entity
   { App.IO.Print(Color.Green, "Your {0} skill went up!", skill.ToString().ToLower());
   }
   public override void OnUnequip(Wieldable item) { App.IO.Print("You unequip {0}.", item); }
-  public override void OnWear(Wearable item)
-  { if(item.EquipText!=null) App.IO.Print(item.EquipText);
-    else App.IO.Print("You put on {0}.", item);
-  }
+  public override void OnWear(Wearable item) { App.IO.Print("You put on {0}.", item); }
 
   protected internal override void OnMapChanged()
   { base.OnMapChanged();

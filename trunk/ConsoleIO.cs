@@ -312,6 +312,64 @@ public sealed class ConsoleIO : InputOutput
     renderStats=true;
   }
 
+  public override void ExamineItem(Entity viewer, Item item)
+  { ClearScreen();
+    console.SetCursorPosition(0, 0);
+    console.WriteLine("{0} - {1}", item.Char, item.InvName);
+    console.WriteLine();
+    if(item.ShortDesc!=null)
+    { WriteWrapped(item.ShortDesc, MapWidth);
+      console.WriteLine();
+    }
+    if(item is Modifying)
+    { Modifying mod = (Modifying)item;
+      if(mod.AC!=0) console.WriteLine("Armor {0}: {1}", mod.AC<0 ? "penalty" : "bonus", mod.AC);
+      if(mod.Dex!=0) console.WriteLine("Dexterity modifier: {0}", mod.Dex);
+      if(mod.EV!=0) console.WriteLine("Evasion modifier: {0}", mod.EV);
+      if(mod.Int!=0) console.WriteLine("Intelligence modifier: {0}", mod.Int);
+      if(mod.Speed!=0) console.WriteLine("Speed modifier: {0}", mod.Speed);
+      if(mod.Str!=0) console.WriteLine("Strength modifier: {0}", mod.Str);
+    }
+    if(item is Chargeable)
+    { Chargeable ch = (Chargeable)item;
+      console.WriteLine("This item has {0} charges remaining.", ch.Charges);
+      if(ch.Recharged>0) console.WriteLine("This item has been recharged {0} times.", ch.Recharged);
+    }
+    if(item is Weapon)
+    { Weapon w = (Weapon)item;
+      if(w.Delay!=0) console.WriteLine("Attack delay: {0}%", w.Delay);
+      if(w.Noise==0) console.WriteLine("This weapon is silent (noise=0).");
+      else if(w.Noise<4) console.WriteLine("This weapon is rather quiet (noise={0}).", w.Noise);
+      else if(w.Noise<8) console.WriteLine("This weapon is quite noisy (noise={0}).", w.Noise);
+      else console.WriteLine("This weapon is extremely noisy (noise={0}).", w.Noise);
+      if(w.ToHitBonus!=0) console.WriteLine("To hit {0}: {1}", w.ToHitBonus<0 ? "penalty" : "bonus", w.ToHitBonus);
+      console.WriteLine("It falls into the '{0}' category.", w.wClass.ToString().ToLower());
+    }
+    else if(item is Shield)
+    { Shield s = (Shield)item;
+      console.WriteLine("Chance to block: {0}%", s.BlockChance);
+    }
+    if(item is Wieldable)
+    { Wieldable w = (Wieldable)item;
+      console.WriteLine("It is a {0}-handed item.", w.AllHandWield ? "two" : "one");
+      console.WriteLine("This item is better for the {0}.",
+                        w.Exercises==Attr.Str ? "strong" : w.Exercises==Attr.Dex ? "dexterous" : "intelligent");
+    }
+    if(item.Count>1)
+      console.WriteLine("They weigh about {0} mt. each ({1} total).", item.Weight, item.Weight*item.Count);
+    else console.WriteLine("It weighs about {0} mt.", item.Weight);
+    if(item.LongDesc!=null)
+    { console.WriteLine();
+      WriteWrapped(item.LongDesc, MapWidth);
+    }
+    ReadChar();
+    RestoreScreen();
+  }
+
+  public override void ExamineTile(Entity viewer, Point pos)
+  { DescribeTile(viewer, pos, viewer.VisibleTiles());
+  }
+
   public override void ManageSkills(Entity player)
   { ClearScreen();
     console.SetCursorPosition(0, 0);
@@ -492,6 +550,7 @@ public sealed class ConsoleIO : InputOutput
         case '<': inp.Action = Action.GoUp; break;
         case '>': inp.Action = Action.GoDown; break;
         case '=': inp.Action = Action.Reassign; break;
+        case ':': inp.Action = Action.ExamineTile; break;
         case '\'':inp.Action = Action.SwapAB; break;
         case '/':
           inp.Direction = CharToDirection(ReadChar());
@@ -516,60 +575,6 @@ public sealed class ConsoleIO : InputOutput
   }
 
   public override void SetTitle(string title) { console.Title = title; }
-
-  public override void ViewItem(Item item)
-  { ClearScreen();
-    console.SetCursorPosition(0, 0);
-    console.WriteLine("{0} - {1}", item.Char, item.InvName);
-    console.WriteLine();
-    if(item.ShortDesc!=null)
-    { WriteWrapped(item.ShortDesc, MapWidth);
-      console.WriteLine();
-    }
-    if(item is Modifying)
-    { Modifying mod = (Modifying)item;
-      if(mod.AC!=0) console.WriteLine("Armor {0}: {1}", mod.AC<0 ? "penalty" : "bonus", mod.AC);
-      if(mod.Dex!=0) console.WriteLine("Dexterity modifier: {0}", mod.Dex);
-      if(mod.EV!=0) console.WriteLine("Evasion modifier: {0}", mod.EV);
-      if(mod.Int!=0) console.WriteLine("Intelligence modifier: {0}", mod.Int);
-      if(mod.Speed!=0) console.WriteLine("Speed modifier: {0}", mod.Speed);
-      if(mod.Str!=0) console.WriteLine("Strength modifier: {0}", mod.Str);
-    }
-    if(item is Chargeable)
-    { Chargeable ch = (Chargeable)item;
-      console.WriteLine("This item has {0} charges remaining.", ch.Charges);
-      if(ch.Recharged>0) console.WriteLine("This item has been recharged {0} times.", ch.Recharged);
-    }
-    if(item is Weapon)
-    { Weapon w = (Weapon)item;
-      if(w.Delay!=0) console.WriteLine("Attack delay: {0}%", w.Delay);
-      if(w.Noise==0) console.WriteLine("This weapon is silent (noise=0).");
-      else if(w.Noise<4) console.WriteLine("This weapon is rather quiet (noise={0}).", w.Noise);
-      else if(w.Noise<8) console.WriteLine("This weapon is quite noisy (noise={0}).", w.Noise);
-      else console.WriteLine("This weapon is extremely noisy (noise={0}).", w.Noise);
-      if(w.ToHitBonus!=0) console.WriteLine("To hit {0}: {1}", w.ToHitBonus<0 ? "penalty" : "bonus", w.ToHitBonus);
-      console.WriteLine("It falls into the '{0}' category.", w.wClass.ToString().ToLower());
-    }
-    else if(item is Shield)
-    { Shield s = (Shield)item;
-      console.WriteLine("Chance to block: {0}%", s.BlockChance);
-    }
-    if(item is Wieldable)
-    { Wieldable w = (Wieldable)item;
-      console.WriteLine("It is a {0}-handed item.", w.AllHandWield ? "two" : "one");
-      console.WriteLine("This item is better for the {0}.",
-                        w.Exercises==Attr.Str ? "strong" : w.Exercises==Attr.Dex ? "dexterous" : "intelligent");
-    }
-    if(item.Count>1)
-      console.WriteLine("They weigh about {0} mt. each ({1} total).", item.Weight, item.Weight*item.Count);
-    else console.WriteLine("It weighs about {0} mt.", item.Weight);
-    if(item.LongDesc!=null)
-    { console.WriteLine();
-      WriteWrapped(item.LongDesc, MapWidth);
-    }
-    ReadChar();
-    RestoreScreen();
-  }
 
   public override bool YesNo(Color color, string prompt, bool defaultYes)
   { char c = CharChoice(color, prompt, defaultYes ? "Yn" : "yN", defaultYes ? 'y' : 'n', true, "Please enter Y or N.");
@@ -1105,7 +1110,7 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
     }
     if(!visible && tile.Type!=TileType.ClosedDoor) ci.Attributes = NTConsole.Attribute.DarkGrey;
     //ci.Attributes |= NTConsole.ForeToBack((NTConsole.Attribute)((tile.Sound*15+Map.MaxSound-1)/Map.MaxSound));
-    ci.Attributes |= NTConsole.ForeToBack((NTConsole.Attribute)((tile.Scent*15+Map.MaxScent-1)/Map.MaxScent));
+    //ci.Attributes |= NTConsole.ForeToBack((NTConsole.Attribute)((tile.Scent*15+Map.MaxScent-1)/Map.MaxScent));
     return ci;
   }
 

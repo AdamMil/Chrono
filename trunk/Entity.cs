@@ -26,7 +26,7 @@ public enum Race
 
 public enum Skill
 { // these match weapon classes
-  Dagger, ShortBlade, LongBlade, Axe, MaceFlail, PoleArm, Staff, Bow, Crossbow, Thrown, WeaponSkills,
+  Dagger, ShortBlade, LongBlade, Axe, MaceFlail, PoleArm, Staff, Bow, Crossbow, Throwing, WeaponSkills,
   // these match magic types
   Summoning=WeaponSkills, Enchantment, Translocation, Transformation, Divination, Channeling, Necromancy,
   Elemental, Poison, MagicSkills,
@@ -152,46 +152,79 @@ public abstract class Entity
   public virtual string TheName { get { return Name==null ? "The "+Race.ToString().ToLower() : Name; } }
   public virtual string theName { get { return Name==null ? "the "+Race.ToString().ToLower() : Name; } }
 
-  public void Attack(Direction dir) // attack in a direction, can be used for attacking locked doors, etc
-  { Point np = Global.Move(Position, dir);
-    Entity c = Map.GetEntity(np);
-    string msg=null;
-    byte noise=0;
-    if(c!=null) Attack(c);
+  // attack in a direction, can be used for attacking locked doors, etc
+  public void Attack(Direction dir) { Attack(Global.Move(Position, dir)); }
+  
+  public bool AttackPoint(Point pt, object context)
+  { if(!Map.IsPassable(Map[pt].Type)) return false;
+    Weapon w = (Weapon)context;
+
+    Entity e = Map.GetEntity(pt);
+    if(e!=null && Attack(e, w)) return false;
+    return true;
+  }
+
+  public void Attack(Point pt) // attacks a point on the map
+  { Weapon w = Weapon;
+    bool ranged = w!=null && w.Ranged;
+    if(ranged) pt = TraceLine(pt, w.wClass==WeaponClass.Thrown ? Str*10/w.Weight : -1, false,
+                              new LinePoint(AttackPoint), w);
+
+    Entity c = Map.GetEntity(pt);
+    if(c!=null)
+    { if(ranged) return; // it's already been hit by AttackPoint
+      else Attack(c, w);
+    }
     else
-    { Tile t = Map[np];
-      Weapon w = Weapon;
+    { Tile t = Map[pt];
+      string msg=null;
+      byte noise=0;
       if(t.Type==TileType.ClosedDoor)
-      { int damage = w==null ? CalculateDamage() : w.CalculateDamage(this);
+      { int damage = w==null ? CalculateDamage(null) : w.CalculateDamage(this, null);
         if(damage>=10)
         { msg = "Crash! You break down the door.";
-          Map.SetType(np, TileType.RoomFloor);
+          Map.SetType(pt, TileType.RoomFloor);
           noise = 200;
           if(w==null) Exercise(Global.Coinflip() ? Attr.Dex : Attr.Str);
           else Exercise((Skill)w.wClass);
         }
-        else { msg = "Wham!"; noise = 80; }
+        else { msg = "Thunk!"; noise = 80; }
       }
-      else if(!Map.IsPassable(t.Type)) { msg = "Wham!"; noise = 80; }
+      else if(!Map.IsPassable(t.Type)) { msg = "Thunk!"; noise = 80; }
       else msg = "You swing at thin air.";
       if(this==App.Player)
       { if(msg!=null) App.IO.Print(msg);
-        if(noise>0) Map.MakeNoise(np, this, Noise.Bang, noise);
+        if(noise>0) Map.MakeNoise(pt, this, Noise.Bang, noise);
       }
     }
   }
-  public void Attack(Entity c) // attack an entity (assumes the entity is within striking range)
-  { bool unarmed=true;
-    int delay=0;
-    for(int i=0; i<Hands.Length; i++)
-    { Weapon w = Hands[i] as Weapon;
-      if(w==null) continue;
-      unarmed=false;
-      TryHit(c, w);
-      if(w.Delay>delay) delay=w.Delay;
+
+  public bool Attack(Entity c, Weapon w)
+  { int noise = Math.Max(w==null ? (10-Stealth)*15 : w.Noise*15 - Stealth*8, 255);
+    bool hit  = TryHit(c, w);
+
+    if(hit) TryDamage(c, w);
+    else
+    { c.Exercise(Attr.EV);
+      c.OnMissBy(this, w);
+      OnMiss(c, w);
+      noise /= 2;
     }
-    if(unarmed) TryHit(c, null);
-    Timer -= delay;
+    if((this==App.Player || c==App.Player) && noise>0)
+      Map.MakeNoise(this==App.Player ? Position : c.Position, this, Noise.Combat, (byte)noise);
+
+    if(w==null) // exercise our battle skills
+    { Exercise(Global.Coinflip() ? Attr.Dex : Attr.Str);
+      Exercise(Skill.UnarmedCombat);
+    }
+    else
+    { Exercise(w.Exercises);
+      Exercise((Skill)w.wClass); // first N skills map directly to weapon class values
+      Exercise(Skill.Fighting);
+      Timer -= Speed*w.Delay/100;
+    }
+    
+    return hit;
   }
 
   // true if item can be removed (not cursed, etc) or slot is empty
@@ -663,11 +696,43 @@ public abstract class Entity
   // the hunger values at which we're hungry, starving, and dead from starvation
   protected const int HungryAt=500, StarvingAt=800, StarveAt=1000;
 
+  protected delegate bool LinePoint(Point point, object context);
+
   // calculates our unarmed combat damage without skill bonuses
-  protected virtual int CalculateDamage() { return Global.NdN(1, 5)+StrBonus; }
+  protected virtual int CalculateDamage(Entity target) { return Global.NdN(1, 5)+StrBonus; }
 
   // called when the creature is added to or removed from a map
   protected internal virtual void OnMapChanged() { }
+
+  protected Point TraceLine(Point dest, int maxDist, bool stopAtDest, LinePoint func, object context)
+  { int x2=dest.X-X, y2=dest.Y-Y;
+    int x=0, y=0, dx=Math.Abs(x2), dy=Math.Abs(y2), xi=Math.Sign(x2), yi=Math.Sign(y2), r, ru, p;
+    Point pt;
+    if(dx>=dy)
+    { r=dy*2; ru=r-dx*2; p=r-dx;
+      do
+      { if(p>0) { y+=yi; p+=ru; }
+        else p+=r;
+        x+=xi; dx--;
+        pt = new Point(x+X, y+Y);
+        if(!func(pt, context)) return pt;
+        if(maxDist!=-1 && Math.Sqrt(x*x+y*y)-0.5>maxDist) return pt;
+      } while(!stopAtDest || dx>=0);
+    }
+    else
+    { r=dx*2; ru=r-dy*2; p=r-dy;
+      do
+      { if(p>0) { x+=xi; p+=ru; }
+        else p+=r;
+        y+=yi; dy--;
+        pt = new Point(x+X, y+Y);
+        if(!func(pt, context)) return pt;
+        if(maxDist!=-1 && Math.Sqrt(x*x+y*y)-0.5>maxDist) return pt;
+      } while(!stopAtDest || dy>=0);
+    }
+    return pt;
+  }
+  
 
   protected void UpdateMemory() // updates Memory using the visible area
   { if(Memory==null) return;
@@ -713,10 +778,44 @@ public abstract class Entity
     return title;
   }
 
-  void TryHit(Entity c, Weapon w)
+  void TryDamage(Entity c, Weapon w)
+  { Shield shield = c.Shield;
+    int blockchance=0, n, wepskill = 
+      (GetSkill(Skill.Fighting) + (w==null ? GetSkill(Skill.UnarmedCombat) : GetSkill((Skill)w.wClass)) + 1) / 2;
+    if(shield!=null)
+    { blockchance = shield.BlockChance + (shield.BlockChance*c.GetSkill(Skill.Shields)*10+50)/100;
+      c.Exercise(Skill.Shields);
+      n = Global.Rand(100);
+    }
+    else n=0;
+    if(shield==null || n*2>=blockchance)  // shield blocks 100% damage half the time that it comes into effect
+    { int damage=(w==null ? CalculateDamage(c) : w.CalculateDamage(this, c)), ac=c.AC;
+      damage += damage * wepskill*10/100; // damage up 10% per skill level
+      int odam=damage;
+      if(n<blockchance) damage /= 2;      // shield blocks 50% damage the other half of the time
+      if(ac>5) c.Exercise(Skill.Armor);   // if wearing substantial armor, exercise it
+      n = Global.Rand(ac+1);              // block 1 to AC damage
+      damage -= n + n*c.GetSkill(Skill.Armor)*10/100; // armor absorbs damage (+10% per skill level)
+      if(damage<0) damage = 0;            // normalize damage
+      App.IO.Print(Color.DarkGrey, "DAMAGE: {0} -> {1}, HP: {2} -> {3}", odam, damage, c.HP, c.HP-damage);
+      c.HP -= damage;
+      c.OnHitBy(this, w, damage);
+      OnHit(c, w, damage);
+      if(c.HP<=0)
+      { c.Die(this, w);
+        if(c.HP<=0) // check health again because amulet of saving, etc could have taken effect
+        { OnKill(c);
+          Exp += c.KillExp;
+          ExpPool += Global.NdN(2, c.baseKillExp);
+        }
+      }
+    }
+    else App.IO.Print(Color.DarkGrey, "BLOCKED");
+  }
+
+  bool TryHit(Entity c, Weapon w)
   { int toHit   = (Dex+EV+1)/2 + (w!=null ? w.ToHitBonus : 0); // average of dex and ev, rounded up
     int toEvade = c.EV;
-    int noise   = w==null ? (10-Stealth)*15 : w.Noise*15 - Stealth*8;
     int wepskill = 
       (GetSkill(Skill.Fighting) + (w==null ? GetSkill(Skill.UnarmedCombat) : GetSkill((Skill)w.wClass)) + 1) / 2;
 
@@ -729,61 +828,10 @@ public abstract class Entity
     c.Exercise(Skill.Dodge);
 
     int n = Global.Rand(toHit+toEvade);
-string msg = string.Format("HIT: (toHit: {0}, EV: {1}, roll: {2} = {3})", toHit, toEvade, n, n>=toEvade ? "hit" : "miss");
-    if(n>=toEvade) // hit
-    { Shield shield = c.Shield;
-      int blockchance=0;
-      if(shield!=null)
-      { blockchance = shield.BlockChance + (shield.BlockChance*c.GetSkill(Skill.Shields)*10+50)/100;
-        c.Exercise(Skill.Shields);
-        n = Global.Rand(100);
-      }
-      else n=0;
-      if(shield==null || n*2>=blockchance)  // shield blocks 100% damage half the time that it comes into effect
-      { int damage=(w==null ? CalculateDamage() : w.CalculateDamage(this)), ac=c.AC;
-        damage += damage * wepskill*10/100; // damage up 10% per skill level
-        int odam=damage;
-        if(n<blockchance) damage /= 2;      // shield blocks 50% damage the other half of the time
-        if(ac>5) c.Exercise(Skill.Armor);   // if wearing substantial armor, exercise it
-        n = Global.Rand(ac);
-        damage -= n + n*c.GetSkill(Skill.Armor)*10/100; // armor absorbs damage (+10% per skill level)
-        if(damage<0) damage = 0;            // normalize damage
-        App.IO.Print(Color.DarkGrey, "{4}, DAMAGE: {0} -> {1}, HP: {2} -> {3}", odam, damage, c.HP, c.HP-damage, msg);
-        c.HP -= damage;
-        c.OnHitBy(this, w, damage);
-        OnHit(c, w, damage);
-        if(c.HP<=0)
-        { c.Die(this, w);
-          if(c.HP<=0) // check health again because amulet of saving, etc could have taken effect
-          { OnKill(c);
-            Exp += c.KillExp;
-            ExpPool += Global.NdN(2, c.baseKillExp);
-          }
-        }
-      }
-      else App.IO.Print(Color.DarkGrey, msg+" BLOCKED");
-    }
-    else // miss
-    { App.IO.Print(Color.DarkGrey, msg);
-      c.Exercise(Attr.EV);
-      c.OnMissBy(this, w);
-      OnMiss(c, w);
-      noise /= 2;
-    }
-    if((this==App.Player || c==App.Player) && noise>0)
-      Map.MakeNoise(this==App.Player ? Position : c.Position, this, Noise.Combat, (byte)noise);
-
-    if(w==null) // exercise our battle skills
-    { Exercise(Global.Coinflip() ? Attr.Dex : Attr.Str);
-      Exercise(Skill.UnarmedCombat);
-    }
-    else
-    { Exercise(w.Exercises);
-      Exercise((Skill)w.wClass); // first N skills map directly to weapon class values
-      Exercise(Skill.Fighting);
-    }
+    App.IO.Print(Color.DarkGrey, "HIT: (toHit: {0}, EV: {1}, roll: {2} = {3})", toHit, toEvade, n, n>=toEvade ? "hit" : "miss");
+    return n>=toEvade;
   }
-
+  
   void VisibleLine(int x2, int y2)
   { int x=0, y=0, dx=Math.Abs(x2), dy=Math.Abs(y2), xi=Math.Sign(x2), yi=Math.Sign(y2), r, ru, p, light=Light;
     if(dx>=dy)

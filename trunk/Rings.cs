@@ -5,7 +5,7 @@ namespace Chrono
 
 public abstract class Ring : Wearable
 { public Ring()
-  { Class=ItemClass.Ring; Slot=Slot.Ring; Prefix="a ring of "; PluralSuffix=""; PluralPrefix="rings of "; Weight=1;
+  { Class=ItemClass.Ring; Slot=Slot.Ring; Prefix="ring of "; PluralSuffix=""; PluralPrefix="rings of "; Weight=1;
     Durability=95;
   }
   static Ring() { Global.RandomizeNames(names); }
@@ -18,7 +18,7 @@ public abstract class Ring : Wearable
       namei++;
     }
     rn += " ring";
-    if(Title!=null) rn += " (called "+Title+')';
+    if(Title!=null) rn += " named "+Title;
     return rn;
   }
   

@@ -7,7 +7,7 @@ namespace Chrono
 public enum Action
 { None, Quit, Rest, Move, MoveToInteresting, MoveToDanger, MoveAFAP, OpenDoor, CloseDoor, Pickup, Drop, DropType,
   GoUp, GoDown, Eat, Wear, Remove, Wield, Inventory, ShowMap, Fire, Quaff, Read, ViewItem, Invoke, SwapAB, Reassign,
-  ManageSkills, UseItem, Carve, ExamineTile, Throw, ZapWand, CastSpell
+  ManageSkills, UseItem, Carve, ExamineTile, Throw, ZapWand, CastSpell, ShowKnowledge
 }
 
 public struct Input
@@ -30,9 +30,11 @@ public enum Color
 [Flags] public enum MenuFlag { None=0, Reletter=1, Multi=2, AllowNum=4, AllowNothing=8 };
 
 public struct MenuItem
-{ public MenuItem(Item item) { Item=item; Count=0; Char = item==null ? '\0' : item.Char; }
-  public MenuItem(Item item, int count) { Item=item; Count=count; Char = item==null ? '\0' : item.Char; }
+{ public MenuItem(Item item) { Item=item; Text=null; Count=0; Char = item==null ? '\0' : item.Char; }
+  public MenuItem(Item item, int count) { Item=item; Text=null; Count=count; Char = item==null ? '\0' : item.Char; }
+  public MenuItem(string text, char c) { Item=null; Text=text; Count=0; Char=c; }
   public Item Item;
+  public string Text;
   public int  Count;
   public char Char;
 }
@@ -95,6 +97,7 @@ public abstract class InputOutput
 
   public void DisplayInventory(Entity entity) { DisplayInventory(entity, ItemClass.Any); }
   public abstract void DisplayInventory(Entity entity, params ItemClass[] classes);
+  public abstract void DisplayKnowledge(Entity entity);
   public abstract void DisplayTileItems(IInventory items);
   public abstract SD.Point DisplayMap(Entity viewer);
 
@@ -110,6 +113,8 @@ public abstract class InputOutput
   }
   public abstract MenuItem[] Menu(Entity entity, System.Collections.ICollection items, MenuFlag flags,
                                   params ItemClass[] classes);
+  public MenuItem[] Menu(MenuItem[] items, MenuFlag flags) { return Menu(null, items, flags); }
+  public abstract MenuItem[] Menu(Entity entity, MenuItem[] items, MenuFlag flags);
 
   public void Print(string format, params object[] parms) { Print(Color.Normal, format, parms); }
   public void Print(Color color, string format, params object[] parms) { Print(color, String.Format(format, parms)); }

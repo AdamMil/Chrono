@@ -1,8 +1,6 @@
-gods, religion
-praying
+gods, religion, praying, add ninja guitar-playing god
 searching & hidden tiles, searching reveals monsters (in memory)
 autopickup, config file
-knowledge/identification
 saving/loading
 status effects
 
@@ -11,9 +9,7 @@ make monsters fill in around the player (if i'm next to player and an empty spac
   me is a monster that's not next to player, move into the empty space)
 Check all the Global.Rand(100)'s for correctness
 document interfaces!
-make visibility checks stop at boulders, etc (once we have them)
 make LevelDown decrease stats
-make carry weight affect smell gain?
 add a way to determine whether a creature is hostile, friendly, or neutral
 make character hesitant to eat raw flesh
 alter AI so that ranged weapons can be used
@@ -24,27 +20,21 @@ implement cloaks
 add the ability to select the default ammo
 add dipping (into potions, water...)
 add the ability to break wands
-alert AI when any damage is taken
 make some spells hit doors, etc (generalize the code to damage tiles)
 handing choosing an above/below directional target
-make ESC skip all --more-- prompts
+make dying stop the simulation immediately
 don't walk through invisible monsters while moving
 make path tracing part of the Map class (?)
-when path finding, if stopped on items, display them
-make spells give monster death messages
 confirm on lifting heavy items
-implement 'D'rop command
 better item spawning
 develop a better, more centralized spell damage system
-add messages like "You are no longer burdened."
 improve spell description (add MP usage, etc)
 improve spell target prompting (add custom messages, etc)
-have corpses rot, too (not just go from plain -> skeleton)
 rework skill system so top level is 10
 add critical hits
 require a sharp weapon for carving (and equip it during carving?)
 add help string to Skill management page
 make higher skill levels harder to obtain
-make use of extra space to show better help
-add identification for individual items (so you don't always know wand charges, for instance)
-add knowledge display
+have user identify wand whenever he can see it cast and the effect?
+add ability to view other levels in DisplayMap
+add magic resistance

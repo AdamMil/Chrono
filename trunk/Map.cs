@@ -203,6 +203,7 @@ public sealed class Map
     if(seen) for(int y=0; y<height; y++) for(int x=0; x<width; x++) map[y,x].Flags=(byte)Tile.Flag.Seen;
   }
 
+  public EntityCollection Entities { get { return entities; } }
   public Link[] Links { get { return links; } }
   public int Width  { get { return width; } }
   public int Height { get { return height; } }
@@ -370,21 +371,17 @@ public sealed class Map
   }
   
   public Map RestoreMemory()
-  { Map ret = memory;
-    memory = null;
+  { Map ret = Memory;
+    Memory = null;
     return ret;
   }
 
-  public void SaveMemory(Map memory) { this.memory = memory; }
-
-  public int Index;
+  public void SaveMemory(Map memory) { Memory = memory; }
 
   public static bool IsDangerous(TileType type) { return (tileFlag[(int)type]&TileFlag.Dangerous) != TileFlag.None; }
   public static bool IsPassable(TileType type) { return (tileFlag[(int)type]&TileFlag.Passable) != TileFlag.None; }
   public static bool IsWall(TileType type) { return (tileFlag[(int)type]&TileFlag.Wall) != TileFlag.None; }
   public static bool IsDoor(TileType type) { return (tileFlag[(int)type]&TileFlag.Door) != TileFlag.None; }
-
-  public EntityCollection Entities { get { return entities; } }
 
   public void Simulate() { Simulate(null); }
   public void Simulate(Player player)
@@ -456,6 +453,9 @@ public sealed class Map
     for(int y=0,i=0; y<height; y++) for(int x=0; x<width; x++) map[y,x].Scent=scentbuf[i++];
   }
 
+  public Map Memory;
+  public int Index;
+
   class EntityComparer : IComparer
   { public int Compare(object x, object y) { return ((Entity)x).Timer - ((Entity)y).Timer; }
   }
@@ -474,7 +474,6 @@ public sealed class Map
 
   Tile[,] map;
   Link[]  links = new Link[0];
-  Map     memory;
   EntityCollection entities;
   PriorityQueue thinkQueue = new PriorityQueue(new EntityComparer());
   Hashtable removedEntities = new Hashtable();

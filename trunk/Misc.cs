@@ -91,7 +91,7 @@ public sealed class Global
           return new TraceResult(start, op);
         if(ta==TraceAction.Go) op=start;
         if((ta&TraceAction.HBounce)!=0) xi=-xi;
-        if((ta&TraceAction.VBounce)!=0) yi=-yi;
+        if((ta&TraceAction.VBounce)!=0) { yi=-yi; start.Y=op.Y; }
       }
     }
     else
@@ -104,7 +104,7 @@ public sealed class Global
         if(ta==TraceAction.Stop || maxDist!=-1 && ++dist>=maxDist || stopAtDest && dy<0)
           return new TraceResult(start, op);
         if(ta==TraceAction.Go) op=start;
-        if((ta&TraceAction.HBounce)!=0) xi=-xi;
+        if((ta&TraceAction.HBounce)!=0) { xi=-xi; start.X=op.X; }
         if((ta&TraceAction.VBounce)!=0) yi=-yi;
       }
     }

@@ -313,13 +313,12 @@ public class TownGenerator : MapGenerator
     if(map.GroupID==-1) map.GroupID = Global.NewSocialGroup(false, true);
 
     map.Fill(TileType.Grass);
-
-    foreach(XmlNode room in root.SelectNodes("room[@required=true]"))
-      if(!AddRoom(room)) throw new UnableToGenerateException("Couldn't add required rooms.");
-    foreach(XmlNode room in root.SelectNodes("room[@required!=true]")) if(!AddRoom(room)) break;
-
     int size = map.Width*map.Height;
     for(int ntrees=size/50; ntrees>0; ntrees--) map.SetType(map.FreeSpace(), TileType.Tree);
+
+    foreach(XmlNode room in root.SelectNodes("room[@required='true']"))
+      if(!AddRoom(room)) throw new UnableToGenerateException("Couldn't add required rooms.");
+    foreach(XmlNode room in root.SelectNodes("room[@required!='true']")) if(!AddRoom(room)) break;
 
     AddShop(ShopType.General);
     AddShop(ShopType.Food);

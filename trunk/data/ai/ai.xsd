@@ -41,6 +41,16 @@
   </xs:restriction>
 </xs:simpleType>
 
+<!-- entityClass -->
+<xs:simpleType name="entityClass">
+  <xs:restriction base="xs:string">
+    <xs:enumeration value="Random"/>
+    <xs:enumeration value="Fighter"/>
+    <xs:enumeration value="Wizard"/>
+    <xs:enumeration value="Plain"/>
+  </xs:restriction>
+</xs:simpleType>
+
 <!-- item -->
 <xs:complexType name="item">
   <xs:sequence>
@@ -58,7 +68,8 @@
     <xs:element name="give" type="item" minOccurs="0" maxOccurs="unbounded"/>
   </xs:sequence>
 
-  <xs:attribute name="class" type="xs:string" use="required"/>
+  <xs:attribute name="type" type="xs:string" use="required"/>
+  <xs:attribute name="class"  type="entityClass"/>
   <xs:attribute name="color" type="color"/>
   <xs:attribute name="defaultState" type="aiState"/>
 

@@ -6,7 +6,7 @@
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://www.adammil.net/Chrono/ai ai.xsd">
 
-  <charData class="Townsperson" name="Pa" gender="male" defaultState="Idle">
+  <charData type="Townsperson" name="Pa" gender="male" defaultState="Idle" IsAdult="true" baseName="clerk">
     <give class="Gold" count="1000"/>
   </charData>
 

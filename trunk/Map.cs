@@ -11,6 +11,8 @@ namespace Chrono
 {
 
 #region Types and Enums
+public enum MapType { Overworld, Town, Other }
+
 public enum Noise { Walking, Bang, Combat, Alert, NeedHelp, Item, Zap }
 
 public enum ShopType { General, Books, Food, Armor, Weapons, ArmorWeapons, Accessories, Magic, NumTypes };
@@ -350,7 +352,8 @@ public class Map : UniqueObject
     set { map[pt.Y, pt.X] = value; }
   }
 
-  public bool IsOverworld { get { return mapID=="overworld"; } }
+  public bool IsOverworld { get { return mapType==MapType.Overworld; } }
+  public bool IsTown { get { return mapType==MapType.Town; } }
 
   public Item AddItem(Point pt, Item item) { return AddItem(pt.X, pt.Y, item); }
   public Item AddItem(int x, int y, Item item)
@@ -373,6 +376,7 @@ public class Map : UniqueObject
   public void AddRoom(Room room)
   { Room[] narr = new Room[rooms.Length+1];
     if(narr.Length!=1) Array.Copy(rooms, narr, narr.Length-1);
+    narr[rooms.Length] = room;
     rooms = narr;
   }
 
@@ -439,7 +443,7 @@ public class Map : UniqueObject
   }
   public Link GetLink(int index) { return GetLink(index, true); }
   public Link GetLink(int index, bool autoGenerate)
-  { if(autoGenerate && links[index].ToPoint.X==-1) // if the link hasn't been initialized yet
+  { /*if(autoGenerate && links[index].ToPoint.X==-1) // if the link hasn't been initialized yet
     { Map nm = links[index].ToDungeon[links[index].ToLevel];
       for(int ml=0,ol=0; ml<links.Length; ml++)    // initialize all links going to the same level
       { if(links[ml].ToLevel!=nm.Index || links[ml].ToDungeon!=nm.Dungeon) continue; // skip ones going elsewhere
@@ -448,10 +452,10 @@ public class Map : UniqueObject
         links[ml].ToPoint = nm.links[ol].FromPoint;
         nm.links[ol].ToPoint = links[ml].FromPoint;
       }
-    }
+    }*/
     return links[index];
   }
-  
+
   public int GetScent(Point pt) { return GetScent(pt.X, pt.Y); }
   public int GetScent(int x, int y)
   { if(x<0 || x>=width || y<0 || y>=height) return 0;
@@ -506,15 +510,44 @@ public class Map : UniqueObject
   { int tries = width*height;
     while(tries-->0)
     { Point pt = new Point(Global.Rand(area.Width)+area.X, Global.Rand(area.Height)+area.Y);
-      if(!IsFreeSpace(pt, allow)) continue;
-      return pt;
+      if(IsFreeSpace(pt, allow)) return pt;
     }
     for(int y=area.Y; y<area.Bottom; y++)
       for(int x=area.X; x<area.Right; x++)
         if(IsFreeSpace(x, y, allow)) return new Point(x, y);
-    throw new ArgumentException("No free space found!");
+    throw new ApplicationException("No free space found!");
   }
   
+  public Point FreeSpaceNear(Point pt)
+  { Point test;
+    for(int tri=0; tri<50; tri++)
+    { int dist = tri/10+1;
+      do test = new Point(pt.X+Global.Rand(-dist, dist), pt.Y+Global.Rand(-dist, dist));
+      while(test.X==pt.X && test.Y==pt.Y);
+      if(IsFreeSpace(test, Space.NoEntities)) return test;
+    }
+    
+    for(int dist=1,max=Math.Max(Math.Max(pt.X, Width-pt.X-1), Math.Max(pt.Y, Height-pt.Y-1)); dist<=max; dist++)
+    { for(int x=-dist, y=-dist; x<=dist; x++)
+      { test = new Point(pt.X+x, pt.Y+y);
+        if(IsFreeSpace(test, Space.NoEntities)) return test;
+      }
+      for(int x=dist, y=-dist; y<=dist; y++)
+      { test = new Point(pt.X+x, pt.Y+y);
+        if(IsFreeSpace(test, Space.NoEntities)) return test;
+      }
+      for(int x=dist, y=dist; x>=-dist; x--)
+      { test = new Point(pt.X+x, pt.Y+y);
+        if(IsFreeSpace(test, Space.NoEntities)) return test;
+      }
+      for(int x=-dist, y=dist; y>=dist; y--)
+      { test = new Point(pt.X+x, pt.Y+y);
+        if(IsFreeSpace(test, Space.NoEntities)) return test;
+      }
+    }
+    throw new ApplicationException("No free space found!");
+  }
+
   public bool IsFreeSpace(Point pt, Space allow) { return IsFreeSpace(pt.X, pt.Y, allow); }
   public bool IsFreeSpace(int x, int y, Space allow)
   { Tile tile = this[x, y];
@@ -773,12 +806,14 @@ public class Map : UniqueObject
   }
 
   public static Map Load(XmlDocument doc, Dungeon.Section section, int index)
-  { XmlNode root = doc.SelectSingleNode("map");
+  { XmlNamespaceManager xmlns = new XmlNamespaceManager(doc.NameTable);
+    xmlns.AddNamespace("map", "http://www.adammil.net/Chrono/map");
+    XmlNode root = doc.SelectSingleNode("map:map", xmlns);
     Map map;
 
     XmlNode node = root.SelectSingleNode("rawMap");
     if(node!=null) // if we have raw map data
-    { string[] lines = Xml.BlockToArray(node.Value);
+    { string[] lines = Xml.BlockToArray(node.InnerText);
       map = new Map(((string)lines[0]).Length, lines.Length);
       for(int y=0; y<map.Height; y++)
       { string line = (string)lines[y];
@@ -824,8 +859,9 @@ public class Map : UniqueObject
     }
     else map = MapGenerator.Generate(root, section, index);
 
-    map.mapID = root.Attributes["id"].Value;
-    map.name  = Xml.Attr(root, "name");
+    map.mapID   = root.Attributes["id"].Value;
+    map.name    = Xml.Attr(root, "name");
+    map.mapType = (MapType)Enum.Parse(typeof(MapType), Xml.Attr(root, "type", "Other"));
 
     #region Add links
     foreach(XmlNode link in root.SelectNodes("link"))
@@ -847,6 +883,7 @@ public class Map : UniqueObject
         { toLevel = int.Parse(to.Substring(pos+1));
           to = to.Substring(0, pos);
         }
+        else toLevel = 0;
         pos = to.IndexOf('/');
         if(pos==-1) toSection=to;
         else { toSection=to.Substring(pos+1); toDungeon=to.Substring(0, pos); }
@@ -862,6 +899,12 @@ public class Map : UniqueObject
       map.AddLink(li);
     }
     #endregion
+    
+    foreach(XmlNode npc in root.SelectNodes("npc"))
+    { AI ai = AI.Load(npc);
+      ai.Position = map.FindXmlLocation(npc);
+      map.Entities.Add(ai);
+    }
     
     map.OnInit();
     return map;
@@ -938,6 +981,7 @@ public class Map : UniqueObject
   Hashtable removedEntities = new Hashtable();
   string mapID, name;
   int width, height, thinking, timer, age, numCreatures;
+  MapType mapType;
 
   static ushort[] scentbuf;
   static Point[] soundStack;

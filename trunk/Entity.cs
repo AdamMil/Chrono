@@ -49,7 +49,7 @@ public struct Effect
 
 public enum EntityClass
 { Other=-3, // not a monster (boulder or some other entity)
-  RandomClass=-1, Fighter, Wizard, Plain, NumClasses
+  Random=-1, Fighter, Wizard, Plain, NumClasses
 }
 
 public enum HungerLevel { Normal, Hungry, Starving, Starved };
@@ -521,9 +521,11 @@ public abstract class Entity : UniqueObject
   }
 
   // generates an entity, gives it default stats
+  public void Generate() { Generate(0, EntityClass.Random); }
+  public void Generate(int level) { Generate(level, EntityClass.Random); }
   public virtual void Generate(int level, EntityClass myClass)
-  { if(myClass==EntityClass.RandomClass)
-      myClass = (EntityClass)Global.Rand((int)EntityClass.NumClasses);
+  { if(level==0) level=1; // default
+    if(myClass==EntityClass.Random) myClass = (EntityClass)Global.Rand((int)EntityClass.NumClasses);
 
     Class = myClass; Title = GetTitle(); SetBaseAttr(Attr.Light, 8);
 
@@ -1030,8 +1032,9 @@ public abstract class Entity : UniqueObject
   public Color  Color=Color.Dire; // our general color
   public bool   Male = true;
 
-  // generates a creature, creates it and calls the creature's Generate() method. class is RandomClass if not passed
-  public static Entity Generate(Type type, int level) { return Generate(type, level, EntityClass.RandomClass); }
+  // generates a creature, creates it and calls the creature's Generate() method. class is Random if not passed
+  public static Entity Generate(Type type) { return Generate(type, 0, EntityClass.Random); }
+  public static Entity Generate(Type type, int level) { return Generate(type, level, EntityClass.Random); }
   public static Entity Generate(Type type, int level, EntityClass myClass)
   { Entity creature = MakeEntity(type);
     creature.Generate(level, myClass);
@@ -1047,7 +1050,8 @@ public abstract class Entity : UniqueObject
   }
 
   public static Entity MakeEntity(Type type) // constructs an entity and returns it
-  { Entity c = type.GetConstructor(Type.EmptyTypes).Invoke(null) as Entity;
+  { if(type==null) throw new ArgumentNullException("type");
+    Entity c = type.GetConstructor(Type.EmptyTypes).Invoke(null) as Entity;
     App.Assert(c!=null, "{0} is not a valid creature type", type);
     return c;
   }
@@ -1162,15 +1166,11 @@ public abstract class Entity : UniqueObject
 
   protected static string GetQuip(Quips type)
   { if(quips[0]==null)
-    { System.IO.Stream stream = Global.LoadData("entity/quips.xml");
-      System.Xml.XmlDocument doc = new System.Xml.XmlDocument();
-      doc.Load(stream);
-      stream.Close();
-
-      System.Text.RegularExpressions.Regex stripre =
+    { System.Text.RegularExpressions.Regex stripre =
         new System.Text.RegularExpressions.Regex(@"^\s+|\s+$", System.Text.RegularExpressions.RegexOptions.Multiline);
 
-      foreach(System.Xml.XmlNode list in doc.SelectSingleNode("/quips").ChildNodes)
+      // TODO: make this code use a Xml.BlockTo*() function
+      foreach(System.Xml.XmlNode list in Global.LoadXml("ai/quips.xml").SelectNodes("//list"))
       { string[] stypes = list.Attributes["appliesTo"].Value.Split(' ');
         int[]     types = new int[stypes.Length];
         int[]   indices = new int[stypes.Length];

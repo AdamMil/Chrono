@@ -183,7 +183,7 @@ public sealed class Global
         switch(ta)
         { case TraceAction.Go: op=start; break;
           case TraceAction.HBounce: xi=-xi; break;
-          case TraceAction.VBounce: yi=-yi; while(p+r<=0) p += r; break;
+          case TraceAction.VBounce: yi=-yi; while(p<=0) p += r; break;
           case TraceAction.Bounce: xi=-xi; yi=-yi; break;
         }
       }
@@ -199,7 +199,7 @@ public sealed class Global
           return new TraceResult(start, op);
         switch(ta)
         { case TraceAction.Go: op=start; break;
-          case TraceAction.HBounce: xi=-xi; while(p+r<=0) p += r; break;
+          case TraceAction.HBounce: xi=-xi; while(p<=0) p += r; break;
           case TraceAction.VBounce: yi=-yi; break;
           case TraceAction.Bounce: xi=-xi; yi=-yi; break;
         }

@@ -7,13 +7,13 @@ using System.Runtime.Serialization;
 namespace Chrono
 {
 
-public enum SpellTarget { Self, Item, Tile };
 public enum SpellClass // remember to add these to the Skill enum as well
 { Summoning, Enchantment, Telekinesis, Translocation, Transformation, Divination, Channeling, Necromancy, Elemental,
   Poison,
 
   NumClasses
 }
+public enum SpellTarget { Self, Item, Tile };
 
 [Serializable]
 public sealed class DefaultSpellProxy : ISerializable, IObjectReference
@@ -46,7 +46,7 @@ public abstract class Spell : UniqueObject
 
   public override void GetObjectData(SerializationInfo info, StreamingContext context)
   { if(Global.ObjHash==null && this==GetType().GetField("Default", BindingFlags.Static|BindingFlags.DeclaredOnly|BindingFlags.Public).GetValue(null))
-    { info.AddValue("Type", GetType().FullName);  
+    { info.AddValue("Type", GetType().FullName);
       info.SetType(typeof(DefaultSpellProxy));
     }
     else base.GetObjectData(info, context);
@@ -350,21 +350,22 @@ public class AmnesiaSpell : Spell
   public override void Cast(Entity user, ItemStatus buc, Point tile, Direction dir)
   { if(user.Memory!=null)
     { user.Memory = Wipe(user.Memory, buc);
-      if((buc&ItemStatus.Cursed)!=0)
-      { int index = user.Map.Index;
-        if(index>0 && App.Dungeon[index-1].Memory!=null)
-          App.Dungeon[index-1].Memory = Wipe(App.Dungeon[index-1].Memory, buc);
-        if(index<App.Dungeon.Count-1 && App.Dungeon[index+1].Memory!=null)
-          App.Dungeon[index+1].Memory = Wipe(App.Dungeon[index+1].Memory, buc);
+      if(user==App.Player)
+      { if((buc&ItemStatus.Cursed)!=0)
+        { int index = user.Map.Index;
+          if(index>0 && user.Map.Dungeon[index-1].Memory!=null)
+            user.Map.Dungeon[index-1].Memory = Wipe(user.Map.Dungeon[index-1].Memory, buc);
+          if(index<user.Map.Dungeon.Count-1 && user.Map.Dungeon[index+1].Memory!=null)
+            user.Map.Dungeon[index+1].Memory = Wipe(user.Map.Dungeon[index+1].Memory, buc);
+        }
+        App.IO.Print("You feel your mind being twisted!");
       }
-
-      if(user==App.Player) App.IO.Print("You feel your mind being twisted!");
     }
   }
-  
+
   public static readonly AmnesiaSpell Default = new AmnesiaSpell();
   public static readonly string Description = "This spell scrambles the caster's memory.";
-  
+
   Map Wipe(Map good, ItemStatus buc)
   { Map bad = new Map(good.Width, good.Height, TileType.Border, false);
     int count = good.Width*good.Height/20;

@@ -13,20 +13,21 @@ public abstract class MapGenerator
 { public void Reseed(int s) { Rand = new Random(s); }
   public Random Rand = new Random();
 
-  public Map Generate() { return Generate(60, 60); }
-  public abstract Map Generate(int width, int height);
+  public virtual Size DefaultSize { get { return new Size(60, 60); } }
+
+  public abstract void Generate(Map map);
 }
 
 #region RoomyMapGenerator
 public class RoomyMapGenerator : MapGenerator
 { public Size MaxRoomSize { get { return maxRoomSize; } set { maxRoomSize=value; } }
 
-  public override Map Generate(int width, int height)
-  { int size = width*height;
-    return Generate(width, height, Math.Max(size/900, 1), Math.Max(size/300, 1));
+  public override void Generate(Map map)
+  { int size = map.Width*map.Height;
+    Generate(map, Math.Max(size/900, 1), Math.Max(size/300, 1));
   }
-  public Map Generate(int width, int height, int minrooms, int maxrooms)
-  { map = new Map(width, height);
+  public void Generate(Map map, int minrooms, int maxrooms)
+  { this.map = map;
     maxRoomSize = new Size(20, 20);
     rooms.Clear();
     while(rooms.Count<minrooms) if(!AddRoom()) throw new UnableToGenerateException("Couldn't add enough rooms.");
@@ -36,7 +37,6 @@ public class RoomyMapGenerator : MapGenerator
 
     AddStairs(false);
     AddStairs(true);
-    return map;
   }
 
   struct Room
@@ -189,15 +189,15 @@ public class RoomyMapGenerator : MapGenerator
 #endregion
 
 public class MetaCaveGenerator : MapGenerator
-{ public override Map Generate(int width, int height) { return Generate(width, height, 50); }
-  public Map Generate(int width, int height, int ncircles)
+{ public override void Generate(Map map) { Generate(map, 50); }
+  public void Generate(Map map, int ncircles)
   { Point[] centers = new Point[ncircles];
     PathFinder path = new PathFinder();
+    int width = map.Width, height = map.Height;
 
     while(true)
     { for(int i=0; i<ncircles; i++) centers[i] = new Point(Global.Rand(width-8)+4, Global.Rand(height-8)+4);
 
-      Map map = new Map(width, height);
       for(int y=0; y<height; y++)
         for(int x=0; x<width; x++)
         { double sum=0;
@@ -217,8 +217,11 @@ public class MetaCaveGenerator : MapGenerator
       }
         
       Point up=AddStairs(map, false), down=AddStairs(map, true);
-      if(!path.Plan(map, up, down) || path.GetPathFrom(up).Cost>=1000) map.ClearLinks();
-      else return map;
+      if(!path.Plan(map, up, down) || path.GetPathFrom(up).Cost>=1000)
+      { map.ClearLinks();
+        map.Fill(TileType.SolidRock);
+      }
+      else return;
     }
   }
 

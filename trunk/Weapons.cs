@@ -16,7 +16,7 @@ public abstract class Weapon : Wieldable
     wClass=ow.wClass; Delay=ow.Delay; Noise=ow.Noise; ToHitBonus=ow.ToHitBonus; Ranged=ow.Ranged;
   }
 
-  public abstract int CalculateDamage(Entity user, Ammo ammo, Entity target); // ammo and target can be null
+  public abstract Damage CalculateDamage(Entity user, Ammo ammo, Entity target); // ammo and target can be null
 
   public override bool CanStackWith(Item item)
   { return wClass==WeaponClass.Thrown && item.Title==null && Title==null && item.GetType()==GetType() &&
@@ -42,6 +42,8 @@ public abstract class FiringWeapon : Weapon
 public abstract class Ammo : Item
 { public Ammo() { Class=ItemClass.Ammo; }
   public Ammo(Item item) : base(item) { }
+  
+  public virtual Damage ModDamage(Damage damage) { return damage; }
 }
 
 public abstract class Arrow : Ammo
@@ -49,27 +51,29 @@ public abstract class Arrow : Ammo
   public Arrow(Item item) : base(item) { }
 }
 
-public class GoodArrow : Arrow
-{ public GoodArrow() { name="good arrow"; }
-  public GoodArrow(Item item) : base(item) { }
+public class BasicArrow : Arrow
+{ public BasicArrow() { name="arrow"; }
+  public BasicArrow(Item item) : base(item) { }
 }
 
-public class BadArrow : Arrow
-{ public BadArrow() { name="bad arrow"; }
-  public BadArrow(Item item) : base(item) { }
+public class FlamingArrow : Arrow
+{ public FlamingArrow() { name="flaming arrow"; }
+  public FlamingArrow(Item item) : base(item) { }
+  
+  public override Damage ModDamage(Damage damage)
+  { damage.Heat += (ushort)Global.NdN(1, 4);
+    return damage;
+  }
 }
 
 public class Dart : Weapon
 { public Dart() { wClass=WeaponClass.Thrown; Ranged=true; name="poisoned dart"; Weight=2; }
   public Dart(Item item) : base(item) { }
 
-  public override bool Hit(Entity user, Entity hit)
-  { if(Global.Rand(100)<100/(hit.Poison+1)) hit.AddEffect(new Effect(user, Attr.Poison, 1, -1));
-    return false;
-  }
-
-  public override int CalculateDamage(Entity user, Ammo ammo, Entity target)
-  { return Global.NdN(1, 3+(int)CompatibleWith(user)) + user.StrBonus/2;
+  public override Damage CalculateDamage(Entity user, Ammo ammo, Entity target)
+  { Damage d = new Damage(Global.NdN(1, 3+(int)CompatibleWith(user)) + user.StrBonus/2);
+    if(Global.Rand(100)<100/(target.Poison+1)) d.Poison = 1;
+    return d;
   }
 }
 
@@ -80,11 +84,13 @@ public class Bow : FiringWeapon
   }
 
   public override Compatibility CompatibleWith(Ammo ammo)
-  { return ammo is GoodArrow ? Compatibility.Perfect : ammo is Arrow ? Compatibility.Okay : Compatibility.None;
+  { return ammo is Arrow ? Compatibility.Okay : Compatibility.None;
   }
 
-  public override int CalculateDamage(Entity user, Ammo ammo, Entity target)
-  { return ammo==null ? 1 : Global.NdN(1, 5+(int)CompatibleWith(user)+(int)CompatibleWith(ammo)) + user.DexBonus;
+  public override Damage CalculateDamage(Entity user, Ammo ammo, Entity target)
+  { Damage dam = new Damage(ammo==null ? 1 : Global.NdN(1, 5+(int)CompatibleWith(user)+(int)CompatibleWith(ammo))
+                            + user.DexBonus);
+    return ammo.ModDamage(dam);
   }
 }
 
@@ -94,8 +100,8 @@ public class ShortSword : Weapon
     wClass=WeaponClass.ShortBlade; Exercises=Attr.Str; Noise=5;
   }
 
-  public override int CalculateDamage(Entity user, Ammo ammo, Entity target)
-  { return Global.NdN(1, 6+(int)CompatibleWith(user)) + user.StrBonus;
+  public override Damage CalculateDamage(Entity user, Ammo ammo, Entity target)
+  { return new Damage(Global.NdN(1, 6+(int)CompatibleWith(user)) + user.StrBonus);
   }
 }
 

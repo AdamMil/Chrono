@@ -6,8 +6,9 @@ namespace Chrono
 {
 
 public enum SpellTarget { Self, Item, Tile };
-public enum SpellClass
-{ Summoning, Enchantment, Translocation, Transformation, Divination, Channeling, Necromancy, Elemental, Poison
+public enum SpellClass // remember to add these to the Skill enum as well
+{ Summoning, Enchantment, Telekinesis, Translocation, Transformation, Divination, Channeling, Necromancy, Elemental,
+  Poison
 }
 
 public abstract class Spell
@@ -22,22 +23,22 @@ public abstract class Spell
   public virtual void Cast(Entity user, Item item) { }
   public virtual void Cast(Entity user, Point tile, Direction dir) { }
 
-  public int Level { get { return Difficulty/100+1; } }
+  public Skill Exercises { get { return (Skill)((int)Class+(int)Skill.WeaponSkills); } }
+  public int Level { get { return (Difficulty+1)/2; } }
 
+  // (Int-7) * 100 * (1.2 - 1/(skill^1.175)) / Difficulty - 10
   public int CastChance(Entity user) // assuming the user knows it
-  { double div = Math.Pow(1.25, user.Int)/8;
-    int skill = (user.GetSkill(Skill.Casting)+GetSpellSkill(user)+1)/2;
-    if(skill>0) div += skill*Math.Pow(1.02, skill)*16*div/100;
-    int chance = 100-(int)Math.Round((Difficulty+50)/div);
+  { int skill = (user.GetSkill(Skill.Casting)+GetSpellSkill(user)+1)/2;
+    double smul = 1.2-1/Math.Pow(1.1746189430880190059144636656919, skill);
+    int chance = (int)Math.Round((user.Int-7)*100*smul/Difficulty) - 10;
     return chance<0 ? 0 : chance>100 ? 100 : chance;
   }
   public bool CastTest(Entity user) { return Global.Rand(100)<CastChance(user); }
 
+  // (Int-8) * 100 * (1.1 - 1/(skill^1.126)) / Difficulty - 20
   public int LearnChance(Entity user)
-  { double div = Math.Pow(1.25, user.Int)/8;                // 1.25 ** INT
-    div += GetSpellSkill(user)*25*div/100;                  // + 25% per skill level
-    int chance = 100-(int)Math.Round((Difficulty+100)/div); // 100 - (Difficulty+100)/that value
-    chance += chance*20/100;                                // + 20%
+  { double smul = 1.1-1/Math.Pow(1.2589254117941672104239541063958, GetSpellSkill(user));
+    int chance = (int)Math.Round((user.Int-8)*100*smul/Difficulty) - 20;
     return chance<0 ? 0 : chance>100 ? 100 : chance;
   }
 
@@ -46,7 +47,7 @@ public abstract class Spell
   public string Name, Description;
   public SpellClass  Class;
   public SpellTarget Target;
-  public int Difficulty; // 0-99=level 1, 100-199=level 2, 200-299=level 3, etc
+  public int Difficulty; // 1-18, 1,2=level 1, 3,4=level 2, etc
   public int Memory; // memory of this spell, decreased every turn that the spell isn't cast, forgotten at zero
   public int Power;  // MP usage
   
@@ -126,8 +127,8 @@ public abstract class BeamSpell : Spell
 
 public class ForceBolt : BeamSpell
 { public ForceBolt()
-  { Name="force bolt"; Class=SpellClass.Elemental; Difficulty=95; Power=2;
-    Description = "The fire spell hurls a great bolt of flames.";
+  { Name="force bolt"; Class=SpellClass.Telekinesis; Difficulty=1; Power=2;
+    Description = "The spell forces stuff. Yeah.";
   }
 
   protected override object Hit(Entity user, Point pt) { return user.Map.GetEntity(pt); }
@@ -146,7 +147,8 @@ public class ForceBolt : BeamSpell
   protected override void Affect(Entity user, object obj)
   { Entity e = obj as Entity;
     if(e!=null)
-    { int damage = Global.NdN(1, 8);
+    { Damage damage = new Damage(Global.NdN(1, 6));
+      damage.Direct = 2;
       e.OnHitBy(user, this, damage);
       user.OnHit(e, this, damage);
       e.DoDamage(user, Death.Combat, damage);
@@ -158,7 +160,7 @@ public class ForceBolt : BeamSpell
 
 public class FireSpell : BeamSpell
 { public FireSpell()
-  { Name="fire"; Class=SpellClass.Elemental; Difficulty=550; Power=12;
+  { Name="fire"; Class=SpellClass.Elemental; Difficulty=10; Power=12;
     Description = "The fire spell hurls a great bolt of flames.";
   }
 
@@ -195,7 +197,8 @@ public class FireSpell : BeamSpell
   { Entity e = obj as Entity;
     bool print;
     if(e!=null)
-    { int damage = Global.NdN(4, 10);
+    { Damage damage = new Damage();
+      damage.Heat = (ushort)Global.NdN(4, 10);
       e.OnHitBy(user, this, damage);
       user.OnHit(e, this, damage);
       print = App.Player.CanSee(e);
@@ -228,7 +231,7 @@ public class FireSpell : BeamSpell
 
 public class TeleportSpell : Spell
 { public TeleportSpell()
-  { Name="teleport"; Class=SpellClass.Translocation; Difficulty=450; Power=9; Target=SpellTarget.Self;
+  { Name="teleport"; Class=SpellClass.Translocation; Difficulty=6; Power=9; Target=SpellTarget.Self;
     Description = "This spell will teleport the caster to a random location.";
   }
 
@@ -242,7 +245,7 @@ public class TeleportSpell : Spell
 
 public class AmnesiaSpell : Spell
 { public AmnesiaSpell()
-  { Name="amnesia"; Class=SpellClass.Divination; Difficulty=10; Power=2; Target=SpellTarget.Self;
+  { Name="amnesia"; Class=SpellClass.Divination; Difficulty=2; Power=2; Target=SpellTarget.Self;
     Description = "This spell scrambles the caster's memory.";
   }
   

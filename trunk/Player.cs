@@ -103,6 +103,9 @@ public class Player : Entity
         if(spell==null) goto nevermind;
         if(MP<spell.Power) { App.IO.Print("You don't have enough power to cast this spell!"); goto next; }
         MP -= spell.Power;
+        Exercise(Attr.Int);
+        Exercise(Skill.Casting);
+        Exercise(spell.Exercises);
         if(spell.Memory<2000) App.IO.Print("Your memory of this spell is very faint.");
         else if(spell.Memory<4000) App.IO.Print("Your memory of this spell is fant.");
         if(spell.CastTest(this))
@@ -382,7 +385,8 @@ public class Player : Entity
           goto next;
         Scroll scroll = read as Scroll;
         if(scroll != null) // read scroll
-        { if(scroll.Count>1) ((Scroll)scroll.Split(1)).Read(this);
+        { Exercise(Attr.Int);
+          if(scroll.Count>1) ((Scroll)scroll.Split(1)).Read(this);
           else { inv.Remove(scroll); scroll.Read(this); }
         }
         else // read spellbook
@@ -399,6 +403,9 @@ public class Player : Entity
           { if(!App.IO.YesNo("This spell seems very difficult. Continue?", false)) goto next;
           }
           else if(chance<50 && !App.IO.YesNo("This spell seems difficult. Continue?", false)) goto next;
+
+          Exercise(Attr.Int);
+          Exercise(spell.Exercises);
 
           bool success = Global.Rand(100)<chance;
           if(success) // succeeded
@@ -422,12 +429,12 @@ public class Player : Entity
           else
           { App.IO.Print("Something has gone wrong! Dark energies cloud your mind.");
             int effect = Global.Rand(chance);
-            AddEffect(new Effect(book, Flag.Confused, 100-effect));
+            AddEffect(book, Flag.Confused, 100-effect);
             if(effect<30) TeleportSpell.Default.Cast(this);
             if(effect<10) AmnesiaSpell.Default.Cast(this);
             if(effect<5)
             { App.IO.Print("You start to shake uncontrollably, and the world goes dark.");
-              AddEffect(new Effect(book, Flag.Asleep, Global.NdN(4, 15)));
+              AddEffect(book, Flag.Asleep, Global.NdN(4, 15));
             }
           }
         }
@@ -730,17 +737,18 @@ public class Player : Entity
     }
   }
 
-  public override void OnHit(Entity hit, object item, int damage)
-  { if(item==null || item is Weapon)
-      App.IO.Print(damage>0 ? "You hit {0}." : "You hit {0}, but do no damage.", hit==this ? "yourself" : hit.theName);
+  public override void OnHit(Entity hit, object item, Damage damage)
+  { int dam = damage.Total;
+    if(item==null || item is Weapon)
+      App.IO.Print(dam>0 ? "You hit {0}." : "You hit {0}, but do no damage.", hit==this ? "yourself" : hit.theName);
     else if(item is Spell)
-      App.IO.Print(damage>0 ? "The spell hits {0}." : "The spell hits {0}, but {1} unaffected.",
+      App.IO.Print(dam>0 ? "The spell hits {0}." : "The spell hits {0}, but {1} unaffected.",
                    hit==this ? "you" : hit.theName, hit==this ? "you are" : "it appears");
   }
-  public override void OnHitBy(Entity attacker, object item, int damage)
+  public override void OnHitBy(Entity attacker, object item, Damage damage)
   { Interrupt();
     if(attacker!=this)
-      App.IO.Print(damage>0 ? "{0} hits you!" : "{0} hits you, but does no damage.", attacker.TheName);
+      App.IO.Print(damage.Total>0 ? "{0} hits you!" : "{0} hits you, but does no damage.", attacker.TheName);
   }
   public override void OnInvoke(Item item) { App.IO.Print("You invoke {0}.", item); }
   public override void OnKill(Entity killed) { App.IO.Print("You kill {0}!", killed.TheName); }

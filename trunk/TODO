@@ -1,8 +1,5 @@
-wands
-carry weight
 gods, religion
 praying
-spells
 spellbooks
 searching & hidden tiles, searching reveals monsters (in memory)
 autopickup, config file
@@ -17,20 +14,17 @@ Check all the Global.Rand(100)'s for correctness
 document interfaces!
 make visibility checks stop at boulders, etc (once we have them)
 make LevelDown decrease stats
-make an OnFlagsChanged event and use to drive flag-related output
 make carry weight affect smell gain?
 add a way to determine whether a creature is hostile, friendly, or neutral
 make character hesitant to eat raw flesh
-handle case when inventory is full in various places
-make Fire check for sufficient ammo
 alter AI so that ranged weapons can be used
 allow monsters to determine from which direction they were hit
 allow attacking ground/ceiling
 truly copy items when updating memory (so changes to them won't be known)
 implement cloaks
-implement falling down stairs
-don't allow user to equip incompatible weapons
-spawn monsters where they can't be seen
 add the ability to select the default ammo
-add the ability to unequip items
-make wield nothing only unequip weapons
+add dipping (into potions, water...)
+add the ability to break wands
+alert AI when any damage is taken
+make some spells hit doors, etc (generalize the code to damage tiles)
+handing choosing an above/below directional target

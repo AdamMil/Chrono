@@ -12,13 +12,13 @@ public abstract class Fighter : AI
     base.Generate(level, myClass);
   }
 
-  public override void OnHitBy(Entity hit, Item item, int damage)
-  { base.OnHitBy(hit, item, damage);
+  public override void OnHitBy(Entity attacker, object item, int damage)
+  { base.OnHitBy(attacker, item, damage);
     Alerted = true; Shout();
   }
 
-  public override void OnMissBy(Entity hit, Item item)
-  { base.OnMissBy(hit, item);
+  public override void OnMissBy(Entity attacker, object item)
+  { base.OnMissBy(attacker, item);
     if(Global.Coinflip()) { Alerted = true; Shout(); }
   }
 

@@ -247,17 +247,17 @@ public abstract class Entity
   { Attack(weapon, ammo, pt, false);
   }
 
-  bool AttackPoint(Point pt, object context)
-  { if(!Map.IsPassable(Map[pt].Type)) return false;
+  TraceAction AttackPoint(Point pt, object context)
+  { if(!Map.IsPassable(Map[pt].Type)) return TraceAction.Stop;
     Entity e = Map.GetEntity(pt);
-    if(e!=null && TryHit(e, (Item)context)) return false;
-    return true;
+    if(e!=null && TryHit(e, (Item)context)) return TraceAction.Stop;
+    return TraceAction.Go;
   }
   public void Attack(Item item, Ammo ammo, Point pt, bool thrown)
   { Weapon w = item as Weapon;
-    bool ranged = thrown || pt!=Position && (w!=null && w.Ranged);
-    TraceResult res = ranged ? TraceLine(pt, ammo==null ? Math.Max(30, Str*10/item.Weight) : 30, false,
-                                         new LinePoint(AttackPoint), item)
+    bool ranged = thrown || pt!=Position && w!=null && (w.Ranged && ammo!=null || w.wClass==WeaponClass.Thrown);
+    TraceResult res = ranged ? Global.TraceLine(Position, pt, ammo==null ? Math.Max(30, Str*10/item.Weight) : 30,
+                                                false, new LinePoint(AttackPoint), item)
                              : new TraceResult(pt, Map.IsPassable(Map[pt].Type) ? pt : Position);
 
     Entity c = Map.GetEntity(res.Point);
@@ -305,8 +305,9 @@ public abstract class Entity
   // true if item can be removed (not cursed, etc) or slot is empty
   public bool CanRemove(Slot slot) { return true; }
   public bool CanRemove(Wearable item) { return true; }
-  // true if there's a line of sight to the given creature
-  public bool CanSee(Entity creature) { return LookAt(creature) != Direction.Invalid; }
+  // true if there's a line of sight to the given creature/tile
+  public bool CanSee(Entity creature) { return this==creature || LookAt(creature) != Direction.Invalid; }
+  public bool CanSee(Point point) { return Position==point || LookAt(point) != Direction.Invalid; }
   // true if item can be unequipped (not cursed, etc) or hand is empty
   public bool CanUnequip(int hand) { return true; }
   public bool CanUnequip(Wieldable item) { return true; }
@@ -314,10 +315,11 @@ public abstract class Entity
   public void Die(Death cause) { Die(null, cause); }
   public abstract void Die(object killer, Death cause);
 
-  public void DoDamage(Death cause, int amount)
+  public void DoDamage(object killer, Death cause, int amount)
   { HP =- amount;
-    if(HP<=0) Die(cause);
+    if(HP<=0) Die(killer, cause);
   }
+  public void DoDamage(Death cause, int amount) { DoDamage(null, cause, amount); }
 
   public Item Drop(char c) // drops an item (assumes it's droppable), returns item dropped
   { Item i = Inv[c];
@@ -483,8 +485,10 @@ public abstract class Entity
 
   public Direction LookAt(Entity creature) // return the direction to a visible creature or Invalid if not visible
   { if(creature.GetFlag(Flag.Invisible) && !GetFlag(Flag.SeeInvisible)) return Direction.Invalid;
-
-    int x2 = creature.Position.X-X, y2 = creature.Position.Y-Y, light=Light;
+    return LookAt(creature.Position);
+  }
+  public Direction LookAt(Point pt)
+  { int x2 = pt.X-X, y2 = pt.Y-Y, light=Light;
     int x=0, y=0, dx=Math.Abs(x2), dy=Math.Abs(y2), xi=Math.Sign(x2), yi=Math.Sign(y2), r, ru, p;
     Point off = new Point();
     if(dx>=dy)
@@ -495,7 +499,7 @@ public abstract class Entity
       { if(p>0) { y+=yi; p+=ru; }
         else p+=r;
         x+=xi; dx--;
-        if(creature.X==x+X && creature.Y==y+Y) break;
+        if(pt.X==x+X && pt.Y==y+Y) break;
         if(!Map.IsPassable(x+X, y+Y) || Math.Sqrt(x*x+y*y)-0.5>light) return Direction.Invalid;
       } while(dx>=0);
     }
@@ -507,7 +511,7 @@ public abstract class Entity
       { if(p>0) { x+=xi; p+=ru; }
         else p+=r;
         y+=yi; dy--;
-        if(creature.X==x+X && creature.Y==y+Y) break;
+        if(pt.X==x+X && pt.Y==y+Y) break;
         if(!Map.IsPassable(x+X, y+Y) || Math.Sqrt(x*x+y*y)-0.5>light) return Direction.Invalid;
       } while(dy>=0);
     }
@@ -520,12 +524,12 @@ public abstract class Entity
   public virtual void OnDrop(Item item) { }
   public virtual void OnEquip(Wieldable item) { }
   public virtual void OnFlagsChanged(Flag oldFlags, Flag newFlags) { }
-  public virtual void OnHit(Entity hit, Item item, int damage) { }
-  public virtual void OnHitBy(Entity hit, Item item, int damage) { }
+  public virtual void OnHit(Entity hit, object item, int damage) { }
+  public virtual void OnHitBy(Entity attacker, object item, int damage) { }
   public virtual void OnInvoke(Item item) { }
   public virtual void OnKill(Entity killed) { }
-  public virtual void OnMiss(Entity hit, Item item) { }
-  public virtual void OnMissBy(Entity hit, Item item) { }
+  public virtual void OnMiss(Entity hit, object item) { }
+  public virtual void OnMissBy(Entity attacker, object item) { }
   public virtual void OnNoise(Entity source, Noise type, int volume) { }
   public virtual void OnPickup(Item item) { }
   public virtual void OnReadScroll(Scroll scroll) { }
@@ -540,19 +544,22 @@ public abstract class Entity
   // place item in inventory, assumes it's within reach, already removed from other inventory, etc
   public Item Pickup(Item item)
   { Item ret = Inv.Add(item);
-    OnPickup(ret);
-    ret.OnPickup(this);
+    if(ret!=null)
+    { OnPickup(ret);
+      ret.OnPickup(this);
+    }
     return ret;
   }
   // removes an item from 'inv' and places it in our inventory
   public Item Pickup(IInventory inv, int index)
-  { Item item = inv[index];
-    inv.RemoveAt(index);
-    return Pickup(item);
+  { Item item = Pickup(inv[index]);
+    if(item!=null) inv.RemoveAt(index);
+    return item;
   }
   public Item Pickup(IInventory inv, Item item) // ditto
-  { inv.Remove(item);
-    return Pickup(item);
+  { Item ret=Pickup(item);
+    if(ret!=null) inv.Remove(item);
+    return ret;
   }
 
   public void Remove(Item item) // removes a worn item (assumes it's being worn)
@@ -607,7 +614,11 @@ public abstract class Entity
             msg = "sick";
           }
           OnSick(msg);
-          if(HP<=0) Die(e.Source, e.Attr==Attr.Poison ? Death.Poison : Death.Sickness);
+          if(HP<=0)
+          { Die(e.Source, e.Attr==Attr.Poison ? Death.Poison : Death.Sickness);
+            Entity killer = e.Source as Entity;
+            if(killer!=null) killer.GiveKillExp(this);
+          }
           else if(Global.OneIn(HP==1 ? 3 : 8))
           { if(--effects[i].Value<=0) CancelEffect(i--);
           }
@@ -817,13 +828,6 @@ public abstract class Entity
   // the carry weight percentages at which we're burdened, stressed, and overtaxed
   protected const int BurdenedAt=60, StressedAt=75, OvertaxedAt=90;
 
-  protected struct TraceResult
-  { public TraceResult(Point pt, Point prev) { Point=pt; Previous=prev; }
-    public Point Point;
-    public Point Previous;
-  }
-  protected delegate bool LinePoint(Point point, object context);
-
   protected bool Attack(Entity c, Item item, Ammo ammo, bool hit, bool thrown)
   { Weapon w = item as Weapon;
     int noise = Math.Min(w!=null ? w.Noise*15-Stealth*8 : item==null ? (10-Stealth)*15 : item.Weight+30, 255);
@@ -855,45 +859,22 @@ public abstract class Entity
   }
 
   // calculates our unarmed combat damage without skill bonuses
-  protected virtual int CalculateDamage(Entity target) { return Global.NdN(1, 4)+Math.Max(0, StrBonus); }
+  protected virtual int CalculateDamage(Entity target)
+  { return Math.Max(1, StrBonus); // FIXME: make this much higher for entities skilled in unarmed combat
+  }
 
   protected void CheckFlags() // check if our flags have changed and call OnFlagsChanged if so
   { Flag nf = Flags;
     if(nf!=oldFlags) { OnFlagsChanged(oldFlags, nf); oldFlags=nf; Interrupt(); }
   }
 
+  protected void GiveKillExp(Entity killed)
+  { Exp += killed.KillExp;
+    ExpPool += Global.NdN(2, killed.baseKillExp); // TODO: this probably needs revision
+  }
+
   // called when the creature is added to or removed from a map
   protected internal virtual void OnMapChanged() { }
-
-  protected TraceResult TraceLine(Point dest, int maxDist, bool stopAtDest, LinePoint func, object context)
-  { int x2=dest.X-X, y2=dest.Y-Y;
-    int x=0, y=0, dx=Math.Abs(x2), dy=Math.Abs(y2), xi=Math.Sign(x2), yi=Math.Sign(y2), r, ru, p;
-    Point op=Position, pt;
-    if(dx>=dy)
-    { r=dy*2; ru=r-dx*2; p=r-dx;
-      while(true)
-      { if(p>0) { y+=yi; p+=ru; }
-        else p+=r;
-        x+=xi; dx--;
-        pt = new Point(x+X, y+Y);
-        if(!func(pt, context) || maxDist!=-1 && Math.Sqrt(x*x+y*y)-0.5>maxDist || stopAtDest && dx<0)
-          return new TraceResult(pt, op);
-        op=pt;
-      }
-    }
-    else
-    { r=dx*2; ru=r-dy*2; p=r-dy;
-      while(true)
-      { if(p>0) { x+=xi; p+=ru; }
-        else p+=r;
-        y+=yi; dy--;
-        pt = new Point(x+X, y+Y);
-        if(!func(pt, context) || maxDist!=-1 && Math.Sqrt(x*x+y*y)-0.5>maxDist || stopAtDest && dy<0)
-          return new TraceResult(pt, op);
-        op=pt;
-      }
-    }
-  }
 
   protected void UpdateMemory() // updates Memory using the visible area
   { if(Memory==null) return;
@@ -976,8 +957,7 @@ public abstract class Entity
       { c.Die(this, Death.Combat);
         if(c.HP<=0) // check health again because amulet of saving, etc could have taken effect
         { OnKill(c);
-          Exp += c.KillExp;
-          ExpPool += Global.NdN(2, c.baseKillExp);
+          GiveKillExp(c);
         }
       }
     }

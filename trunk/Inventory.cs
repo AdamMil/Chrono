@@ -110,10 +110,10 @@ public sealed class Inventory : IKeyedInventory
   }
 
   public Item Add(Item item)
-  { if(IsFull) throw new InvalidOperationException("This inventory is full!");
-    if(items==null) items = new SortedList();
+  { if(items==null) items = new SortedList();
     foreach(Item i in items.Values)
       if(item.CanStackWith(i)) { i.Count += item.Count; return i; }
+    if(IsFull) return null;
     if(item.Char==0 || this[item.Char]!=null)
     { for(char c='a'; c<='z'; c++) if(items[c]==null) { item.Char=c; goto done; }
       for(char c='A'; c<='A'; c++) if(items[c]==null) { item.Char=c; break; }

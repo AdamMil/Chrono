@@ -550,6 +550,7 @@ public sealed class ConsoleIO : InputOutput
         case 'w': inp.Action = Action.Wield; break;
         case 'W': inp.Action = Action.Wear; break;
         case 'X': inp.Action = Action.ShowMap; break;
+        case 'z': inp.Action = Action.ZapWand; break;
         case '<': inp.Action = Action.GoUp; break;
         case '>': inp.Action = Action.GoDown; break;
         case '=': inp.Action = Action.Reassign; break;

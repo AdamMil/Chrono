@@ -33,14 +33,15 @@ public sealed class App
     Player.Pickup(new Dart()).Count = 20;
     Player.Pickup(new Buckler());
     Player.Pickup(new PaperBag());
-    Player.Pickup(new BadArrow()).Count = 10;
-    Player.Pickup(new GoodArrow()).Count = 10;
+    Player.Pickup(new BadArrow()).Count = 20;
+    Player.Pickup(new GoodArrow()).Count = 20;
     Player.Pickup(new Hamburger());
     Player.Pickup(new InvisibilityRing());
     Player.Pickup(new SeeInvisibleRing());
     Player.Pickup(new TeleportScroll());
     Player.Pickup(new HealPotion()).Count=2;
     Player.Pickup(new Deodorant());
+    Player.Pickup(new WandOfFire());
     map.Entities.Add(Player);
 
     IO.Render(Player);

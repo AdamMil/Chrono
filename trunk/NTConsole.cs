@@ -181,7 +181,7 @@ public class NTConsole
       Check(GetNumberOfConsoleInputEvents(hRead, out num));
       while(num-->0)
       { Check(PeekConsoleInputA(hRead, out rec, 1, out read));
-        if(rec.Type<=InputType.BufferResize) return true;
+        if(rec.Type==InputType.Keyboard) return true;
         Check(ReadConsoleInputA(hRead, out rec, 1, out read));
       }
       return false;

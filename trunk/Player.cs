@@ -82,7 +82,6 @@ public class Player : Creature
         }
         else if(toEat.Eat(this)) inv.Remove(toEat);
         if(Hunger<100) App.IO.Print("You feel full.");
-        App.IO.RedrawStats=true;
         break;
       }
 
@@ -191,7 +190,6 @@ public class Player : Creature
       else
       { App.IO.Print("You die of starvation.");
       }
-      App.IO.RedrawStats = true;
       Interrupt();
     }
   }

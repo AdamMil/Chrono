@@ -13,9 +13,8 @@ public sealed class ConsoleIO : InputOutput
     console.OutputMode = NTConsole.OutputModes.Processed|NTConsole.OutputModes.WrapAtEOL;
     console.Fill();
     console.SetCursorVisibility(true, 20);
+    for(int i=0; i<stats.Length; i++) stats[i] = int.MinValue;
   }
-
-  public override bool RedrawStats { get { return redrawStats; } set { redrawStats=value; } }
 
   public override int ScrollBack
   { get { return maxLines; }
@@ -306,11 +305,8 @@ public sealed class ConsoleIO : InputOutput
     }
 
     console.PutBlock(new Rectangle(0, 0, rect.Width, rect.Height), buf);
-    if(redrawStats)
-    { RenderStats(viewer);
-      SetCursorToPlayer();
-      redrawStats=false;
-    }
+    RenderStats(viewer);
+    SetCursorToPlayer();
     uncleared = 0;
   }
 
@@ -405,6 +401,9 @@ public sealed class ConsoleIO : InputOutput
     }
   }
 
+  bool Diff(Creature player, Attr attr) { return player.GetAttr(attr)!=stats[(int)attr]; }
+  bool Diff(Creature player, Attr attr1, Attr attr2) { return Diff(player, attr1) || Diff(player, attr2); }
+  
   void DrawLines()
   { Line[] arr;
     { LinkedList.Node node = lines.Tail;
@@ -510,32 +509,51 @@ public sealed class ConsoleIO : InputOutput
   }
   
   void RenderStats(Creature player)
-  { int x=MapWidth+2, y=0, healthpct=player.HP*100/player.MaxHP, xlines=0, width=console.Width-x;
-    PutStringP(width, x, y++, "{0} the {1} (lv {2})", player.Name, player.Title, player.ExpLevel+1);
-    PutStringP(width, x, y++, "Human");
-    PutStringP(healthpct<25 ? Color.Dire : healthpct<50 ? Color.Warning : Color.Normal,
-               width, x, y++, "HP:   {0}/{1}", player.HP, player.MaxHP);
-    PutStringP(width, x, y++, "MP:   {0}/{1}", player.MP, player.MaxMP);
-    PutStringP(width, x, y++, "AC:   {0}", player.AC);
-    PutStringP(width, x, y++, "EV:   {0}", player.EV);
-    PutStringP(width, x, y++, "Str:  {0}", player.Str);
-    PutStringP(width, x, y++, "Int:  {0}", player.Int);
-    PutStringP(width, x, y++, "Dex:  {0}", player.Dex);
-    PutStringP(width, x, y++, "Gold: {0}", 0);
-    PutStringP(width, x, y++, "Exp:  {0}/{0}", player.Exp, player.NextExp);
-    PutStringP(width, x, y++, "Turn: {0}", player.Age);
-    PutStringP(width, x, y++, "Dungeon level {0}", App.CurrentLevel+1);
+  { int x=MapWidth+2, y=0, xlines=0, width=console.Width-x;
+    if(Diff(player, Attr.ExpLevel))
+      PutStringP(width, x, y, "{0} the {1} (lv {2})", player.Name, player.Title, player.ExpLevel+1);
+    PutStringP(width, x, y+1, "Human");
+    if(Diff(player, Attr.HP, Attr.MaxHP))
+    { int healthpct = player.HP*100/player.MaxHP;
+      PutStringP(healthpct<25 ? Color.Dire : healthpct<50 ? Color.Warning : Color.Normal,
+                width, x, y+2, "HP:   {0}/{1}", player.HP, player.MaxHP);
+    }
+    if(Diff(player, Attr.MaxHP, Attr.MaxMP))
+    { int magicpct = player.MP*100/player.MaxMP;
+      PutStringP(magicpct<25 ? Color.Dire : magicpct<50 ? Color.Warning : Color.Normal,
+                 width, x, y+3, "MP:   {0}/{1}", player.MP, player.MaxMP);
+    }
+    if(Diff(player, Attr.AC)) PutStringP(width, x, y+4, "AC:   {0}", player.AC);
+    if(Diff(player, Attr.EV)) PutStringP(width, x, y+5, "EV:   {0}", player.EV);
+    if(Diff(player, Attr.Str)) PutStringP(width, x, y+6, "Str:  {0}", player.Str);
+    if(Diff(player, Attr.Int)) PutStringP(width, x, y+7, "Int:  {0}", player.Int);
+    if(Diff(player, Attr.Dex)) PutStringP(width, x, y+8, "Dex:  {0}", player.Dex);
+    if(Diff(player, Attr.Gold)) PutStringP(width, x, y+9, "Gold: {0}", player.Gold);
+    if(Diff(player, Attr.Exp)) PutStringP(width, x, y+10, "Exp:  {0}/{0}", player.Exp, player.NextExp);
+    if(Diff(player, Attr.Age))
+    { PutStringP(width, x, y+11, "Turn: {0}", player.Age);
+      PutStringP(width, x, y+12, "Dungeon level {0}", App.CurrentLevel+1);
+    }
+    y += 13;
+    if(hunger!=player.HungerLevel || playerFlags!=player.Flags)
+    { if(player.HungerLevel==Hunger.Hungry) { PutStringP(Color.Warning, width, x, y++, "Hungry"); xlines++; }
+      else if(player.HungerLevel==Hunger.Starving) { PutStringP(Color.Dire, width, x, y++, "Starving"); xlines++; }
+      if(xlines<statLines) console.Fill(x, y, width, statLines-xlines);
+    }
+    UpdateStats(player);
 
-    if(player.HungerLevel==Hunger.Hungry) { PutStringP(Color.Warning, width, x, y++, "Hungry"); xlines++; }
-    else if(player.HungerLevel==Hunger.Starving) { PutStringP(Color.Dire, width, x, y++, "Starving"); xlines++; }
-
-    if(xlines<statLines) console.Fill(x, y, width, statLines-xlines);
     statLines=xlines;
   }
 
   void SetCursorAtEOBL() { console.SetCursorPosition(blX, blY); }
   void SetCursorToPlayer() { console.SetCursorPosition(mapW/2, mapH/2); }
   
+  void UpdateStats(Creature player)
+  { for(int i=0; i<(int)Attr.NumAttributes; i++) stats[i] = player.GetAttr((Attr)i);
+    playerFlags = player.Flags;
+    hunger = player.HungerLevel;
+  }
+
   int WordWrap(string line)
   { int width=console.Width, s=0, e=line.Length, height=0;
     if(e==0) { AddWrapped(0, ""); return 1; }
@@ -559,11 +577,16 @@ public sealed class ConsoleIO : InputOutput
   bool[] vis;
   MenuItem[] menu;
   string[] wrapped = new string[4];
+
+  int[] stats = new int[(int)Attr.NumAttributes];
+  Creature.Flag playerFlags;
+  Hunger hunger;
+
   NTConsole console = new NTConsole();
-  LinkedList lines = new LinkedList(); // a circular array would be better
+  LinkedList lines = new LinkedList(); // a circular array would be more efficient...
   NTConsole.InputRecord rec;
   int  uncleared, maxLines=200, blX, blY, mapW, mapH, count, statLines;
-  bool inputMode, redrawStats=true;
+  bool inputMode;
 
   static NTConsole.Attribute ColorToAttr(Color color)
   { NTConsole.Attribute attr = NTConsole.Attribute.Black;

@@ -93,13 +93,7 @@ public abstract class Creature
   }
 
   public int GetAttr(Attr attribute) { return attr[(int)attribute]; }
-  public int SetAttr(Attr attribute, int val)
-  { if(val != attr[(int)attribute])
-    { App.IO.RedrawStats = true;
-      attr[(int)attribute]=val;
-    }
-    return val;
-  }
+  public int SetAttr(Attr attribute, int val) { return attr[(int)attribute]=val; }
 
   public bool GetFlag(Flag f) { return (Flags&f)!=0; }
   public bool SetFlag(Flag flag, bool on) { if(on) Flags |= flag; else Flags &= ~flag; return on; }

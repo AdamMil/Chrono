@@ -179,6 +179,11 @@
                     BuildAction = "Compile"
                 />
                 <File
+                    RelPath = "Rings.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
                     RelPath = "Scrolls.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
@@ -191,6 +196,11 @@
                 <File
                     RelPath = "TODO"
                     BuildAction = "None"
+                />
+                <File
+                    RelPath = "Tools.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
                 />
                 <File
                     RelPath = "Weapons.cs"

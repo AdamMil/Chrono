@@ -12,6 +12,16 @@ public abstract class Fighter : AI
     base.Generate(level, myClass);
   }
 
+  public override void OnHitBy(Entity hit, Weapon w, int damage)
+  { base.OnHitBy(hit, w, damage);
+    alerted = true; Shout();
+  }
+
+  public override void OnMissBy(Entity hit, Weapon w)
+  { base.OnMissBy(hit, w);
+    if(Global.Coinflip()) { alerted = true; Shout(); }
+  }
+
   public override void OnNoise(Entity source, Noise type, int volume)
   { if(!HasEars) return;
     if(!alerted) switch(type)
@@ -35,12 +45,12 @@ public abstract class Fighter : AI
     bool saw = dir!=Direction.Invalid;
     if(saw) 
     { if(alerted) tries=0;
-      if(!shouted) { Map.MakeNoise(Position, this, Noise.Alert, 150); shouted=true; }
+      Shout();
     }
     // then try sound (not affected by stealth because sound is already dampened by stealth)
     else if(noiseDir!=Direction.Invalid) { tries=0; dir=noiseDir; }
 
-    if(dir==Direction.Invalid && dontign && HasNose && lastDir==Direction.Invalid) // then try scent
+    if(dir==Direction.Invalid && HasNose && lastDir==Direction.Invalid) // then try scent (not dampened by stealth)
     { int maxScent=0;
       for(int i=0; i<8; i++)
       { Tile t = Map[Global.Move(Position, i)];
@@ -70,6 +80,8 @@ public abstract class Fighter : AI
     done:
     noiseDir=Direction.Invalid; maxNoise=0;
   }
+
+  void Shout() { if(!shouted) { Map.MakeNoise(Position, this, Noise.Alert, 150); shouted=true; } }
 
   Direction lastDir=Direction.Invalid, noiseDir=Direction.Invalid;
   int tries=3;

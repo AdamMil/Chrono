@@ -41,6 +41,15 @@ public abstract class Item : ICloneable
   public virtual object Clone() { return GetType().GetConstructor(copyCons).Invoke(new object[] { this }); }
   #endregion
 
+  public virtual bool Use(Entity user, Direction dir)
+  { if(user==App.Player) App.IO.Print("Nothing seems to happen.");
+    return false;
+  }
+  public virtual bool Use(Entity user, Entity target)
+  { if(user==App.Player) App.IO.Print("Nothing seems to happen.");
+    return false;
+  }
+
   public virtual bool CanStackWith(Item item)
   { if(item.Title!=null || Title!=null || item.GetType() != GetType()) return false;
     if(Class==ItemClass.Food || Class==ItemClass.Potion || Class==ItemClass.Scroll || Class==ItemClass.Treasure)
@@ -71,6 +80,7 @@ public abstract class Item : ICloneable
   public ItemClass Class;
   public Color Color;
   public char Char;
+  public bool UseDirection, UseTarget;
 
   protected string name;
 
@@ -91,10 +101,14 @@ public abstract class Modifying : Item
   public int Stealth { get { return Mods[(int)Attr.Stealth]; } set { Mods[(int)Attr.Stealth]=value; } }
   public int Str { get { return Mods[(int)Attr.Str]; } set { Mods[(int)Attr.Str]=value; } }
 
-  public int GetAttr(Attr attribute) { return Mods[(int)attribute]; }
-  public int SetAttr(Attr attribute, int val) { return Mods[(int)attribute]=val; }
+  public int  GetAttr(Attr attribute) { return Mods[(int)attribute]; }
+  public void SetAttr(Attr attribute, int val) { Mods[(int)attribute]=val; }
+
+  public bool GetFlag(Entity.Flag flag) { return (FlagMods&flag)!=0; }
+  public void SetFlag(Entity.Flag flag, bool on) { if(on) FlagMods |= flag; else FlagMods &= ~flag; }
 
   public int[] Mods = new int[(int)Attr.NumModifiable];
+  public Entity.Flag FlagMods;
 }
 
 public abstract class Wearable : Modifying
@@ -137,6 +151,10 @@ public abstract class Readable : Item
 { protected Readable() { }
   protected Readable(Item item) : base(item) { }
   public abstract void Read(Entity user);
+}
+
+public abstract class Chargeable : Item
+{ public int Charges, Recharged;
 }
 
 } // namespace Chrono

@@ -312,6 +312,10 @@ public class Player : Entity
         done: break;
       }
 
+      case Action.UseItem:
+      {
+      }
+
       case Action.ViewItem:
       { MenuItem[] items = App.IO.ChooseItem("Examine which item?", Inv, MenuFlag.None, ItemClass.Any);
         if(items.Length==0) goto nevermind;
@@ -325,7 +329,12 @@ public class Player : Entity
         Wearable item = items[0].Item as Wearable;
         if(item==null) { App.IO.Print("You can't wear that!"); goto next; }
         if(Wearing(item)) { App.IO.Print("You're already wearing that!"); goto next; }
-        if(Wearing(item.Slot) && !TryRemove(item.Slot)) goto next;
+        if(item.Slot==Slot.Ring)
+        { if(Wearing(Slot.LRing) && Wearing(Slot.RRing))
+          { App.IO.Print("You're already wearing two rings!"); goto next;
+          }
+        }
+        else if(Wearing(item.Slot) && !TryRemove(item.Slot)) goto next;
         Wear(item);
         break;
       }
@@ -383,17 +392,19 @@ public class Player : Entity
   
   protected virtual void OnAge()
   { Hunger++;
-    if(Hunger==HungryAt || Hunger==StarvingAt || Hunger==StarveAt)
-    { if(Hunger==HungryAt) App.IO.Print(Color.Warning, "You're getting hungry.");
-      else if(Hunger==StarvingAt) App.IO.Print(Color.Dire, "You're starving!");
-      else
+    if(HungerLevel>oldHungerLevel)
+    { if(HungerLevel==HungerLevel.Starved)
       { App.IO.Print("The world grows dim and you faint from starvation. You don't wake up.");
         Die("starvation");
       }
+      else if(HungerLevel==HungerLevel.Starving) App.IO.Print(Color.Dire, "You're starving!");
+      else if(HungerLevel==HungerLevel.Hungry)   App.IO.Print(Color.Warning, "You're getting hungry.");
+      oldHungerLevel = HungerLevel;
       Interrupt();
     }
     
-    Map.AddScent(X, Y);
+    Smell += Map.MaxScentAdd/100; // smelliness refills from 0 over 100 turns
+    Map.AddScent(X, Y, Smell);
     Map.SpreadScent();
   }
 
@@ -464,7 +475,7 @@ public class Player : Entity
     base.Think();
     if(vis!=null) UpdateMemory(vis);
     vis = VisibleTiles();
-    if(IsMonsterVisible(vis)) interrupt=true;
+    if(IsCreatureVisible(vis)) interrupt=true;
     OnAge();
     if(interrupt) { interrupt=false; return true; }
     return false;
@@ -475,6 +486,7 @@ public class Player : Entity
   };
 
   Input inp;
+  HungerLevel oldHungerLevel;
 }
 
 } // namespace Chrono

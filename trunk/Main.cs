@@ -27,11 +27,15 @@ public sealed class App
         if(map[x, y].Type==TileType.UpStairs) { Player.X = x; Player.Y = y; break; }
     Player.SetRawAttr(Attr.AC, 7);
     Player.SetRawAttr(Attr.EV, 6);
+    Player.SetRawAttr(Attr.Stealth, 10);
     Player.Pickup(new CueStick());
+    Player.Pickup(new Deodorant());
     Player.Pickup(new Buckler());
     Player.Pickup(new TwigOfDeath());
     Player.Pickup(new ShortSword());
     Player.Pickup(new PaperBag());
+    Player.Pickup(new InvisibilityRing());
+    Player.Pickup(new SeeInvisibleRing());
     Player.Pickup(new Hamburger()).Count=2;
     Player.Pickup(new HealPotion()).Count=2;
     Player.Pickup(new TeleportScroll());

@@ -435,6 +435,11 @@ public sealed class ConsoleIO : InputOutput
       if(mod.Speed!=0) console.WriteLine("Speed modifier: {0}", mod.Speed);
       if(mod.Str!=0) console.WriteLine("Strength modifier: {0}", mod.Str);
     }
+    if(item is Chargeable)
+    { Chargeable ch = (Chargeable)item;
+      console.WriteLine("This item has {0} charges remaining.", ch.Charges);
+      if(ch.Recharged>0) console.WriteLine("This item has been recharged {0} times.", ch.Recharged);
+    }
     if(item is Weapon)
     { Weapon w = (Weapon)item;
       if(w.Delay!=0) console.WriteLine("Attack delay: {0}%", w.Delay);
@@ -565,7 +570,7 @@ public sealed class ConsoleIO : InputOutput
   }
 
   bool Diff(Entity player, Attr attr) { return renderStats || player.GetAttr(attr)!=stats[(int)attr]; }
-  bool Diff(Entity player, Attr attr1, Attr attr2) { return Diff(player, attr1) || Diff(player, attr2); }
+  bool Diff(int a, int b) { return renderStats || a!=b; }
 
   void DisplayHelp()
   { ClearScreen();
@@ -738,6 +743,8 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
     if(buf==null || buf.Length<size) buf = new NTConsole.CharInfo[size];
     if(vis==null || vis.Length<size) vis = new bool[size];
 
+    seeInvisible = viewer.GetFlag(Entity.Flag.SeeInvisible);
+
     Map map = viewer.Memory==null ? viewer.Map : viewer.Memory;
     if(map==viewer.Map)
     { for(int i=0,y=rect.Top; y<rect.Bottom; y++)
@@ -764,7 +771,8 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
 
   void RenderMonsters(System.Collections.ICollection coll, Point[] vpts, Rectangle rect)
   { foreach(Entity c in coll)
-    { Point cp = c.Position;
+    { if(!seeInvisible && c.GetFlag(Entity.Flag.Invisible)) continue;
+      Point cp = c.Position;
       int bi = (c.Y-rect.Y)*rect.Width + c.X-rect.X;
       if(!rect.Contains(cp) || !vis[bi]) continue;
       for(int i=0; i<vpts.Length; i++) if(vpts[i]==cp) { buf[bi] = CreatureToChar(c, vis[bi]); break; }
@@ -773,14 +781,14 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
 
   void RenderStats(Entity player)
   { int x=MapWidth+2, y=0, xlines, width=console.Width-x;
-    if(Diff(player, Attr.ExpLevel)) PutStringP(width, x, y, "{0} the {1}", player.Name, player.Title);
+    if(Diff(player.ExpLevel, expLevel)) PutStringP(width, x, y, "{0} the {1}", player.Name, player.Title);
     PutStringP(width, x, y+1, "Human");
-    if(Diff(player, Attr.HP, Attr.MaxHP))
+    if(Diff(player, Attr.MaxHP) || Diff(player.HP, hp))
     { int healthpct = player.HP*100/player.MaxHP;
       PutStringP(healthpct<25 ? Color.Dire : healthpct<50 ? Color.Warning : Color.Normal,
                 width, x, y+2, "HP:   {0}/{1}", player.HP, player.MaxHP);
     }
-    if(Diff(player, Attr.MaxHP, Attr.MaxMP))
+    if(Diff(player, Attr.MaxMP) || Diff(player.MP, mp))
     { int magicpct = player.MP*100/player.MaxMP;
       PutStringP(magicpct<25 ? Color.Dire : magicpct<50 ? Color.Warning : Color.Normal,
                  width, x, y+3, "MP:   {0}/{1}", player.MP, player.MaxMP);
@@ -790,10 +798,10 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
     if(Diff(player, Attr.Str)) PutStringP(width, x, y+6, "Str:  {0}", player.Str);
     if(Diff(player, Attr.Int)) PutStringP(width, x, y+7, "Int:  {0}", player.Int);
     if(Diff(player, Attr.Dex)) PutStringP(width, x, y+8, "Dex:  {0}", player.Dex);
-    if(Diff(player, Attr.Gold)) PutStringP(width, x, y+9, "Gold: {0}", player.Gold);
-    if(Diff(player, Attr.Exp))
+    if(Diff(player.Gold, gold)) PutStringP(width, x, y+9, "Gold: {0}", player.Gold);
+    if(Diff(player.Exp, exp))
       PutStringP(width, x, y+10, "Exp:  {0}/{1} [{2}] (lv {3})", player.Exp, player.NextExp, player.ExpPool, player.ExpLevel);
-    if(Diff(player, Attr.Age))
+    if(Diff(player.Age, age))
     { PutStringP(width, x, y+11, "Turn: {0}", player.Age);
       PutStringP(width, x, y+12, "Dungeon level {0}", App.CurrentLevel+1);
     }
@@ -816,8 +824,8 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
     y = 13 + handLines;
     if(drewHands || hunger!=player.HungerLevel || playerFlags!=player.Flags)
     { xlines=handLines;
-      if(player.HungerLevel==Hunger.Hungry) { PutStringP(Color.Warning, width, x, y++, "Hungry"); xlines++; }
-      else if(player.HungerLevel==Hunger.Starving) { PutStringP(Color.Dire, width, x, y++, "Starving"); xlines++; }
+      if(player.HungerLevel==HungerLevel.Hungry) { PutStringP(Color.Warning, width, x, y++, "Hungry"); xlines++; }
+      else if(player.HungerLevel==HungerLevel.Starving) { PutStringP(Color.Dire, width, x, y++, "Starving"); xlines++; }
       if(xlines<statLines) console.Fill(x, y, width, statLines-xlines);
       statLines=xlines;
     }
@@ -860,6 +868,7 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
   { for(int i=0; i<(int)Attr.NumAttributes; i++) stats[i] = player.GetAttr((Attr)i);
     playerFlags = player.Flags;
     hunger = player.HungerLevel;
+    age=player.Age; exp=player.Exp; expLevel=player.ExpLevel; gold=player.Gold; hp=player.HP; mp=player.MP;
     equipStr = "";
     for(int i=0; i<player.Hands.Length; i++) if(player.Hands[i]!=null) equipStr += player.Hands[i].FullName;
   }
@@ -904,17 +913,19 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
   MenuItem[] menu;
   string[] wrapped = new string[4];
 
+  // these are used for stat rendering
   int[] stats = new int[(int)Attr.NumAttributes];
   Entity.Flag playerFlags;
-  Hunger hunger;
+  HungerLevel hunger;
   string equipStr="";
-  int handLines;
+  int age=-1, exp=-1, expLevel=-1, gold=-1, hp=-1, mp=-1, handLines;
+  bool renderStats;
 
   NTConsole console = new NTConsole();
   LinkedList lines = new LinkedList(); // a circular array would be more efficient...
   NTConsole.InputRecord rec;
   int  uncleared, maxLines=200, blX, blY, mapW, mapH, statLines;
-  bool inputMode, renderStats;
+  bool inputMode, seeInvisible;
 
   static NTConsole.Attribute ColorToAttr(Color color)
   { NTConsole.Attribute attr = NTConsole.Attribute.Black;

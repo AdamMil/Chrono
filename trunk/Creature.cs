@@ -46,7 +46,7 @@ public abstract class Creature
   public int HP { get { return attr[(int)Attr.HP]; } set { SetAttr(Attr.HP, value); } }
   public int Hunger { get { return attr[(int)Attr.Hunger]; } set { SetAttr(Attr.Hunger, value); } }
   public Hunger HungerLevel
-  { get { return Hunger<500 ? Chrono.Hunger.Normal : Hunger<800 ? Chrono.Hunger.Hungry : Chrono.Hunger.Starving; }
+  { get { return Hunger<HungryAt ? Chrono.Hunger.Normal : Hunger<StarvingAt ? Chrono.Hunger.Hungry : Chrono.Hunger.Starving; }
   }
   public int Int { get { return attr[(int)Attr.Int]; } set { SetAttr(Attr.Int, value); } }
   public int MaxHP { get { return attr[(int)Attr.MaxHP]; } set { SetAttr(Attr.MaxHP, value); } }

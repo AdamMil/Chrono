@@ -6,8 +6,8 @@ namespace Chrono
 
 public enum ItemClass
 { Invalid=-1, Any=-1,
-  Amulet, Weapon, Shield, Armor, Ammo, Food, Corpse, Scroll, Ring, Potion, Wand, Tool, Spellbook, Container, Treasure,
-  NumClasses
+  Gold, Amulet, Weapon, Shield, Armor, Ammo, Food, Corpse, Scroll, Ring, Potion, Wand, Tool, Spellbook, Container,
+  Treasure, NumClasses
 }
 [Flags] public enum ItemUse { NoUse=0, Self=1, UseTarget=2, UseDirection=4, UseBoth=UseTarget|UseDirection };
 
@@ -173,6 +173,14 @@ public abstract class Readable : Item
 
 public abstract class Chargeable : Item
 { public int Charges, Recharged;
+}
+
+public class Gold : Item
+{ public Gold() { name="gold piece"; Color=Color.Yellow; Class=ItemClass.Gold; }
+  public Gold(Item item) : base(item) { }
+  
+  public override bool CanStackWith(Item item) { return item.Class==ItemClass.Gold; }
+
 }
 
 } // namespace Chrono

@@ -42,6 +42,17 @@ public abstract class AI : Entity
   public override void OnEquip(Wieldable item)
   { if(App.Player.CanSee(this)) App.IO.Print("{0}{1}.", TheName, item.FullName);
   }
+  public override void OnFlagsChanged(Chrono.Entity.Flag oldFlags, Chrono.Entity.Flag newFlags)
+  { Flag diff = oldFlags ^ newFlags;
+    if((diff&(Flag.Asleep|Flag.Invisible))!=0 && App.Player.CanSee(this))
+    { if((diff&newFlags&Flag.Asleep)!=0) App.IO.Print(TheName+" wakes up.");
+      if((diff&Flag.Invisible)!=0) // invisibility changed
+      { bool seeInvis = (App.Player.Flags&Flag.SeeInvisible)!=0;
+        if((newFlags&Flag.Invisible)!=0 && !seeInvis) App.IO.Print(TheName+" vanishes from sight.");
+        else if((newFlags&Flag.Invisible)==0 && !seeInvis) App.IO.Print(TheName+" reappears!");
+      }
+    }
+  }
   public override void OnPickup(Item item)
   { if(App.Player.CanSee(this)) App.IO.Print("{0} picks up {1}.", TheName, item.FullName);
   }

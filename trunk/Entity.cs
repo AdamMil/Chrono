@@ -75,6 +75,13 @@ public abstract class Entity
       return flags;
     }
   }
+  public int Gold
+  { get
+    { int gold = 0;
+      foreach(Item i in Inv) if(i.Class==ItemClass.Gold) gold += i.Count;
+      return gold;
+    }
+  }
   public bool HandsFull
   { get
     { bool full=true;
@@ -258,6 +265,7 @@ public abstract class Entity
       { Hands[i] = item;
         OnEquip(item);
         item.OnEquip(this);
+        CheckFlags();
         break;
       }
   }
@@ -345,7 +353,10 @@ public abstract class Entity
   }
 
   public bool GetRawFlag(Flag flag) { return (RawFlags&flag)!=0; } // gets a raw flag (no modifiers)
-  public void SetRawFlag(Flag flag, bool on) { if(on) RawFlags |= flag; else RawFlags &= ~flag; } // sets a base flag
+  public void SetRawFlag(Flag flag, bool on) // sets a base flag
+  { if(on) RawFlags |= flag; else RawFlags &= ~flag;
+    CheckFlags();
+  }
 
   public int GetSkill(Skill skill) { return Skills[(int)skill]; }
   public void SetSkill(Skill skill, int value) { Skills[(int)skill]=value; }
@@ -422,6 +433,7 @@ public abstract class Entity
   public virtual void OnDrink(Potion potion) { }
   public virtual void OnDrop(Item item) { }
   public virtual void OnEquip(Wieldable item) { }
+  public virtual void OnFlagsChanged(Flag oldFlags, Flag newFlags) { }
   public virtual void OnHit(Entity hit, Item item, int damage) { }
   public virtual void OnHitBy(Entity hit, Item item, int damage) { }
   public virtual void OnInvoke(Item item) { }
@@ -466,6 +478,7 @@ public abstract class Entity
     Slots[(int)slot] = null;
     OnRemove(item);
     item.OnRemove(this);
+    CheckFlags();
   }
 
   public virtual void Think() // base Think()
@@ -494,7 +507,7 @@ public abstract class Entity
       else if(Global.OneIn(HP==1 ? 3 : 8)) Sickness--;
     }
   }
-
+  
   public void ThrowItem(Item item, Direction dir)
   { if(dir==Direction.Above || dir==Direction.Below || dir==Direction.Self) Attack(item, null, Position, true);
     else Attack(item, null, Global.Move(Position, dir), true);
@@ -579,6 +592,7 @@ public abstract class Entity
     Hands[hand] = null;
     OnUnequip(i);
     i.OnUnequip(this);
+    CheckFlags();
   }
 
   // returns a list of creatures visible from this position
@@ -634,6 +648,7 @@ public abstract class Entity
     else Slots[(int)item.Slot] = item;
     OnWear(item);
     item.OnWear(this);
+    CheckFlags();
   }
 
   // returns true if the given item is being worn
@@ -655,7 +670,7 @@ public abstract class Entity
   public Race   Race;        // our race
   public Color  Color=Color.Dire; // our general color
   public EntityClass Class;  // our class/job
-  public int Age, ExpPool, Gold, Hunger, Sickness;
+  public int Age, ExpPool, Hunger, Sickness;
 
   // generates a creature, creates it and calls the creature's Generate() method. class is RandomClass if not passed
   static public Entity Generate(Type type, int level) { return Generate(type, level, EntityClass.RandomClass); }
@@ -729,6 +744,11 @@ public abstract class Entity
   // calculates our unarmed combat damage without skill bonuses
   protected virtual int CalculateDamage(Entity target) { return Global.NdN(1, 4)+Math.Max(0, StrBonus); }
 
+  protected void CheckFlags() // check if our flags have changed and call OnFlagsChanged if so
+  { Flag nf = Flags;
+    if(nf!=oldFlags) { OnFlagsChanged(oldFlags, nf); oldFlags=nf; Interrupt(); }
+  }
+
   // called when the creature is added to or removed from a map
   protected internal virtual void OnMapChanged() { }
 
@@ -784,6 +804,7 @@ public abstract class Entity
 
   protected string prefix;   // my name prefix (usually null)
   protected int baseKillExp; // the base experience gotten for killing me
+  protected Flag oldFlags;   // the flags at the beginning of this turn
   protected bool interrupt;  // true if we've been interrupted
 
   struct AttrMods

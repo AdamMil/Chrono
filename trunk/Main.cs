@@ -35,6 +35,7 @@ public sealed class App
     map.Creatures.Add(player);
     
     player.Pickup(new PaperBag());
+    player.Pickup(new CueStick());
 
     Maps.Add(map);
     IO.Render(player);

@@ -8,7 +8,7 @@ namespace Chrono
 public enum Attr
 { Str, Dex, Int, NumBasics,
   MaxHP=NumBasics, MaxMP, Speed, AC, EV, NumModifiable,
-  Age=NumModifiable, Exp, ExpLevel, HP, MP, Gold, Hunger, NumAttributes
+  Age=NumModifiable, Exp, ExpLevel, HP, MP, Gold, Hunger, Sickness, NumAttributes
 }
 
 public enum Slot
@@ -28,37 +28,47 @@ public enum Hunger { Normal, Hungry, Starving };
 public abstract class Creature
 { [Flags] public enum Flag { None=0, Confused=1, Stunned=2, Hallucinating=4, Asleep=8 }
 
-  public int AC { get { return GetModAttr(Attr.AC); } }
-  public int Age { get { return attr[(int)Attr.Age]; } set { SetAttr(Attr.Age, value); } }
-  public int Dex { get { return GetModAttr(Attr.Dex); } }
-  public int EV { get { return GetModAttr(Attr.EV); } }
+  public int AC { get { return GetAttr(Attr.AC); } }
+  public int Age { get { return attr[(int)Attr.Age]; } set { SetRawAttr(Attr.Age, value); } }
+  public int Dex { get { return GetAttr(Attr.Dex); } }
+  public int EV { get { return GetAttr(Attr.EV); } }
   public int Exp
   { get { return attr[(int)Attr.Exp]; }
     set
-    { SetAttr(Attr.Exp, value);
+    { SetRawAttr(Attr.Exp, value);
       if(value>=NextExp) LevelUp();
     }
   }
   public int ExpLevel
   { get { return attr[(int)Attr.ExpLevel]; }
     set
-    { SetAttr(Attr.ExpLevel, value);
+    { SetRawAttr(Attr.ExpLevel, value);
       Title = GetTitle();
     }
   }
 
-  public int Gold { get { return attr[(int)Attr.Gold]; } set { SetAttr(Attr.Gold, value); } }
-  public int HP { get { return attr[(int)Attr.HP]; } set { SetAttr(Attr.HP, value); } }
-  public int Hunger { get { return attr[(int)Attr.Hunger]; } set { SetAttr(Attr.Hunger, value); } }
+  public int Gold { get { return attr[(int)Attr.Gold]; } set { SetRawAttr(Attr.Gold, value); } }
+  public bool HandsFull
+  { get
+    { bool full=true;
+      for(int i=0; i<Hands.Length; i++)
+        if(Hands[i]==null) full=false;
+        else if(Hands[i].AllHandWield) return true;
+      return full;
+    }
+  }
+  public int HP { get { return attr[(int)Attr.HP]; } set { SetRawAttr(Attr.HP, value); } }
+  public int Hunger { get { return attr[(int)Attr.Hunger]; } set { SetRawAttr(Attr.Hunger, value); } }
   public Hunger HungerLevel
   { get { return Hunger<HungryAt ? Chrono.Hunger.Normal : Hunger<StarvingAt ? Chrono.Hunger.Hungry : Chrono.Hunger.Starving; }
   }
-  public int Int { get { return GetModAttr(Attr.Int); } }
-  public int MaxHP { get { return GetModAttr(Attr.MaxHP); } }
-  public int MaxMP { get { return GetModAttr(Attr.MaxMP); } }
-  public int MP { get { return attr[(int)Attr.MP]; } set { SetAttr(Attr.MP, value); } }
-  public int Speed { get { return GetModAttr(Attr.Speed); } }
-  public int Str { get { return GetModAttr(Attr.Str); } }
+  public int Int { get { return GetAttr(Attr.Int); } }
+  public int MaxHP { get { return GetAttr(Attr.MaxHP); } }
+  public int MaxMP { get { return GetAttr(Attr.MaxMP); } }
+  public int MP { get { return attr[(int)Attr.MP]; } set { SetRawAttr(Attr.MP, value); } }
+  public int Sickness { get { return attr[(int)Attr.Sickness]; } set { SetRawAttr(Attr.Sickness, value); } }
+  public int Speed { get { return GetAttr(Attr.Speed); } }
+  public int Str { get { return GetAttr(Attr.Str); } }
 
   public Flag Flags { get { return flags; } set { flags=value; /* FIXME: redraw stats */ } }
 
@@ -73,6 +83,8 @@ public abstract class Creature
 
   public bool CanRemove(Slot slot) { return true; }
   public bool CanRemove(Wearable item) { return true; }
+  public bool CanUnequip(int hand) { return true; }
+  public bool CanUnequip(Wieldable item) { return true; }
 
   public Item Drop(char c)
   { Item i = Inv[c];
@@ -92,8 +104,34 @@ public abstract class Creature
     return i;
   }
 
-  public int GetAttr(Attr attribute) { return attr[(int)attribute]; }
-  public int SetAttr(Attr attribute, int val) { return attr[(int)attribute]=val; }
+  public void Equip(Wieldable item)
+  { if(item.AllHandWield)
+      for(int i=0; i<Hands.Length; i++) if(Hands[i]!=null) throw new ApplicationException("No room to wield!");
+    if(HandsFull) throw new ApplicationException("No room to wield!");
+    for(int i=0; i<Hands.Length; i++)
+      if(Hands[i]==null)
+      { Hands[i] = item;
+        OnEquip(item);
+        item.OnEquip(this);
+        break;
+      }
+  }
+
+  public bool Equipped(int hand) { return Hands[hand]!=null; }
+  public bool Equipped(Item item)
+  { for(int i=0; i<Hands.Length; i++) if(Hands[i]==item) return true;
+    return false;
+  }
+
+  public int GetAttr(Attr attribute)
+  { int idx=(int)attribute, val = attr[idx];
+    if(attribute>=Attr.NumModifiable) return val;
+    for(int i=0; i<Slots.Length; i++) if(Slots[i]!=null) val += Slots[i].Mods[idx];
+    return val;
+  }
+
+  public int GetRawAttr(Attr attribute) { return attr[(int)attribute]; }
+  public int SetRawAttr(Attr attribute, int val) { return attr[(int)attribute]=val; }
 
   public bool GetFlag(Flag f) { return (Flags&f)!=0; }
   public bool SetFlag(Flag flag, bool on) { if(on) Flags |= flag; else Flags &= ~flag; return on; }
@@ -117,7 +155,7 @@ public abstract class Creature
     int points = 8; // allocate extra points randomly
     while(points>0)
     { int a = Global.Rand((int)Attr.NumBasics);
-      if(attr[a]<=17 || Global.Coinflip()) { SetAttr((Attr)a, attr[a]+1); points--; }
+      if(attr[a]<=17 || Global.Coinflip()) { SetRawAttr((Attr)a, attr[a]+1); points--; }
     }
 
     HP = MaxHP; MP = MaxMP;
@@ -141,8 +179,11 @@ public abstract class Creature
   public void ItemThink() { for(int i=0; i<Inv.Count; i++) Inv[i].Think(this); }
 
   public virtual void OnDrop(Item item) { }
+  public virtual void OnEquip(Wieldable item) { }
   public virtual void OnRemove(Wearable item) { }
   public virtual void OnRemoveFail(Wearable item) { }
+  public virtual void OnUnequip(Wieldable item) { }
+  public virtual void OnUnequipFail(Wieldable item) { }
   public virtual void OnWear(Wearable item) { }
 
   public virtual Item Pickup(Item item)
@@ -173,6 +214,35 @@ public abstract class Creature
 
   public virtual void Think() { Age++; Timer-=Speed; }
   
+  public bool TryEquip(Wieldable item)
+  { if(item==null)
+    { bool success=true;
+      for(int i=0; i<Hands.Length; i++) if(!TryUnequip(i)) success=false;
+      return success;
+    }
+    if(item.AllHandWield)
+    { for(int i=0; i<Hands.Length; i++) if(!CanUnequip(i)) return false;
+      for(int i=0; i<Hands.Length; i++) Unequip(i);
+    }
+    else if(HandsFull)
+    { bool success=false;
+      for(int i=0; i<Hands.Length; i++) if(Hands[i].Class==item.Class && TryUnequip(i)) { success=true; break; }
+      if(!success) for(int i=0; i<Hands.Length; i++) if(TryUnequip(i)) { success=true; break; }
+      if(!success) return false;
+    }
+    Equip(item);
+    return true;
+  }
+  
+  public bool TryUnequip(Item item)
+  { if(Equipped(item)) Unequip(item);
+    return true;
+  }
+  public bool TryUnequip(int hand)
+  { if(Equipped(hand)) Unequip(hand);
+    return true;
+  }
+
   public bool TryRemove(Item item)
   { Remove(item);
     return true;
@@ -180,6 +250,23 @@ public abstract class Creature
   public bool TryRemove(Slot slot)
   { Remove(slot);
     return true;
+  }
+
+  public void Unequip(Item item)
+  { for(int i=0; i<Hands.Length; i++)
+      if(Hands[i]==item)
+      { Hands[i].OnUnequip(this);
+        OnUnequip(Hands[i]);
+        Hands[i]=null;
+        return;
+      }
+    throw new ApplicationException("Not wielding "+item);
+  }
+  public void Unequip(int hand)
+  { Wieldable i = Hands[hand];
+    Hands[hand] = null;
+    i.OnUnequip(this);
+    OnUnequip(i);
   }
 
   public Creature[] VisibleCreatures() { return VisibleCreatures(VisibleTiles()); }
@@ -220,7 +307,8 @@ public abstract class Creature
   }
 
   public void Wear(Wearable item)
-  { Slots[(int)item.Slot] = item;
+  { if(Slots[(int)item.Slot] != null) throw new ApplicationException("Already wearing something!");
+    Slots[(int)item.Slot] = item;
     OnWear(item);
     item.OnWear(this);
   }
@@ -233,6 +321,7 @@ public abstract class Creature
 
   public Inventory  Inv = new Inventory();
   public Wearable[] Slots = new Wearable[(int)Slot.NumSlots];
+  public Wieldable[] Hands = new Wieldable[2];
   public string Name, Title;
   public int    X, Y;
   public int    Light, Timer;
@@ -291,12 +380,6 @@ public abstract class Creature
   { public ClassLevel(int level, string title) { Level=level; Title=title; }
     public int Level;
     public string Title;
-  }
-
-  int GetModAttr(Attr attribute)
-  { int idx=(int)attribute, val = attr[idx];
-    for(int i=0; i<Slots.Length; i++) if(Slots[i]!=null) val += Slots[i].Mods[idx];
-    return val;
   }
 
   string GetTitle()

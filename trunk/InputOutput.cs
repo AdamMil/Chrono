@@ -7,7 +7,7 @@ namespace Chrono
 public enum Action
 { None, Quit, Rest, Move, MoveToInteresting, MoveToDanger, MoveAFAP, OpenDoor, CloseDoor, Pickup, Drop, DropType,
   GoUp, GoDown, Eat, Wear, Remove, Wield, Inventory, ShowMap, Fire, Quaff, Read, ViewItem, Invoke, SwapAB, Reassign,
-  ManageSkills, UseItem, Carve, ExamineTile, Throw, ZapWand, CastSpell, ShowKnowledge, Save, NameItem
+  ManageSkills, UseItem, Carve, ExamineTile, Throw, ZapWand, CastSpell, ShowKnowledge, Save, NameItem, TalkTo
 }
 
 public struct Input
@@ -63,6 +63,9 @@ public abstract class InputOutput
   { return Ask(Color.Normal, prompt, allowEmpty, rebuke);
   }
   public abstract string Ask(Color color, string prompt, bool allowEmpty, string rebuke);
+
+  public abstract int ConversationChoice(Entity talkingTo, string prompt, string[] options);
+  public abstract void EndConversation();
 
   public char CharChoice(string prompt, string chars)
   { return CharChoice(Color.Normal, prompt, chars, '\0', false, null);

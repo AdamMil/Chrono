@@ -215,8 +215,10 @@ public abstract class Wearable : Modifying
   protected Wearable(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override string GetInvName(Entity e)
-  { string ret = GetAName(e);
-    if(worn) ret += " (worn)";
+  { string ret = "";
+    if(worn)       ret += (ret!="" ? ", " : "(") + "worn";
+    if(Shop!=null) ret += (ret!="" ? ", " : "(") + "unpaid";
+    if(ret!="") ret = GetAName(e) + ' ' + ret + ')';
     return ret;
   }
 
@@ -234,8 +236,10 @@ public abstract class Wieldable : Modifying
   protected Wieldable(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override string GetInvName(Entity e)
-  { string ret = GetAName(e);
-    if(equipped) ret += " (equipped)";
+  { string ret = "";
+    if(equipped)   ret += (ret!="" ? ", " : "(") + "equipped";
+    if(Shop!=null) ret += (ret!="" ? ", " : "(") + "unpaid";
+    if(ret!="") ret = GetAName(e) + ' ' + ret + ')';
     return ret;
   }
 

@@ -120,13 +120,7 @@ public abstract class Entity : UniqueObject
     set { expLevel=value; Title=GetTitle(); }
   }
   public Flag Flags { get { return flags; } }
-  public int Gold
-  { get
-    { int gold = 0;
-      foreach(Item i in Inv) if(i.Class==ItemClass.Gold) gold += i.Count;
-      return gold;
-    }
-  }
+  public int Gold { get { return HowMuchGold(Inv); } }
   public bool HandsFull
   { get
     { bool full=true;
@@ -286,8 +280,9 @@ public abstract class Entity : UniqueObject
   public void Attack(Item item, Ammo ammo, Point pt, bool thrown)
   { Weapon w = item as Weapon;
     bool ranged = thrown || pt!=Position && w!=null && (w.Ranged && ammo!=null || w.wClass==WeaponClass.Thrown);
-    TraceResult res = ranged ? Global.TraceLine(Position, pt, ammo==null ? Math.Max(30, Str*10/item.Weight) : 30,
-                                                false, new LinePoint(AttackPoint), item)
+    TraceResult res = ranged ? Global.TraceLine(Position, pt,
+                                                ammo==null ? Math.Max(30, Str*10/(item.Weight==0 ? 1 : item.Weight))
+                                                           : 30, false, new LinePoint(AttackPoint), item)
                              : new TraceResult(pt, Map.IsPassable(Map[pt].Type) ? pt : Position);
 
     Entity c = Map.GetEntity(res.Point);
@@ -416,16 +411,18 @@ public abstract class Entity : UniqueObject
   public Item Drop(char c, int count) { return Drop(Inv[c], count); }
   public void Drop(Item item) // drops an item (assumes it's droppable)
   { Inv.Remove(item);
-    item.OnDrop(this);
-    OnDrop(item);
-    Map.AddItem(Position, item);
+    if(OnDrop(item))
+    { item.OnDrop(this);
+      Map.AddItem(Position, item);
+    }
   }
   public Item Drop(Item item, int count) // drops an item (assumes it's droppable)
   { if(count==item.Count) Inv.Remove(item);
     else item = item.Split(count);
-    item.OnDrop(this);
-    OnDrop(item);
-    Map.AddItem(Position, item);
+    if(OnDrop(item))
+    { item.OnDrop(this);
+      Map.AddItem(Position, item);
+    }
     return item;
   }
 
@@ -496,7 +493,10 @@ public abstract class Entity : UniqueObject
     return val;
   }
 
-  public Gold GetGold(int amount, bool acceptLess) { return GetGold(amount, acceptLess, Inv); }
+  public Gold GetGold(int amount, bool acceptLess)
+  { if(!acceptLess && amount>Gold) return null;
+    return GetGold(amount, acceptLess, Inv);
+  }
 
   // generates an entity, gives it default stats
   public virtual void Generate(int level, EntityClass myClass)
@@ -626,7 +626,7 @@ public abstract class Entity : UniqueObject
   public virtual void OnAttackedBy(Entity attacker) { }
   public virtual void OnAttrChange(Attr attribute, int amount, bool fromExercise) { }
   public virtual void OnDrink(Potion potion) { }
-  public virtual void OnDrop(Item item) { }
+  public virtual bool OnDrop(Item item) { return true; }
   public virtual void OnEquip(Wieldable item) { }
   public virtual void OnFlagsChanged(Flag oldFlags, Flag newFlags) { }
   public virtual void OnHit(Entity hit, object item, Damage damage) { }
@@ -732,13 +732,15 @@ public abstract class Entity : UniqueObject
     return 0;
   }
 
+  public virtual void TalkTo() { App.IO.Print(TheName+" has nothing to say to you."); }
+
   public virtual void Think() // base Think()
   { Age++;
     Timer-=Speed;
     if(Age%10==0)
     { int maxHP=MaxHP, maxMP=MaxMP;
       if(HP<maxHP) HP += (maxHP+39)/40; // heal 2.5% every 10 turns (rounded up)
-      if(MP<maxMP) MP += (maxMP+39)/40;
+      if(MP<maxMP) MP += (maxMP+39)/40; // ditto for MP
     }
 
     bool healthup=false;
@@ -1059,6 +1061,13 @@ public abstract class Entity : UniqueObject
   // the carry weight percentages at which we're burdened, stressed, and overtaxed
   protected const int BurdenedAt=60, StressedAt=75, OvertaxedAt=90;
 
+  protected enum Quips
+  { Attacking, KidAttacking, Kid, Fighter, Worker, Farmer, Holyman, Hobo, Housewife, Prostitute, Shopkeeper,
+    Other,
+  
+    NumTypes
+  };
+
   protected bool Attack(Entity c, Item item, Ammo ammo, bool hit, bool thrown)
   { Weapon w = item as Weapon;
     int noise = Math.Min(w!=null ? w.GetNoise(this) : item==null ? (10-Stealth)*15 : item.Weight+30, 255);
@@ -1129,6 +1138,45 @@ public abstract class Entity : UniqueObject
   protected int baseKillExp; // the base experience gotten for killing me
   protected bool interrupt;  // true if we've been interrupted
 
+  protected static string GetQuip(Quips type)
+  { if(quips[0]==null)
+    { System.IO.Stream stream = Global.LoadData("entity/quips.xml");
+      System.Xml.XmlDocument doc = new System.Xml.XmlDocument();
+      doc.Load(stream);
+      stream.Close();
+
+      System.Text.RegularExpressions.Regex stripre =
+        new System.Text.RegularExpressions.Regex(@"^\s+|\s+$", System.Text.RegularExpressions.RegexOptions.Multiline);
+
+      foreach(System.Xml.XmlNode list in doc.SelectSingleNode("/quips").ChildNodes)
+      { string[] stypes = list.Attributes["appliesTo"].Value.Split(' ');
+        int[]     types = new int[stypes.Length];
+        int[]   indices = new int[stypes.Length];
+
+        for(int i=0; i<stypes.Length; i++)
+        { int t = types[i] = (int)(Quips)Enum.Parse(typeof(Quips), stypes[i]);
+          if(quips[t]==null) quips[t] = new string[list.ChildNodes.Count];
+          else
+          { string[] narr = new string[quips[t].Length+list.ChildNodes.Count];
+            indices[i] = quips[t].Length;
+            Array.Copy(quips[t], narr, indices[i]);
+            quips[t] = narr;
+          }
+        }
+        
+        foreach(System.Xml.XmlNode quip in list.ChildNodes)
+        { string s = stripre.Replace(quip.InnerText, "").Replace("\n", " ").Replace("\r", "");
+          for(int i=0; i<types.Length; i++) quips[types[i]][indices[i]++] = s;
+        }
+      }
+    }
+    
+    string[] arr = quips[(int)type];
+    if(arr==null || arr.Length==0) return "MISSING QUIP FOR "+type;
+    
+    return arr[Global.Rand(arr.Length)].Replace("{NAME}", App.Player.Name);
+  }
+
   struct AttrMods
   { public AttrMods(params int[] mods) { Mods = mods; }
     public int[] Mods;
@@ -1176,7 +1224,6 @@ public abstract class Entity : UniqueObject
         }
       }
     
-    if(!acceptLess && amount>0 && inv==Inv) { inv.Add(ret); ret=null; }
     return ret;
   }
 
@@ -1188,6 +1235,16 @@ public abstract class Entity : UniqueObject
       title = classes[i].Title;
     }
     return title;
+  }
+
+  int HowMuchGold(IInventory inv)
+  { int total=0;
+    foreach(Item item in inv)
+    { if(item.Class==ItemClass.Gold) total += item.Count;
+      IInventory ni = item as IInventory;
+      if(ni!=null) total += HowMuchGold(ni);
+    }
+    return total;
   }
 
   bool TryDamage(Entity c, Item item, Ammo ammo) // returns true if 'item' should be destroyed
@@ -1343,6 +1400,9 @@ public abstract class Entity : UniqueObject
     { new ClassLevel(1, "Peon"), new ClassLevel(2, "Worker"), new ClassLevel(3, "Craftsman"),
     },
   };
+  
+  // quips
+  static readonly string[][] quips = new string[(int)Quips.NumTypes][];
 }
 
 } // namespace Chrono

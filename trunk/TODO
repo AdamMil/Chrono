@@ -11,7 +11,7 @@ document interfaces!
 make LevelDown decrease stats
 add a way to determine whether a creature is hostile, friendly, or neutral
 update target selection interface so you can filter by creature type (hostile/friendly/neutral/all)
-make character hesitant to eat raw flesh
+make some characters hesitant to eat raw flesh
 allow attacking ground/ceiling
 implement cloaks
 add dipping (into potions, water...)
@@ -24,7 +24,7 @@ add ability to view other levels in DisplayMap
 save when moving between levels, load levels on demand, unload unused levels
 redo formula for MaxHP/MaxMP gain (make based somewhat on race)
 make the AI affected by carry weight (unable to move, etc)
-fix bug where if an orc is on the up stairs, you'll be placed over it (prevent enemies from being spawned on stairs?)
+fix bug where if an entity is on a link and you traverse the link, you'll overlap the entity (move it away?)
 in places where SPACE means page down, make it mean page down or close the menu/etc if we're already on the last page
 make pressing characters representing an item class toggle all items of that class in menus (ie '!' toggles potions)
 speed up (optimize) item cloning!
@@ -44,3 +44,4 @@ amplify damage against unalerted creatures
 add ability to jump to monsters in DisplayMap (like in ChooseTarget)
 store gender and use it to change messages about "it" to "he" or "she" (eg, when examining creatures)
 add random encounters
+when using ',' to switch between weapons, remember both hands (eg, shield) and restore them

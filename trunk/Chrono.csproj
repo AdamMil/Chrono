@@ -104,6 +104,11 @@
                     AssemblyName = "ICSharpCode.SharpZipLib"
                     HintPath = "..\SharpZipLib\ICSharpCode.SharpZipLib.dll"
                 />
+                <Reference
+                    Name = "System.XML"
+                    AssemblyName = "System.Xml"
+                    HintPath = "..\..\WINDOWS\Microsoft.NET\Framework\v1.1.4322\System.XML.dll"
+                />
             </References>
         </Build>
         <Files>
@@ -179,10 +184,6 @@
                     BuildAction = "Compile"
                 />
                 <File
-                    RelPath = "MapFormat.txt"
-                    BuildAction = "Content"
-                />
-                <File
                     RelPath = "MapGenerator.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
@@ -201,10 +202,6 @@
                     RelPath = "NTConsole.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "Overworld.txt"
-                    BuildAction = "Content"
                 />
                 <File
                     RelPath = "Player.cs"
@@ -259,6 +256,36 @@
                     RelPath = "Weapons.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
+                />
+                <File
+                    RelPath = "data\dialog\fatherOfPC.xml"
+                    BuildAction = "Content"
+                />
+                <File
+                    RelPath = "data\dialog\quips.xml"
+                    BuildAction = "Content"
+                />
+                <File
+                    RelPath = "data\dialog\quips.xsd"
+                    BuildAction = "Content"
+                />
+                <File
+                    RelPath = "data\dialog\textData.xsd"
+                    BuildAction = "Content"
+                />
+                <File
+                    RelPath = "data\dialog\textData.xsx"
+                    DependentUpon = "textData.xsd"
+                    BuildAction = "None"
+                />
+                <Folder RelPath = "data\entities\" />
+                <File
+                    RelPath = "data\maps\MapFormat.txt"
+                    BuildAction = "Content"
+                />
+                <File
+                    RelPath = "data\maps\overworld.xml"
+                    BuildAction = "Content"
                 />
             </Include>
         </Files>

@@ -45,7 +45,7 @@ public class Overworld : MapCollection
   { Map map;
     switch((Place)mi)
     { case Place.Overworld:
-      { FileStream f = File.Open("Overworld.txt", FileMode.Open, FileAccess.Read);
+      { Stream f = Global.LoadData("maps/overworld.xml");
         map = Map.Load(f);
         f.Close();
 

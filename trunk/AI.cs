@@ -57,7 +57,7 @@ public abstract class AI : Entity
   }
 
   public override void OnDrink(Potion potion) { Does("drinks", potion); }
-  public override void OnDrop(Item item) { Does("drops", item); }
+  public override bool OnDrop(Item item) { Does("drops", item); return true; }
   public override void OnEquip(Wieldable item)
   { if(App.Player.CanSee(this))
     { App.IO.Print("{0} equips {1}.", TheName, item.GetAName(App.Player));
@@ -148,6 +148,11 @@ public abstract class AI : Entity
   public new void Pickup(IInventory inv, Item item)
   { if(items==null) items=new ArrayList();
     items.Add(base.Pickup(inv, item));
+  }
+
+  public override void TalkTo()
+  { if(canSpeak) Say(GetQuip(HostileTowards(App.Player) ? Quips.Attacking : Quips.Other));
+    else App.IO.Print(TheName+" grunts (you're not sure if it can speak).");
   }
 
   public override void Think()
@@ -737,6 +742,7 @@ public abstract class AI : Entity
   protected byte maxNoise;        // the loudest noise we've heard so far (reset at the end of every turn)
   protected bool alwaysHostile=true;  // true if we should attack the player's party regardless of social group considerations
   protected bool canOpenDoors =false; // most creatures can't open doors (by default)
+  protected bool canSpeak     =true;  // most creatures can speak
   protected bool shout;           // true if we will shout on our next turn to alert others
 
   void AddSkills(int points, Skill[] skills)

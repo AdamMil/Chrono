@@ -123,7 +123,8 @@ public sealed class Inventory : IKeyedInventory
     if(IsFull) return null;
     if(!char.IsLetter(item.Char) || this[item.Char]!=null)
     { for(char c='a'; c<='z'; c++) if(items[c]==null) { item.Char=c; goto done; }
-      for(char c='A'; c<='A'; c++) if(items[c]==null) { item.Char=c; break; }
+      for(char c='A'; c<='Z'; c++) if(items[c]==null) { item.Char=c; goto done; }
+      return null;
     }
     done: items[item.Char] = item;
     return item;

@@ -41,7 +41,7 @@ public abstract class Scroll : Readable
   public Spell Spell;
 
   protected bool Cast(Entity user)
-  { switch(Spell.Target)
+  { switch(Spell.GetSpellTarget(user))
     { case SpellTarget.Self: Spell.Cast(user, Status, user.Position, Direction.Self); break;
       case SpellTarget.Item:
         MenuItem[] items = App.IO.ChooseItem(Prompt==null ? "Cast on which item?" : Prompt,

@@ -80,6 +80,8 @@ public abstract class AI : Entity
     { GotoState(AIState.Attacking);
       hitDir = LookAt(attacker.Position);
     }
+    if(SocialGroup!=-1 && attacker==App.Player && !Global.GetSocialGroup(SocialGroup).Hostile)
+      Global.UpdateSocialGroup(SocialGroup, true);
   }
   public override void OnMissBy(Entity attacker, object item)
   { if(state==AIState.Asleep) return;
@@ -125,7 +127,10 @@ public abstract class AI : Entity
         if(t.Sound>maxNoise) { maxNoise=t.Sound; noiseDir=(Direction)i; }
       }
   }
-  public override void OnPickup(Item item) { Does("picks up", item); }
+  public override void OnPickup(Item item, IInventory inv)
+  { item.Status &= ~ItemStatus.PlayerOwned;
+    Does("picks up", item);
+  }
   public override void OnReadScroll(Scroll scroll) { Does("reads", scroll); }
   public override void OnRemove(Wearable item) { Does("removes", item); }
   public override void OnSick(string howSick)
@@ -445,8 +450,10 @@ public abstract class AI : Entity
 
   protected virtual bool PickupItems()
   { if(!HasInventory || Inv.IsFull || !Map.HasItems(Position)) return false;
-    Shop shop = Map.GetShop(Position);
-    if(shop!=null && shop.Shopkeeper!=null) return false; // don't pick up items in shops (unless the shop is abandoned)
+    if(state!=AIState.Attacking) // don't pick up items in shops, unless we're fighting or the shop is abandoned
+    { Shop shop = Map.GetShop(Position);
+      if(shop!=null && shop.Shopkeeper!=null) return false;
+    }
 
     int weight = CarryWeight, burdenedAt = BurdenedAt*CarryMax/100;
     bool pickup=false;
@@ -565,12 +572,18 @@ public abstract class AI : Entity
   protected virtual int RingScore(Ring ring)
   { int score = 0;
 
-    if(ring.KnownCursed) score -= 4; // blessed/cursed status (uses player's knowledge)
+    if(ring.KnownCursed) score -= 6; // blessed/cursed status (uses player's knowledge)
     else if(ring.KnownBlessed) score += 2;
     else if(ring.KnownUncursed) score++;
     
-    if(ring is InvisibilityRing) score += 8; // specific rings
-    else if(ring is SeeInvisibleRing) score += 3;
+    if(ring is InvisibilityRing) // specific rings
+    { if(Is(Flag.Invisible)) return -10;
+      score += 8;
+    }
+    else if(ring is SeeInvisibleRing)
+    { if(Is(Flag.SeeInvisible)) return -10;
+      score += 3;
+    }
 
     return score;
   }

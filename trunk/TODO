@@ -27,7 +27,7 @@ make the AI affected by carry weight (unable to move, etc)
 fix bug where if an orc is on the up stairs, you'll be placed over it (prevent enemies from being spawned on stairs?)
 in places where SPACE means page down, make it mean page down or close the menu/etc if we're already on the last page
 make pressing characters representing an item class toggle all items of that class in menus (ie '!' toggles potions)
-speed up item cloning!
+speed up (optimize) item cloning!
 clone entities into memory as well as items
 add ways to raise natural resistances
 improve AI's RunAway() so it will go through doors more often
@@ -42,3 +42,5 @@ allow stealthy kills (if attacking an unalerted creature and the blow is fatal, 
   or, just make creatures scream on their turn [which should have the same effect])
 amplify damage against unalerted creatures
 add ability to jump to monsters in DisplayMap (like in ChooseTarget)
+store gender and use it to change messages about "it" to "he" or "she" (eg, when examining creatures)
+add random encounters

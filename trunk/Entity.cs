@@ -80,7 +80,9 @@ public enum Slot // where an item can be worn
 }
 
 public abstract class Entity : UniqueObject
-{ [Flags] public enum Flag { None=0, Confused=1, Hallucinating=2, Asleep=4, Invisible=8, SeeInvisible=16 }
+{ [Flags] public enum Flag
+  { None=0, Confused=1, Hallucinating=2, Asleep=4, Invisible=8, SeeInvisible=16, TeleportControl=32
+  }
 
   public Entity() { ExpLevel=1; Smell=Map.MaxScentAdd/2; }
   protected Entity(SerializationInfo info, StreamingContext context) : base(info, context) { }
@@ -161,7 +163,7 @@ public abstract class Entity : UniqueObject
                            : level<20 ? 100*Math.Pow(1.3, level+10)-3000 : 100*Math.Pow(1.18, level+25)+50000) - 25;
     }
   }
-  public bool OnOverworld { get { return Map.Dungeon is Overworld && Map.Index==(int)Overworld.Place.Overworld; } }
+  public bool OnOverworld { get { return Map.Index==(int)Overworld.Place.Overworld && Map.Dungeon is Overworld; } }
   public int Poison
   { get // only one effect can be Poison
     { for(int i=0; i<numEffects; i++) if(effects[i].Attr==Attr.Poison) return effects[i].Value;
@@ -348,6 +350,9 @@ public abstract class Entity : UniqueObject
   public void Die(Death cause) { Die(null, cause); }
   public abstract void Die(object killer, Death cause);
 
+  public int DistanceTo(Entity e) { return DistanceTo(e.Position); }
+  public int DistanceTo(Point pt) { return Math.Max(Math.Abs(X-pt.X), Math.Abs(Y-pt.Y)); }
+
   public void DoDamage(Death cause, int damage)
   { Damage d = new Damage();
     d.Direct = (ushort)damage;
@@ -407,16 +412,16 @@ public abstract class Entity : UniqueObject
   public Item Drop(char c, int count) { return Drop(Inv[c], count); }
   public void Drop(Item item) // drops an item (assumes it's droppable)
   { Inv.Remove(item);
-    Map.AddItem(Position, item);
     item.OnDrop(this);
     OnDrop(item);
+    Map.AddItem(Position, item);
   }
   public Item Drop(Item item, int count) // drops an item (assumes it's droppable)
   { if(count==item.Count) Inv.Remove(item);
     else item = item.Split(count);
-    Map.AddItem(Position, item);
     item.OnDrop(this);
     OnDrop(item);
+    Map.AddItem(Position, item);
     return item;
   }
 
@@ -570,7 +575,9 @@ public abstract class Entity : UniqueObject
     return LookAt(creature.Position);
   }
   public Direction LookAt(Point pt)
-  { int x2 = pt.X-X, y2 = pt.Y-Y, light=Light;
+  { if(pt==Position) return Direction.Self;
+
+    int x2 = pt.X-X, y2 = pt.Y-Y, light=Light;
     int x=0, y=0, dx=Math.Abs(x2), dy=Math.Abs(y2), xi=Math.Sign(x2), yi=Math.Sign(y2), r, ru, p;
     Point off = new Point();
     if(dx>=dy)
@@ -623,7 +630,7 @@ public abstract class Entity : UniqueObject
   public virtual void OnMiss(Entity hit, object item) { }
   public virtual void OnMissBy(Entity attacker, object item) { }
   public virtual void OnNoise(Entity source, Noise type, int volume) { }
-  public virtual void OnPickup(Item item) { }
+  public virtual void OnPickup(Item item, IInventory from) { }
   public virtual void OnReadScroll(Scroll scroll) { }
   public virtual void OnRemove(Wearable item) { }
   public virtual void OnRemoveFail(Wearable item) { }
@@ -634,22 +641,21 @@ public abstract class Entity : UniqueObject
   public virtual void OnWear(Wearable item) { }
 
   // place item in inventory, assumes it's within reach, already removed from other inventory, etc
-  public Item Pickup(Item item)
-  { Item ret = Inv.Add(item);
-    if(ret!=null)
-    { OnPickup(ret);
-      ret.OnPickup(this);
-    }
+  public Item Pickup(Item item) { return Pickup(item, null); }
+  public Item Pickup(Item item, IInventory from)
+  { OnPickup(item, from);
+    Item ret = Inv.Add(item);
+    if(ret!=null) ret.OnPickup(this);
     return ret;
   }
   // removes an item from 'inv' and places it in our inventory
   public Item Pickup(IInventory inv, int index)
-  { Item item = Pickup(inv[index]);
+  { Item item = Pickup(inv[index], inv);
     if(item!=null) inv.RemoveAt(index);
     return item;
   }
   public Item Pickup(IInventory inv, Item item) // ditto
-  { Item ret=Pickup(item);
+  { Item ret=Pickup(item, inv);
     if(ret!=null) inv.Remove(item);
     return ret;
   }
@@ -673,6 +679,12 @@ public abstract class Entity : UniqueObject
   { Hands[hand] = null;
     CheckFlags();
   }
+
+  public void Say(string text)
+  { if(App.Player.CanSee(this)) App.IO.Print("{0} says \"{1}\".", TheName, text);
+    else if(DistanceTo(App.Player)<30) App.IO.Print("You hear something say \"{0}\".", text);
+  }
+  public void Say(string text, params object[] args) { Say(string.Format(text, args)); }
 
   public Ammo SelectAmmo(Weapon w)
   { FiringWeapon fw = w as FiringWeapon;
@@ -1065,7 +1077,7 @@ public abstract class Entity : UniqueObject
 
   protected void GiveKillExp(Entity killed)
   { Exp += killed.KillExp;
-    ExpPool += Global.NdN(2, killed.baseKillExp)-2; // TODO: this probably needs revision
+    ExpPool += Math.Max(Global.NdN(2, killed.baseKillExp)-2, 1); // TODO: this probably needs revision
   }
 
   protected void UpdateMemory() // updates Memory using the visible area
@@ -1128,7 +1140,7 @@ public abstract class Entity : UniqueObject
     else dam.Physical = (ushort)Math.Round(dam.Physical * SkillModifier(wepskill/2.0));
 
     c.OnHitBy(this, item, dam);
-    OnHit(c, item, dam);
+    OnHit(c, item, dam); // TODO: apply the effects of AC and resistances before calling OnHit, so we can report actual damage done
     if(item!=null) if(item.Hit(this, c)) destroyed=true;
     c.DoDamage(this, Death.Combat, dam);
 

@@ -279,6 +279,7 @@ public class Map : UniqueObject
 
   public EntityCollection Entities { get { return entities; } }
   public Link[] Links { get { return links; } }
+  public Shop[] Shops { get { return shops; } }
   public int Width  { get { return width; } }
   public int Height { get { return height; } }
   public Tile this[int x, int y]
@@ -313,9 +314,12 @@ public class Map : UniqueObject
   { Shop[] narr = new Shop[shops==null ? 1 : shops.Length+1];
     if(narr.Length!=1) Array.Copy(shops, narr, narr.Length-1);
     shops = narr;
+
     Shop shop = narr[narr.Length-1] = new Shop(rect, shopkeeper, type);
+    Entities.Add(shop.Shopkeeper);
+    shop.Shopkeeper.Position = new Point(shop.Area.X+shop.Area.Width/2, shop.Area.Y+shop.Area.Height/2); // FIXME: wrong
+    shop.Shopkeeper.SocialGroup = GroupID;
     if(stock) while(RestockShop(shop));
-    shopkeeper.SetShop(shop);
   }
 
   public void ClearLinks() { links = new Link[0]; }
@@ -400,18 +404,21 @@ public class Map : UniqueObject
   public bool IsDoor(Point pt) { return IsDoor(this[pt.X,pt.Y].Type); }
   public bool IsDoor(int x, int y) { return IsDoor(this[x,y].Type); }
 
-  public Point FreeSpace() { return FreeSpace(Space.Items); }
-  public Point FreeSpace(Space allow)
+  // FIXME: make changes so this doesn't crash the game
+  public Point FreeSpace() { return FreeSpace(Space.Items, new Rectangle(0, 0, Width, Height)); }
+  public Point FreeSpace(Rectangle area) { return FreeSpace(Space.Items, area); }
+  public Point FreeSpace(Space allow) { return FreeSpace(allow, new Rectangle(0, 0, Width, Height)); }
+  public Point FreeSpace(Space allow, Rectangle area)
   { int tries = width*height;
     while(tries-->0)
-    { Point pt = new Point(Global.Rand(width), Global.Rand(height));
+    { Point pt = new Point(Global.Rand(area.Width)+area.X, Global.Rand(area.Height)+area.Y);
       if(!IsFreeSpace(pt, allow)) continue;
       return pt;
     }
-    for(int y=0; y<height; y++)
-      for(int x=0; x<width; x++)
+    for(int y=area.Y; y<area.Bottom; y++)
+      for(int x=area.X; x<area.Right; x++)
         if(IsFreeSpace(x, y, allow)) return new Point(x, y);
-    throw new ArgumentException("No free space found on this map!");
+    throw new ArgumentException("No free space found!");
   }
 
   public bool IsFreeSpace(Point pt, Space allow) { return IsFreeSpace(pt.X, pt.Y, allow); }
@@ -823,6 +830,13 @@ public class TestMap : Map
       if(App.Player==null || !App.Player.CanSee(Entities[idx])) break;
     }
   }
+}
+
+[Serializable]
+public class TownMap : Map
+{ public TownMap(int width, int height) : base(width, height) { }
+  public TownMap(Size size) : base(size) { }
+  public TownMap(SerializationInfo info, StreamingContext context) : base(info, context) { }
 }
 
 } // namespace Chrono

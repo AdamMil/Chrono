@@ -41,6 +41,7 @@ public abstract class Spell : UniqueObject
   }
   public void Cast(Entity user, Item target) { Cast(user, ItemStatus.None, target); }
   public virtual void Cast(Entity user, ItemStatus buc, Item target) { }
+  public void Cast(Entity user, Point tile) { Cast(user, ItemStatus.None, tile, Direction.Invalid); }
   public void Cast(Entity user, Point tile, Direction dir) { Cast(user, ItemStatus.None, tile, dir); }
   public virtual void Cast(Entity user, ItemStatus buc, Point tile, Direction dir) { }
 
@@ -95,11 +96,12 @@ public abstract class Spell : UniqueObject
     return chance<0 ? 0 : chance>100 ? 100 : chance;
   }
 
+  public virtual SpellTarget GetSpellTarget(Entity user) { return target; }
+
   public virtual ICollection TracePath(Entity user, Point pt) { return null; }
 
   public string Name;
-  public SpellClass  Class;
-  public SpellTarget Target;
+  public SpellClass Class;
   public int Difficulty; // 1-18, 1,2=level 1, 3,4=level 2, etc
   public int Memory; // decreased every turn that the spell isn't cast, forgotten at zero. -1 means never forget
   public int Power;  // MP usage
@@ -133,6 +135,8 @@ public abstract class Spell : UniqueObject
     return true;
   }
 
+  protected SpellTarget target;
+
   protected static ArrayList path = new ArrayList();
 
   static readonly int[] armorPenalty = new int[]
@@ -143,7 +147,7 @@ public abstract class Spell : UniqueObject
 
 #region BeamSpell
 public abstract class BeamSpell : Spell
-{ protected BeamSpell() { Target=SpellTarget.Tile; Range=10; }
+{ protected BeamSpell() { target=SpellTarget.Tile; Range=10; }
   protected BeamSpell(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override void Cast(Entity user, ItemStatus buc, Point tile, Direction dir)
@@ -309,8 +313,8 @@ public class FireSpell : BeamSpell
   { if(i.Class==ItemClass.Scroll || i.Class==ItemClass.Potion || i.Class==ItemClass.Spellbook)
     { if(print)
       { string plural = i.Count>1 ? "" : "s";
-        App.IO.Print(i.Class==ItemClass.Potion ? "Your {0} heat{1} up and burst{1}!" : "Your {0} burn{1} up!",
-                     i.GetFullName(App.Player), plural);
+        App.IO.Print(i.Class==ItemClass.Potion ? "{0} heat{1} up and burst{1}!" : "{0} burn{1} up!",
+                     (inv==App.Player.Inv ? "Your "+i.GetFullName(App.Player) : i.GetAName(App.Player)), plural);
       }
       inv.Remove(i);
       return true;
@@ -327,14 +331,27 @@ public class FireSpell : BeamSpell
 [Serializable]
 public class TeleportSpell : Spell
 { public TeleportSpell()
-  { Name="teleport"; Class=SpellClass.Translocation; Difficulty=6; Power=9; Target=SpellTarget.Self; AutoIdentify=true;
+  { Name="teleport"; Class=SpellClass.Translocation; Difficulty=6; Power=9; AutoIdentify=true;
   }
   public TeleportSpell(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
-
   public override void Cast(Entity user, ItemStatus buc, Point tile, Direction dir)
-  { if(user!=App.Player && App.Player.CanSee(user)) App.IO.Print("{0} disappears.", user.TheName);
-    user.Position = user.Map.FreeSpace();
+  { Point telTo = user.Is(Entity.Flag.TeleportControl) ? tile : user.Map.FreeSpace();
+    if(user!=App.Player)
+    { if(App.Player.CanSee(user))
+      { user.Position = telTo;
+        App.IO.Print("{0} {1}.", user.TheName, App.Player.CanSee(telTo) ? "teleports" : "disappears");
+      }
+      else
+      { user.Position = telTo;
+        if(App.Player.CanSee(user)) App.IO.Print("{0} appears out of nowhere!", user.AName);
+      }
+    }
+    else user.Position = telTo;
+  }
+
+  public override SpellTarget GetSpellTarget(Entity user)
+  { return user.Is(Entity.Flag.TeleportControl) ? SpellTarget.Tile : SpellTarget.Self;
   }
 
   public readonly static TeleportSpell Default = new TeleportSpell();
@@ -346,7 +363,7 @@ public class TeleportSpell : Spell
 [Serializable]
 public class AmnesiaSpell : Spell
 { public AmnesiaSpell()
-  { Name="amnesia"; Class=SpellClass.Divination; Difficulty=2; Power=2; Target=SpellTarget.Self;
+  { Name="amnesia"; Class=SpellClass.Divination; Difficulty=2; Power=2; target=SpellTarget.Self;
   }
   public AmnesiaSpell(SerializationInfo info, StreamingContext context) : base(info, context) { }
   
@@ -393,7 +410,7 @@ public class AmnesiaSpell : Spell
 [Serializable]
 public class IdentifySpell : Spell
 { public IdentifySpell()
-  { Name="identify"; Class=SpellClass.Divination; Difficulty=5; Power=3; Target=SpellTarget.Item; AutoIdentify=true;
+  { Name="identify"; Class=SpellClass.Divination; Difficulty=5; Power=3; target=SpellTarget.Item; AutoIdentify=true;
   }
   public IdentifySpell(SerializationInfo info, StreamingContext context) : base(info, context) { }
 

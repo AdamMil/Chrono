@@ -16,7 +16,7 @@ public enum ItemClass : sbyte
 [Flags] public enum ItemUse : byte { NoUse=0, Self=1, UseTarget=2, UseDirection=4, UseBoth=UseTarget|UseDirection };
 
 [Flags] public enum ItemStatus : byte
-{ None=0, Identified=1, KnowCB=2, Burnt=4, Rotted=8, Rusted=16, Cursed=32, Blessed=64
+{ None=0, Identified=1, KnowCB=2, Burnt=4, Rotted=8, Rusted=16, Cursed=32, Blessed=64, PlayerOwned=128
 };
 
 public enum Material : byte { Paper, Leather, HardMaterials, Wood=HardMaterials, Metal, Glass }
@@ -124,6 +124,8 @@ public abstract class Item : UniqueObject, ICloneable
   { if(user==App.Player) App.IO.Print("Nothing seems to happen.");
     return false;
   }
+  
+  public bool Is(ItemStatus status) { return (Status&status)!=0; }
 
   public virtual bool Think(Entity holder) { Age++; return false; }
 
@@ -253,12 +255,14 @@ public abstract class Chargeable : Item
 [Serializable]
 public class Gold : Item
 { public Gold() { name="gold piece"; Color=Color.Yellow; Class=ItemClass.Gold; }
+  public Gold(int count) : this() { Count=count; }
   public Gold(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override bool CanStackWith(Item item) { return item.Class==ItemClass.Gold; }
   
   public static readonly int SpawnChance=200; // 2% chance
   public static readonly int SpawnMin=3, SpawnMax=16; // 2% chance
+  public static readonly int ShopValue=1;
 }
 
 } // namespace Chrono

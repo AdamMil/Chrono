@@ -192,7 +192,7 @@ public sealed class ConsoleIO : InputOutput
         else console.WriteLine("You know this spell quite well.");
 
         console.WriteLine("Casting this spell requires {0} MP.", selected.Power);
-        switch(selected.Target)
+        switch(selected.GetSpellTarget(reader))
         { case SpellTarget.Self: console.WriteLine("This spell only affects the caster."); break;
           case SpellTarget.Item: console.WriteLine("This spell is cast upon an item."); break;
           case SpellTarget.Tile: console.WriteLine("This spell is cast at a point in space."); break;
@@ -929,6 +929,7 @@ public sealed class ConsoleIO : InputOutput
           case AIState.Attacking: AddLine("It looks angry!"); break;
           case AIState.Escaping: AddLine("It looks frightened."); break;
           case AIState.Idle: case AIState.Patrolling: case AIState.Wandering: AddLine("It looks bored."); break;
+          case AIState.Working: AddLine("It's busy working."); break;
           default: AddLine("UNKNOWN AI STATE"); break;
         }
       }
@@ -973,6 +974,7 @@ Ctrl-P - see old messages";
     console.SetCursorPosition(0, 0);
     NTConsole.OutputModes mode = console.OutputMode;
     console.OutputMode = NTConsole.OutputModes.Processed;
+    console.Attributes = ColorToAttr(Color.Normal);
     console.Write(helptext);
     ReadChar();
     console.OutputMode = mode;

@@ -561,8 +561,8 @@ public abstract class Entity : UniqueObject
       { if(p>0) { y+=yi; p+=ru; }
         else p+=r;
         x+=xi; dx--;
+        if(!Map.IsPassable(Map[x+X, y+Y].Type) || Math.Sqrt(x*x+y*y)-0.5>light) return Direction.Invalid;
         if(pt.X==x+X && pt.Y==y+Y) break;
-        if(!Map.IsPassable(x+X, y+Y) || Math.Sqrt(x*x+y*y)-0.5>light) return Direction.Invalid;
       } while(dx>=0);
     }
     else
@@ -573,8 +573,8 @@ public abstract class Entity : UniqueObject
       { if(p>0) { x+=xi; p+=ru; }
         else p+=r;
         y+=yi; dy--;
+        if(!Map.IsPassable(Map[x+X, y+Y].Type) || Math.Sqrt(x*x+y*y)-0.5>light) return Direction.Invalid;
         if(pt.X==x+X && pt.Y==y+Y) break;
-        if(!Map.IsPassable(x+X, y+Y) || Math.Sqrt(x*x+y*y)-0.5>light) return Direction.Invalid;
       } while(dy>=0);
     }
     return Global.PointToDir(off);
@@ -711,6 +711,7 @@ public abstract class Entity : UniqueObject
           { if(--effects[i].Value<=0) CancelEffect(i--);
             healthup = true;
           }
+          Interrupt();
         }
       }
       else if(--effects[i].Timeout<=0) CancelEffect(i--);
@@ -745,12 +746,22 @@ public abstract class Entity : UniqueObject
       return success;
     }
     if(item.AllHandWield) // unequip all items so we can equip new one
-    { for(int i=0; i<Hands.Length; i++) if(!CanUnequip(i)) return false;
+    { for(int i=0; i<Hands.Length; i++)
+        if(!CanUnequip(i))
+        { if(this==App.Player) App.IO.Print("You can't unequip your {0}!", Hands[i].GetFullName(this));
+          return false;
+        }
       for(int i=0; i<Hands.Length; i++) if(Hands[i]!=null) Unequip(i);
     }
     else
-    { for(int i=0; i<Hands.Length; i++) // unequip all items of the same class
-        if(Hands[i]!=null && Hands[i].Class==item.Class && !TryUnequip(i)) return false;
+    { for(int i=0; i<Hands.Length; i++) // unequip all items of the same class - this assumes there will only be one
+        if(Hands[i]!=null && Hands[i].Class==item.Class)
+        { if(!CanUnequip(i))
+          { if(this==App.Player) App.IO.Print("You can't unequip your {0}!", Hands[i].GetFullName(this));
+            return false;
+          }
+          else { Unequip(i); break; }
+        }
       if(HandsFull) // unequip one item to make room
       { int i;
         for(i=0; i<Hands.Length; i++) if(TryUnequip(i)) break; // try any class
@@ -779,7 +790,8 @@ public abstract class Entity : UniqueObject
   { if(Equipped(item))
     { if(item.Cursed)
       { if(this==App.Player)
-        { App.IO.Print("The {0} is stuck to your {1}!", item.Name, item.Class==ItemClass.Shield ? "arm" : "hand");
+        { App.IO.Print("The {0} is stuck to your {1}!",
+                       item.GetFullName(this), item.Class==ItemClass.Shield ? "arm" : "hand");
           item.Status |= ItemStatus.KnowCB;
         }
         return false;
@@ -795,7 +807,7 @@ public abstract class Entity : UniqueObject
   { if(Wearing(item))
     { if(item.Cursed)
       { if(this==App.Player)
-        { App.IO.Print("The {0} won't come off!", item.Name);
+        { App.IO.Print("The {0} won't come off!", item.GetFullName(this));
           item.Status |= ItemStatus.KnowCB;
         }
         return false;

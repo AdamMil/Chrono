@@ -8,8 +8,14 @@ namespace Chrono
 
 #region Wand
 public abstract class Wand : Chargeable
-{ public Wand() { Class=ItemClass.Wand; Weight=15; }
-  static Wand() { Global.RandomizeNames(names); }
+{ public Wand()
+  { Class=ItemClass.Wand; Weight=15;
+
+    object i = namemap[GetType().ToString()];
+    if(i==null) { Color = colors[namei]; namemap[GetType().ToString()] = namei++; }
+    else Color = colors[(int)i];
+  }
+  static Wand() { Global.Randomize(names, colors); }
   protected Wand(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override string Name { get { return "wand of "+Spell.Name; } }
@@ -56,19 +62,22 @@ public abstract class Wand : Chargeable
     Spell.Cast(user, Status, target, dir);
   }
 
-  public static void Deserialize(System.IO.Stream stream, IFormatter formatter) // deserialize static data
+  public static void Deserialize(System.IO.Stream stream, IFormatter formatter)
   { namemap = (Hashtable)formatter.Deserialize(stream);
     names   = (string[])formatter.Deserialize(stream);
+    colors  = (Color[])formatter.Deserialize(stream);
     namei   = (int)formatter.Deserialize(stream);
   }
-  public static void Serialize(System.IO.Stream stream, IFormatter formatter) // serialize static data
+  public static void Serialize(System.IO.Stream stream, IFormatter formatter)
   { formatter.Serialize(stream, namemap);
     formatter.Serialize(stream, names);
+    formatter.Serialize(stream, colors);
     formatter.Serialize(stream, namei);
   }
 
   static Hashtable namemap = new Hashtable();
   static string[] names = new string[] { "gold", "forked", "lead", "pointy" };
+  static Color[] colors = new Color[] { Color.Yellow, Color.Blue, Color.Grey, Color.Brown };
   static int namei;
 }
 #endregion

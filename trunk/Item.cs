@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Reflection;
 using System.Runtime.Serialization;
 
 namespace Chrono
@@ -65,7 +66,7 @@ public abstract class Item : UniqueObject, ICloneable
         else if(KnownBlessed) ret = "blessed";
         else if(KnownCursed) ret = "cursed";
       }
-
+  
       if((Status&ItemStatus.Burnt)!=0) ret += (ret!="" ? ", " : "") + "burnt";
       if((Status&ItemStatus.Rotted)!=0) ret += (ret!="" ? ", " : "") + "rotted";
       if((Status&ItemStatus.Rusted)!=0) ret += (ret!="" ? ", " : "") + "rusted";
@@ -73,11 +74,20 @@ public abstract class Item : UniqueObject, ICloneable
     }
   }
 
-  public object Clone()
-  { buffer.Position = 0;
-    formatter.Serialize(buffer, this);
-    buffer.Position = 0;
-    return formatter.Deserialize(buffer);
+  public object Clone() { return Clone(false); }
+  public virtual object Clone(bool force)
+  { Type t = GetType();
+    if(!force && t.GetCustomAttributes(typeof(NoCloneAttribute), true).Length!=0) return this;
+    object o = t.GetConstructor(Type.EmptyTypes).Invoke(null), v;
+    while(t!=null)
+    { foreach(FieldInfo f in t.GetFields(BindingFlags.DeclaredOnly|BindingFlags.Instance|BindingFlags.Public|BindingFlags.NonPublic))
+        if(!f.IsNotSerialized)
+        { v = f.GetValue(this);
+          f.SetValue(o, v!=null && f.FieldType.IsSubclassOf(typeof(Array)) ? ((ICloneable)v).Clone() : v);
+        }
+      t = t.BaseType;
+    }
+    return o;
   }
 
   public virtual bool CanStackWith(Item item)
@@ -134,7 +144,7 @@ public abstract class Item : UniqueObject, ICloneable
 
   public Item Split(int toRemove)
   { if(toRemove>=Count) throw new ArgumentOutOfRangeException("toRemove", toRemove, "is >= than Count");
-    Item newItem = (Item)Clone();
+    Item newItem = (Item)Clone(true);
     newItem.Count = toRemove;
     Count -= toRemove;
     return newItem;
@@ -151,9 +161,6 @@ public abstract class Item : UniqueObject, ICloneable
   public ItemStatus Status;
 
   protected string name;
-
-  static System.IO.MemoryStream buffer = new System.IO.MemoryStream(512);
-  static System.Runtime.Serialization.Formatters.Binary.BinaryFormatter formatter = new System.Runtime.Serialization.Formatters.Binary.BinaryFormatter();
 }
 #endregion
 
@@ -244,6 +251,7 @@ public class Gold : Item
   public override bool CanStackWith(Item item) { return item.Class==ItemClass.Gold; }
   
   public static readonly int SpawnChance=200; // 2% chance
+  public static readonly int SpawnMin=3, SpawnMax=16; // 2% chance
 }
 
 } // namespace Chrono

@@ -7,12 +7,16 @@ namespace Chrono
 {
 
 #region Potion
+[NoClone]
 public abstract class Potion : Item
 { public Potion()
   { Class=ItemClass.Potion; Prefix="potion of "; PluralPrefix="potions of "; PluralSuffix=""; Weight=5;
+    object i = namemap[GetType().ToString()];
+    if(i==null) { Color = colors[namei]; namemap[GetType().ToString()] = namei++; }
+    else Color = colors[(int)i];
   }
   protected Potion(SerializationInfo info, StreamingContext context) : base(info, context) { }
-  static Potion() { Global.RandomizeNames(names); }
+  static Potion() { Global.Randomize(names, colors); }
 
   public override bool CanStackWith(Item item)
   { return base.CanStackWith(item) && ((Potion)item).Name==Name;
@@ -22,9 +26,8 @@ public abstract class Potion : Item
 
   public override string GetFullName(Entity e, bool forceSingular)
   { if(e==null || e.KnowsAbout(this)) return base.GetFullName(e, forceSingular);
-    string tn = GetType().ToString(), rn = (string)namemap[tn];
-    if(rn==null) namemap[tn] = rn = names[namei++];
-    rn = !forceSingular && Count>1 ? Count.ToString() + ' ' + rn + " potions" : rn + " potion";
+    int i = (int)namemap[GetType().ToString()];
+    string rn = !forceSingular && Count>1 ? Count.ToString() + ' ' + names[i] + " potions" : names[i] + " potion";
     if(Title!=null) rn += " named "+Title;
     return rn;
   }
@@ -32,31 +35,34 @@ public abstract class Potion : Item
   public static void Deserialize(System.IO.Stream stream, IFormatter formatter)
   { namemap = (Hashtable)formatter.Deserialize(stream);
     names   = (string[])formatter.Deserialize(stream);
+    colors  = (Color[])formatter.Deserialize(stream);
     namei   = (int)formatter.Deserialize(stream);
   }
   public static void Serialize(System.IO.Stream stream, IFormatter formatter)
   { formatter.Serialize(stream, namemap);
     formatter.Serialize(stream, names);
+    formatter.Serialize(stream, colors);
     formatter.Serialize(stream, namei);
   }
 
   static Hashtable namemap = new Hashtable();
   static string[] names = new string[] { "green", "purple", "bubbly", "fizzy" };
+  static Color[]  colors = new Color[] { Color.Green, Color.Purple, Color.Grey, Color.Brown };
   static int namei;
 }
 #endregion
 
 [Serializable]
 public class HealPotion : Potion
-{ public HealPotion() { name="healing"; Color=Color.LightGreen; }
+{ public HealPotion() { name="healing"; }
   public HealPotion(SerializationInfo info, StreamingContext context) : base(info, context) { }
-  
+
   public override void Drink(Entity user)
   { user.OnDrink(this);
     if(user.MaxHP-user.HP>0)
     { user.HP += Global.NdN(4, 6);
       if(user==App.Player) App.IO.Print("You feel better.");
-      else if(App.Player.CanSee(user)) App.IO.Print("{0} looks better.");
+      else if(App.Player.CanSee(user)) App.IO.Print("{0} looks better.", user.TheName);
     }
     else if(user==App.Player) App.IO.Print("Nothing seems to happen.");
   }

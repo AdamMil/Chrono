@@ -92,7 +92,8 @@ public class Hamburger : Food
 
 [Serializable]
 public class Flesh : Food
-{ public Flesh(Corpse from)
+{ public Flesh() { }
+  public Flesh(Corpse from)
   { Color=from.Color; Weight=2; Prefix="chunk of "; PluralPrefix="chunks of "; PluralSuffix="";
     name=from.CorpseOf.Race.ToString().ToLower()+" flesh"; FromCorpse=from; DecayTime=60;
     Age=from.Age/2; // meat from older corpses decays quicker

@@ -54,7 +54,7 @@ public class Player : Entity
   public override void Think()
   { if(interrupt) { inp.Count=0; interrupt=false; }
     base.Think();
-    Point[] vis = VisibleTiles(); UpdateMemory(vis);
+    Point[] vis = VisibleTiles();
     goto next;
 
     nevermind: App.IO.Print("Never mind."); goto next;
@@ -136,8 +136,8 @@ public class Player : Entity
         Exercise(Attr.Int);
         Exercise(Skill.Casting);
         Exercise(spell.Skill);
-        if(spell.Memory<2000) App.IO.Print("Your memory of this spell is very faint.");
-        else if(spell.Memory<4000) App.IO.Print("Your memory of this spell is fant.");
+        if(spell.Memory<500) App.IO.Print("Your memory of this spell is very faint.");
+        else if(spell.Memory<1000) App.IO.Print("Your memory of this spell is faint.");
         if(spell.CastTest(this))
         { switch(spell.Target)
           { case SpellTarget.Self: spell.Cast(this); break;
@@ -190,9 +190,9 @@ public class Player : Entity
         { System.Collections.ArrayList list = new System.Collections.ArrayList();
           list.Add(new MenuItem("All types", 'a'));
           char c = 'b';
-          for(int i=0; i<(int)ItemClass.NumClasses; i++)
+          for(int i=0; i<(int)ItemClass.NumClasses; c++,i++)
             foreach(Item item in Inv)
-              if(item.Class==(ItemClass)i) { list.Add(new MenuItem(item.Class.ToString(), c++)); break; }
+              if(item.Class==(ItemClass)i) { list.Add(new MenuItem(item.Class.ToString(), c)); break; }
           list.Add(new MenuItem("Auto-select every item", 'A'));
           foreach(Item item in Inv)
             if(item.KnownBlessed) { list.Add(new MenuItem("Items known to be blessed", 'B')); break; }
@@ -241,7 +241,7 @@ public class Player : Entity
             }
 
           foreach(Item i in list) inv.Add(i);
-          menu: items = App.IO.Menu(this, inv, MenuFlag.Multi, ItemClass.Any);
+          menu: items = App.IO.Menu(this, inv, MenuFlag.Multi|MenuFlag.AllowNum, ItemClass.Any);
         }
         if(items.Length==0) goto nevermind;
         foreach(MenuItem i in items)
@@ -269,7 +269,7 @@ public class Player : Entity
         Food toEat = (Food)item;
         bool split=false, consumed=false, stopped=false;
         if(toEat.Count>1) { toEat = (Food)toEat.Split(1); split=true; }
-        if(toEat.FoodLeft>Food.MaxFoodPerTurn) App.IO.Print("You begin to eat {0}.", toEat);
+        if(toEat.FoodLeft>Food.MaxFoodPerTurn) App.IO.Print("You begin to eat {0}.", toEat.GetFullName(this));
         while(true)
         { Map.MakeNoise(Position, this, Noise.Item, toEat.GetNoise(this));
           if(toEat.Eat(this)) { consumed=true; break; }
@@ -783,10 +783,11 @@ public class Player : Entity
     if(Map.HasItems(Position))
     { Item[] items = Map[Position].Items.GetItems(classes);
       foreach(Item i in items)
-        if(App.IO.YesNo(string.Format("There {0} {1} here. {2} {3}?", i.AreIs, i, verb, i.ItOne),
-                        false))
-        { item=i; inv=Map[Position].Items; break;
-        }
+      { char c = App.IO.CharChoice(string.Format("There {0} {1} here. {2} {3}?",
+                                                 i.AreIs, i.GetFullName(this), verb, i.ItOne), "ynq", 'q', true);
+        if(c=='y') { item=i; inv=Map[Position].Items; break; }
+        else if(c=='q') { App.IO.Print("Never mind."); return false; }
+      }
     }
     if(item==null)
     { if(!Inv.Has(classes)) { App.IO.Print("You have nothing to {0}!", verb.ToLower()); return false; }
@@ -855,7 +856,7 @@ public class Player : Entity
   }
   public override void OnFlagsChanged(Chrono.Entity.Flag oldFlags, Chrono.Entity.Flag newFlags)
   { Flag diff = oldFlags ^ newFlags;
-    if((diff&newFlags&Flag.Asleep)!=0) App.IO.Print("You wake up.");
+    if((diff&oldFlags&Flag.Asleep)!=0) App.IO.Print("You wake up.");
     if((diff&Flag.Confused)!=0)
       App.IO.Print((newFlags&Flag.Confused)==0 ? "Your head clears a bit." : "You stumble, confused.");
     if((diff&Flag.Hallucinating)!=0)
@@ -875,8 +876,11 @@ public class Player : Entity
 
   public override void OnHit(Entity hit, object item, Damage damage)
   { int dam = damage.Total;
-    if(item==null || item is Weapon)
-      App.IO.Print(dam>0 ? "You hit {0}." : "You hit {0}, but do no damage.", hit==this ? "yourself" : hit.theName);
+    if(hit!=this && !CanSee(hit))
+      App.IO.Print("{0} it.", item is Spell ? "The spell hits" : "You hit");
+    else if(item==null || item is Weapon)
+      App.IO.Print(dam>0 ? "You hit {0}." : "You hit {0}, but do no damage.",
+                   hit==this ? "yourself" : hit.theName);
     else if(item is Spell)
       App.IO.Print(dam>0 ? "The spell hits {0}." : "The spell hits {0}, but {1} unaffected.",
                    hit==this ? "you" : hit.theName, hit==this ? "you are" : "it appears");
@@ -884,7 +888,7 @@ public class Player : Entity
   public override void OnHitBy(Entity attacker, object item, Damage damage)
   { Interrupt();
     if(attacker!=this) App.IO.Print(damage.Total>0 ? "{0} hits you!" : "{0} hits you, but does no damage.",
-                                    item is Spell ? "The spell" : attacker.TheName);
+                                    item is Spell ? "The spell" : CanSee(attacker) ? attacker.TheName : "It");
   }
   public override void OnInvoke(Item item) { App.IO.Print("You invoke {0}.", item.GetAName(this)); }
   public override void OnKill(Entity killed) { App.IO.Print("You kill {0}!", killed.TheName); }
@@ -895,7 +899,8 @@ public class Player : Entity
   }
   public override void OnMissBy(Entity attacker, object item)
   { if(Global.Coinflip()) Interrupt();
-    if(attacker!=this) App.IO.Print("{0} misses you.", item is Spell ? "The spell" : attacker.TheName);
+    if(attacker!=this)
+      App.IO.Print("{0} misses you.", item is Spell ? "The spell" : CanSee(attacker) ? attacker.TheName : "It");
   }
   public override void OnNoise(Entity source, Noise type, int volume)
   { if(type==Noise.Alert) { App.IO.Print("You hear a shout!"); Interrupt(); }

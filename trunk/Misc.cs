@@ -7,7 +7,10 @@ using System.Runtime.Serialization;
 namespace Chrono
 {
 
-public class EmptyEnumerator : IEnumerator
+[AttributeUsage(AttributeTargets.Class)]
+public sealed class NoCloneAttribute : Attribute { }
+
+public sealed class EmptyEnumerator : IEnumerator
 { public object Current { get { throw new InvalidOperationException(); } }
   public bool MoveNext() { return false; }
   public void Reset() { }
@@ -52,7 +55,8 @@ public class UniqueObject : ISerializable
       info.SetType(typeof(ObjectProxy));
     }
     else
-    { if(Global.ObjHash!=null) Global.ObjHash[ID] = this;
+    { if(Global.ObjHash!=null) Global.ObjHash[ID]=this;
+      
       Type t = GetType();
       do // private fields are not inherited, so we traverse the class hierarchy ourselves
       { foreach(FieldInfo f in t.GetFields(BindingFlags.DeclaredOnly|BindingFlags.Instance|BindingFlags.Public|BindingFlags.NonPublic))
@@ -145,10 +149,17 @@ public sealed class Global
   public static int Rand(int min, int max) { return Random.Next(min, max+1); }
   public static int Rand(int max) { return Random.Next(max); }
   
-  public static void RandomizeNames(string[] names)
+  public static void Randomize(string[] names)
   { for(int i=0; i<names.Length; i++)
     { int j = Global.Rand(names.Length);
       string t = names[i]; names[i] = names[j]; names[j] = t;
+    }
+  }
+  public static void Randomize(string[] names, Color[] colors)
+  { for(int i=0; i<names.Length; i++)
+    { int j = Global.Rand(names.Length);
+      string n = names[i]; names[i] = names[j]; names[j] = n;
+      Color  c = colors[i]; colors[i] = colors[j]; colors[j] = c;
     }
   }
 

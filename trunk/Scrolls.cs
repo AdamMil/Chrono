@@ -6,13 +6,14 @@ namespace Chrono
 {
 
 #region Scroll
+[NoClone]
 public abstract class Scroll : Readable
 { public Scroll()
   { Class=ItemClass.Scroll; Prefix="scroll of "; PluralSuffix=""; PluralPrefix="scrolls of "; Weight=1;
     Durability=75;
   }
   protected Scroll(SerializationInfo info, StreamingContext context) : base(info, context) { }
-  static Scroll() { Global.RandomizeNames(names); }
+  static Scroll() { Global.Randomize(names); }
 
   public override string Name { get { return Spell.Name; } }
 

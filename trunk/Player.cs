@@ -71,17 +71,29 @@ public class Player : Entity
 
   public override void OnDrop(Item item)
   { App.IO.Print("You drop {0}.", item.GetAName(this));
-    Shop shop = Map.GetShop(Position);
-    if(shop!=null && shop.Shopkeeper!=null)
-    { if(shop.Shopkeeper.IsOnTab(item)) shop.Shopkeeper.PlayerReturned(item);
-      else
+    if(item.Shop==null)
+    { Shop shop = Map.GetShop(Position);
+      if(shop!=null && shop.Shopkeeper!=null)
       { int price = shop.Shopkeeper.BuyCost(item);
-        item.Status |= ItemStatus.PlayerOwned;
         if(price==0) App.IO.Print("{0} seems uninterested in that.", shop.Shopkeeper.TheName);
         else if(App.IO.YesNo(string.Format("{0} offers you {1} gold for that. Accept?",
-                                           shop.Shopkeeper.TheName, price), true))
-        { item.Status &= ~ItemStatus.PlayerOwned;
-          Pickup(new Gold(price));
+                                            shop.Shopkeeper.TheName, price), true))
+        { if(shop.Shopkeeper.Credit<0)
+          { int take = Math.Min(-shop.Shopkeeper.Credit, price);
+            shop.Shopkeeper.Say("{0}I'll cancel {1} gold from your debt.", take==price ? "" : "First, ", take);
+            shop.Shopkeeper.GiveCredit(take);
+            price -= take;
+          }
+
+          Gold gold = shop.Shopkeeper.GetGold(price, true);
+          int count = gold==null ? 0 : gold.Count;
+          if(gold!=null) Pickup(gold);
+          if(count<price)
+          { shop.Shopkeeper.Say("Sorry, I don't have enough money, but I'll give you {0} gold "+
+                                "and {1} additional credit at my shop.", count, price-count);
+            shop.Shopkeeper.GiveCredit(price-count);
+          }
+          item.Shop = shop;
         }
       }
     }
@@ -94,6 +106,7 @@ public class Player : Entity
       item.Status |= ItemStatus.KnowCB;
     }
   }
+
   public override void OnFlagsChanged(Chrono.Entity.Flag oldFlags, Chrono.Entity.Flag newFlags)
   { Flag diff = oldFlags ^ newFlags;
     if((diff&oldFlags&Flag.Asleep)!=0) App.IO.Print("You wake up.");
@@ -125,13 +138,16 @@ public class Player : Entity
       App.IO.Print(dam>0 ? "The spell hits {0}." : "The spell hits {0}, but {1} unaffected.",
                    hit==this ? "you" : hit.theName, hit==this ? "you are" : "it appears");
   }
+
   public override void OnHitBy(Entity attacker, object item, Damage damage)
   { Interrupt();
     if(attacker!=this) App.IO.Print(damage.Total>0 ? "{0} hits you!" : "{0} hits you, but does no damage.",
                                     item is Spell ? "The spell" : CanSee(attacker) ? attacker.TheName : "It");
   }
+
   public override void OnInvoke(Item item) { App.IO.Print("You invoke {0}.", item.GetAName(this)); }
-  public override void OnKill(Entity killed) { App.IO.Print("You kill {0}!", killed.TheName); }
+  public override void OnKill(Entity killed) { App.IO.Print("You kill {0}!", killed.theName); }
+
   public override void OnMapChanged()
   { base.OnMapChanged();
     if(Map==null) Memory=null;
@@ -140,31 +156,59 @@ public class Player : Entity
       if(Memory==null) Memory = new Map(Map.Width, Map.Height, TileType.Border, false);
     }
   }
+
   public override void OnMiss(Entity hit, object item)
   { if(item==null || item is Weapon) App.IO.Print("You miss {0}.", hit.theName);
     else if(item is Spell && CanSee(hit)) 
       App.IO.Print("The spell {0} {1}.", Global.Coinflip() ? "misses" : "whizzes by", hit==this ? "you" : hit.theName);
   }
+
   public override void OnMissBy(Entity attacker, object item)
   { if(Global.Coinflip()) Interrupt();
     if(attacker!=this)
       App.IO.Print("{0} misses you.", item is Spell ? "The spell" : CanSee(attacker) ? attacker.TheName : "It");
   }
+  
+  public override void OnMove(Point newPos, Map newMap)
+  { Shop oldShop=Map.GetShop(Position);
+    if(oldShop==null)
+    { Shop newShop = newMap==null ? Map.GetShop(newPos) : newMap.GetShop(newPos);
+      if(newShop!=null)
+      { if(newShop.Shopkeeper==null) App.IO.Print("This shop appears deserted.");
+        else newShop.Shopkeeper.GreetPlayer(this);
+      }
+    }
+    else if(oldShop.Shopkeeper!=null)
+    { if(newMap!=null || Map.GetShop(newPos)!=oldShop) oldShop.Shopkeeper.PlayerLeft(this);
+      else if(newPos==oldShop.Door)
+      { int bill = oldShop.Shopkeeper.GetPlayerBill(this);
+        if(bill>0)
+        { int credit = oldShop.Shopkeeper.Credit;
+          oldShop.Shopkeeper.Say("{0}! You owe {1} gold. Please pay before you leave{2}.",
+                                 Name, bill, credit>0 ? " (you have "+credit+" credit)" : "");
+        }                         
+      }
+    }
+    base.OnMove(newPos, newMap);
+  }
+
   public override void OnNoise(Entity source, Noise type, int volume)
   { if(type==Noise.Alert) { App.IO.Print("You hear a shout!"); Interrupt(); }
   }
+
   public override void OnPickup(Item item, IInventory from)
-  { if(!item.Is(ItemStatus.PlayerOwned) && from!=null && from==Map[Position].Items)
-    { Shop shop = Map.GetShop(Position);
-      if(shop!=null && shop.Shopkeeper!=null) shop.Shopkeeper.PlayerTook(item);
-    }
+  { if(item.Shop!=null && from!=null && item.Shop.Shopkeeper!=null && from==Map[Position].Items)
+      item.Shop.Shopkeeper.PlayerTook(item);
   }
+
   public override void OnReadScroll(Scroll item) { App.IO.Print("You read {0}.", item.GetAName(this)); }
   public override void OnRemove(Wearable item) { App.IO.Print("You remove {0}.", item.GetAName(this)); }
   public override void OnSick(string howSick) { App.IO.Print(Color.Dire, "You feel {0}.", howSick); }
+
   public override void OnSkillUp(Skill skill)
   { App.IO.Print(Color.Green, "Your {0} skill went up!", skill.ToString().ToLower());
   }
+
   public override void OnUnequip(Wieldable item) { App.IO.Print("You unequip {0}.", item.GetAName(this)); }
   public override void OnWear(Wearable item) { App.IO.Print("You put on {0}.", item.GetAName(this)); }
 
@@ -215,6 +259,8 @@ public class Player : Entity
           foreach(Item item in Inv)
             if(item.KnownCursed) { list.Add(new MenuItem("Items known to be cursed", 'C')); break; }
           foreach(Item item in Inv)
+            if(item.Shop!=null) { list.Add(new MenuItem("Unpaid items", 'P')); break; }
+          foreach(Item item in Inv)
             if(item.KnownUncursed) { list.Add(new MenuItem("Items known to be uncursed", 'U')); break; }
           foreach(Item item in Inv)
             if(item.CBUnknown) { list.Add(new MenuItem("Items of unknown B/C/U status", 'X')); break; }
@@ -252,6 +298,7 @@ public class Player : Entity
             switch(item.Char)
             { case 'B': foreach(Item i in Inv) if(i.KnownBlessed  && !list.Contains(i)) list.Add(i); break;
               case 'C': foreach(Item i in Inv) if(i.KnownCursed   && !list.Contains(i)) list.Add(i); break;
+              case 'P': foreach(Item i in Inv) if(i.Shop!=null    && !list.Contains(i)) list.Add(i); break;
               case 'U': foreach(Item i in Inv) if(i.KnownUncursed && !list.Contains(i)) list.Add(i); break;
               case 'X': foreach(Item i in Inv) if(i.CBUnknown     && !list.Contains(i)) list.Add(i); break;
             }
@@ -284,19 +331,22 @@ public class Player : Entity
 
         Food toEat = (Food)item;
         bool split=false, consumed=false, stopped=false;
-        if(toEat.Count>1) { toEat = (Food)toEat.Split(1); split=true; }
+        if(toEat.Count>1) { toEat=(Food)toEat.Split(1); split=true; }
         if(toEat.FoodLeft>Food.MaxFoodPerTurn) App.IO.Print("You begin to eat {0}.", toEat.GetAName(this));
+        Use(toEat);
         while(true)
         { Map.MakeNoise(Position, this, Noise.Item, toEat.GetNoise(this));
           if(toEat.Eat(this)) { consumed=true; break; }
           if(Hunger<Food.MaxFoodPerTurn) break;
           if(ThinkUpdate(ref vis)) { App.IO.Print("You stop eating."); stopped=true; break; }
         }
+
         if(consumed && !split) inv.Remove(toEat);
         else if(split && !consumed && inv.Add(toEat)==null)
         { App.IO.Print("The {0} does not fit in your pack, so you put it down.", toEat.GetFullName(this));
           Map.AddItem(Position, toEat);
         }
+
         if(consumed) App.IO.Print("You finish eating.");
         if(Hunger<Food.MaxFoodPerTurn) App.IO.Print("You feel full.");
         if(stopped) return false;
@@ -315,12 +365,8 @@ public class Player : Entity
         
         if(type==TileType.UpStairs && CarryStress>CarryStress.Stressed) goto carrytoomuch;
 
-        Map.SaveMemory(Memory);
-        Link link = Map.GetLink(Position);
-        Map.Entities.Remove(this);
-        link.ToDungeon[link.ToLevel].Entities.Add(this);
-        Position = link.ToPoint;
-        
+        OnMove(Map.GetLink(Position));
+
         if(type==TileType.DownStairs)
         { CarryStress stress = CarryStress;
           if(stress>=CarryStress.Stressed || stress==CarryStress.Burdened && Global.Coinflip())
@@ -361,7 +407,7 @@ public class Player : Entity
           np = Global.Move(Position, inp.Direction);
           if(Map.IsPassable(np) && !Map.IsDangerous(np))
           { if(OnOverworld) PassTime(WalkTime(np));
-            Position = np;
+            OnMove(np);
             if(noise>0) Map.MakeNoise(np, this, Noise.Walking, (byte)noise);
           }
           else return false;
@@ -426,8 +472,11 @@ public class Player : Entity
         Item potion;
         IInventory inv;
         if(!GroundPackUse(typeof(Potion), "Drink", out potion, out inv, ItemClass.Potion)) return false;
-        if(potion.Count>1) ((Potion)potion.Split(1)).Drink(this);
-        else { inv.Remove(potion); ((Potion)potion).Drink(this); }
+        Potion toDrink;
+        if(potion.Count>1) toDrink = (Potion)potion.Split(1);
+        else { inv.Remove(potion); toDrink=(Potion)potion; }
+        Use(toDrink);
+        toDrink.Drink(this);
         Map.MakeNoise(Position, this, Noise.Item, potion.GetNoise(this));
         break;
       }
@@ -454,6 +503,7 @@ public class Player : Entity
           OnReadScroll(scroll);
           scroll.Read(this);
           Map.MakeNoise(Position, this, Noise.Item, scroll.GetNoise(this));
+          Use(scroll);
         }
         else // read spellbook
         { Spellbook book = (Spellbook)read;
@@ -469,6 +519,12 @@ public class Player : Entity
           { if(!App.IO.YesNo("This spell seems very difficult. Continue?", false)) return false;
           }
           else if(chance<50 && !App.IO.YesNo("This spell seems difficult. Continue?", false)) return false;
+
+          if(book.Shop!=null && book.Shop.Shopkeeper!=null &&
+             book.Shop.Shopkeeper.Say("Hey! This isn't a lending library!"))
+          { App.IO.Print("Your concentration is broken.");
+            return false;
+          }
 
           Exercise(Attr.Int);
           Exercise(spell.Skill);
@@ -560,8 +616,7 @@ public class Player : Entity
         bool first = true;
         do
         { Point od = node.Parent.Point;
-          TileType type = Map[od].Type;
-          if(Map.IsPassable(type))
+          if(Map.IsPassable(od))
           { if(OnOverworld)
             { PassTime(WalkTime(od));
               if(first)
@@ -569,23 +624,21 @@ public class Player : Entity
                 first = false;
               }
             }
-            Position = od;
+            OnMove(od);
             node = node.Parent;
           }
+          else if(Map[od].Type==TileType.ClosedDoor)
+          { if(Map.GetFlag(od, Tile.Flag.Locked))
+            { App.IO.Print("This door is locked.");
+              break;
+            }
+            Map.SetType(od, TileType.OpenDoor); // FIXME: make an attempt to open the door like the opendoor code
+            continue;
+          }
           else
-          { if(type==TileType.ClosedDoor)
-            { if(Map.GetFlag(od, Tile.Flag.Locked))
-              { App.IO.Print("This door is locked.");
-                break;
-              }
-              Map.SetType(od, TileType.OpenDoor);
-              continue;
-            }
-            else
-            { if(!path.Plan(Memory, Position, pt)) break;
-              node = path.GetPathFrom(Position);
-              if(node.Parent.Point==od) break;
-            }
+          { if(!path.Plan(Memory, Position, pt)) break;
+            node = path.GetPathFrom(Position);
+            if(node.Parent.Point==od) break;
           }
         } while(!ThinkUpdate(ref vis) && Position!=pt);
         DescribeTile(Position);
@@ -633,8 +686,8 @@ public class Player : Entity
         else consume = i.Use(this, Direction.Self);
         Map.MakeNoise(Position, this, Noise.Item, i.GetNoise(this));
         if(consume)
-        { if(i.Count>1) i.Count--;
-          else Inv.Remove(i.Char);
+        { if(i.Count>1) Use(i.Split(1));
+          else { Inv.Remove(i.Char); Use(i); }
         }
         break;
       }
@@ -976,6 +1029,7 @@ public class Player : Entity
         else goto nevermind;
         Map.MakeNoise(Position, this, Noise.Zap, wand.GetNoise(this));
         if(destroy) Inv.Remove(wand);
+        Use(wand);
         break;
       }
       
@@ -1110,18 +1164,14 @@ public class Player : Entity
       { if(Map.HasItems(Position)) Map[Position].Items.Clear();
         PassTime(WalkTime(pt));
       }
-      Position = pt;
+      OnMove(pt);
       int noise = (10-Stealth)*12; // stealth = 0 to 10
       if(noise>0) Map.MakeNoise(pt, this, Noise.Walking, (byte)noise);
       return true;
     }
     else if(type==TileType.Border && Map.Dungeon is Overworld && Map.Index!=(int)Overworld.Place.Overworld && // town
             App.IO.YesNo("Leave the town?", false))
-    { Map.SaveMemory(Memory);
-      Link link = Map.GetLink(0);
-      Map.Entities.Remove(this);
-      link.ToDungeon[link.ToLevel].Entities.Add(this);
-      Position = link.ToPoint;
+    { OnMove(Map.GetLink(0));
       return true;
     }
     else return false;

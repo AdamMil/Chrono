@@ -16,7 +16,7 @@ public enum ItemClass : sbyte
 [Flags] public enum ItemUse : byte { NoUse=0, Self=1, UseTarget=2, UseDirection=4, UseBoth=UseTarget|UseDirection };
 
 [Flags] public enum ItemStatus : byte
-{ None=0, Identified=1, KnowCB=2, Burnt=4, Rotted=8, Rusted=16, Cursed=32, Blessed=64, PlayerOwned=128
+{ None=0, Identified=1, KnowCB=2, Burnt=4, Rotted=8, Rusted=16, Cursed=32, Blessed=64
 };
 
 public enum Material : byte { Paper, Leather, HardMaterials, Wood=HardMaterials, Metal, Glass }
@@ -91,7 +91,8 @@ public abstract class Item : UniqueObject, ICloneable
   }
 
   public virtual bool CanStackWith(Item item)
-  { if(Status!=item.Status || item.Title!=null || Title!=null || item.GetType() != GetType()) return false;
+  { if(Status!=item.Status || Shop!=item.Shop || item.Title!=null || Title!=null || item.GetType() != GetType())
+      return false;
     if(Class==ItemClass.Food || Class==ItemClass.Potion || Class==ItemClass.Scroll || Class==ItemClass.Ammo ||
        Class==ItemClass.Weapon && Class==ItemClass.Treasure)
       return true;
@@ -113,7 +114,13 @@ public abstract class Item : UniqueObject, ICloneable
     if(Title!=null) ret += " named "+Title;
     return ret;
   }
-  public virtual string GetInvName(Entity e) { return Global.WithAorAn(GetFullName(e)); }
+  public virtual string GetInvName(Entity e)
+  { string s = Global.WithAorAn(GetFullName(e));
+    if(Shop!=null) s += " (unpaid)";
+    return s;
+  }
+  public string GetThatName(Entity e) { return (Count>1 ? "those " : "that ") + GetFullName(e); }
+
   public byte GetNoise(Entity e) { return (byte)Math.Max(Math.Min(Noise*15-e.Stealth*8, 255), 0); }
 
   // item is thrown at or bashed on an entity. returns true if item should be destroyed
@@ -153,6 +160,7 @@ public abstract class Item : UniqueObject, ICloneable
   }
 
   public string Title, Prefix, PluralPrefix, PluralSuffix;
+  public Shop   Shop;
   public int Age, Count, Weight; // age in map ticks, number in the stack, weight (5 = approx. 1 pound)
   public short Durability;       // 0 - 100 (chance of breaking if thrown), or -1, which uses the default
   public char Char;

@@ -304,7 +304,13 @@ public class FireSpell : BeamSpell
       IInventory inv = user.Map[pt].Items;
       if(inv!=null)
       { print = App.Player.CanSee(pt);
-        for(int i=0; i<inv.Count; i++) if(AffectItem(inv, inv[i], print)) i--;
+        for(int i=0; i<inv.Count; i++)
+        { Item item = inv[i];
+          if(AffectItem(inv, item, print))
+          { i--;
+            if(user==App.Player && item.Shop!=null && item.Shop.Shopkeeper!=null) user.Use(item, true);
+          }
+        }
       }
     }
   }
@@ -314,7 +320,8 @@ public class FireSpell : BeamSpell
     { if(print)
       { string plural = i.Count>1 ? "" : "s";
         App.IO.Print(i.Class==ItemClass.Potion ? "{0} heat{1} up and burst{1}!" : "{0} burn{1} up!",
-                     (inv==App.Player.Inv ? "Your "+i.GetFullName(App.Player) : i.GetAName(App.Player)), plural);
+                     (inv==App.Player.Inv ? "Your "+i.GetFullName(App.Player) : Global.Cap1(i.GetAName(App.Player))),
+                     plural);
       }
       inv.Remove(i);
       return true;
@@ -339,15 +346,14 @@ public class TeleportSpell : Spell
   { Point telTo = user.Is(Entity.Flag.TeleportControl) ? tile : user.Map.FreeSpace();
     if(user!=App.Player)
     { if(App.Player.CanSee(user))
-      { user.Position = telTo;
         App.IO.Print("{0} {1}.", user.TheName, App.Player.CanSee(telTo) ? "teleports" : "disappears");
-      }
       else
-      { user.Position = telTo;
+      { user.OnMove(telTo);
         if(App.Player.CanSee(user)) App.IO.Print("{0} appears out of nowhere!", user.AName);
+        return;
       }
     }
-    else user.Position = telTo;
+    user.OnMove(telTo);
   }
 
   public override SpellTarget GetSpellTarget(Entity user)

@@ -12,7 +12,13 @@ public abstract class AI : Entity
 { protected AI() { }
   protected AI(SerializationInfo info, StreamingContext context) : base(info, context) { }
   
+  public bool Hostile
+  { get { return alwaysHostile || (SocialGroup!=-1 && Global.GetSocialGroup(SocialGroup).Hostile); }
+  }
+
   public AIState State { get { return state; } }
+
+  public void Attack(Entity target) { this.target=target; GotoState(AIState.Attacking); }
 
   public override void Die(object killer, Death cause)
   { if(App.Player.CanSee(this))
@@ -47,8 +53,7 @@ public abstract class AI : Entity
   }
 
   public bool HostileTowards(Entity e)
-  { return e==attacker || e==target || e.SocialGroup==App.Player.SocialGroup &&
-                                       (alwaysHostile || SocialGroup!=-1 && Global.GetSocialGroup(SocialGroup).Hostile);
+  { return e==attacker || e==target || e.SocialGroup==App.Player.SocialGroup && Hostile;
   }
 
   public override void OnDrink(Potion potion) { Does("drinks", potion); }
@@ -80,8 +85,7 @@ public abstract class AI : Entity
     { GotoState(AIState.Attacking);
       hitDir = LookAt(attacker.Position);
     }
-    if(SocialGroup!=-1 && attacker==App.Player && !Global.GetSocialGroup(SocialGroup).Hostile)
-      Global.UpdateSocialGroup(SocialGroup, true);
+    if(SocialGroup!=-1 && attacker==App.Player) Global.UpdateSocialGroup(SocialGroup, true);
   }
   public override void OnMissBy(Entity attacker, object item)
   { if(state==AIState.Asleep) return;
@@ -112,9 +116,8 @@ public abstract class AI : Entity
 
       if(volume>Map.MaxSound*thresh/100)
       { if(state==AIState.Asleep && App.Player.CanSee(this)) App.IO.Print("{0} wakes up.", TheName);
-        if(source.SocialGroup==App.Player.SocialGroup &&
-           (alwaysHostile || SocialGroup!=-1 && Global.GetSocialGroup(SocialGroup).Hostile))
-        { GotoState(AIState.Attacking);
+        if(source.SocialGroup==App.Player.SocialGroup && Hostile)
+        { Attack(source);
           shout = false;
         }
         else if(state==AIState.Asleep) GotoState(defaultState);
@@ -128,7 +131,7 @@ public abstract class AI : Entity
       }
   }
   public override void OnPickup(Item item, IInventory inv)
-  { item.Status &= ~ItemStatus.PlayerOwned;
+  { item.Shop = null;
     Does("picks up", item);
   }
   public override void OnReadScroll(Scroll scroll) { Does("reads", scroll); }
@@ -217,7 +220,7 @@ public abstract class AI : Entity
     }
 
     if(target!=null && (dir=LookAt(target.Position))!=Direction.Invalid) // we have a line of sight to the enemy
-    { timeout=5; lastDir=dir; // we know where the enemy is! our vigor is renewed!
+    { timeout=attackTimeout; lastDir=dir; // we know where the enemy is! our vigor is renewed!
       // if we know exactly where the target is and we want to use a ranged attack
       if(dist>=rangedThresh || bestWand!=null || Spells!=null)
       { if(bestWand!=null && bestWand.Spell.Range>=dist) // use a wand if possible
@@ -267,7 +270,7 @@ public abstract class AI : Entity
       lastDir = dir;
 
       if(target!=null && TryAttack(target, dir, pdir)) return true;
-      if(alwaysHostile || SocialGroup!=-1 && Global.GetSocialGroup(SocialGroup).Hostile)
+      if(Hostile)
         foreach(Entity e in Global.GetSocialGroup(App.Player.SocialGroup).Entities)
           if(e!=target && TryAttack(e, dir, pdir)) return true;
 
@@ -275,9 +278,9 @@ public abstract class AI : Entity
       if(timeout==0) { lastDir=Direction.Invalid; GotoState(defaultState); return false; } // we give up
 
       Point np = Global.Move(Position, dir); // we couldn't find anything to attack, so we try to move towards target
-      if(TryMove(np)) return true;
-      else if(TryMove(dir-1)) { lastDir--; return true; }
-      else if(TryMove(dir+1)) { lastDir++; return true; }
+      if(TrySmartMove(np)) return true;
+      else if(TrySmartMove(dir-1)) { lastDir--; return true; }
+      else if(TrySmartMove(dir+1)) { lastDir++; return true; }
       if(sightDir==Direction.Invalid && noiseDir==Direction.Invalid) timeout--;
     }
     return false;
@@ -380,7 +383,7 @@ public abstract class AI : Entity
     { wakeup = state==AIState.Idle || state==AIState.Wandering ? 1 : state==AIState.Asleep ? 2 : 0;
       if(sightDir!=Direction.Invalid || hitDir!=Direction.Invalid) shout=true;
       if(state==AIState.Escaping && App.Player.CanSee(this)) App.IO.Print(TheName+" rejoins the battle!");
-      timeout = 5; // we'll be in the attack state for at least 5 turns
+      timeout = attackTimeout; // we'll be in the attack state for at least N turns
       lastDir = Direction.Invalid; // force us to calculate a new direction
     }
     state = newstate;
@@ -622,7 +625,7 @@ public abstract class AI : Entity
   protected bool SenseEnemy()
   { if(target!=null && SenseEnemy(target)) return true;     // first try last target
     if(attacker!=null && SenseEnemy(attacker)) return true; // then attacker
-    if(alwaysHostile || SocialGroup!=-1 && Global.GetSocialGroup(SocialGroup).Hostile) // then any party member
+    if(Hostile) // then any party member
       foreach(Entity e in Global.GetSocialGroup(App.Player.SocialGroup).Entities)
         if(SenseEnemy(e)) return true;
     return false;
@@ -651,6 +654,18 @@ public abstract class AI : Entity
   { if(spell is FireSpell) return 10;
     if(spell is ForceBolt) return 2;
     return 0;
+  }
+
+  protected bool TrySmartMove(Direction d) { return TrySmartMove(Global.Move(Position, d)); }
+  protected bool TrySmartMove(Point pt)
+  { if(TryMove(pt)) return true;
+
+    Tile t = Map[pt];
+    if(canOpenDoors && t.Type==TileType.ClosedDoor && !t.GetFlag(Tile.Flag.Locked))
+    { Map.SetType(pt, TileType.OpenDoor);
+      return true;
+    }
+    return false;
   }
 
   protected bool UseItem(IInventory inv, Item i)
@@ -704,6 +719,7 @@ public abstract class AI : Entity
     return true;
   }
 
+  protected const int attackTimeout=5;
   protected Entity attacker;      // the entity that last attacked us
   protected Entity target;        // the entity we're attacking
   protected Wand bestWand;        // the best wand for attacking
@@ -719,7 +735,8 @@ public abstract class AI : Entity
   protected AIState state=AIState.Wandering;        // our current state
   protected Combat combat;        // the type of combat we're prepared for
   protected byte maxNoise;        // the loudest noise we've heard so far (reset at the end of every turn)
-  protected bool alwaysHostile=true; // true if we should attack the player's party regardless of social group considerations
+  protected bool alwaysHostile=true;  // true if we should attack the player's party regardless of social group considerations
+  protected bool canOpenDoors =false; // most creatures can't open doors (by default)
   protected bool shout;           // true if we will shout on our next turn to alert others
 
   void AddSkills(int points, Skill[] skills)
@@ -763,7 +780,7 @@ public abstract class AI : Entity
         { Attack(Weapon, null, prevDir);
           if(App.Player.CanSee(this)) App.IO.Print(TheName+" attacks empty space.");
         }
-        timeout = 5; // we attacked something, so our vigor is renewed!
+        timeout = attackTimeout; // we attacked something, so our vigor is renewed!
         return true; // but our turn is up
       }
     }

@@ -591,8 +591,9 @@ public sealed class ConsoleIO : InputOutput
                                       : items[i].Item==null ? items[i].Count==0 ? 1 : 0
                                                             : items[i].Count>0 ? 0 : items[i].Item.Count;
               if((flags&MenuFlag.Multi)==0 && items[i].Count>0)
-              { for(int j=0; j<items.Length; j++) if(j!=i) items[j].Count=0;
-                goto redraw;
+              { /*for(int j=0; j<items.Length; j++) if(j!=i) items[j].Count=0;
+                goto redraw;*/
+                goto done;
               }
               else if(i>=cs && i<cs+mc)                   // if it's onscreen
               { DrawMenuItem(entity, y, items[i], flags); // draw it
@@ -604,14 +605,14 @@ public sealed class ConsoleIO : InputOutput
         }
         else
         { switch(c)
-          { case ',':
+          { case ',': case '@':
               bool select=false;
               for(int i=0; i<items.Length; i++)
                 if(items[i].Count!=(items[i].Item==null ? 1 : items[i].Item.Count)) { select=true; break; }
               for(int i=0; i<items.Length; i++)
                 items[i].Count = select ? (items[i].Item==null ? 1 : items[i].Item.Count) : 0;
               goto redraw;
-            case '+':
+            case '+': case '=':
               for(int i=0; i<items.Length; i++) items[i].Count = (items[i].Item==null ? 1 : items[i].Item.Count);
               goto redraw;
             case '-': for(int i=0; i<items.Length; i++) items[i].Count = 0; goto redraw;
@@ -899,7 +900,7 @@ Ctrl-P - see old messages";
     NTConsole.OutputModes mode = console.OutputMode;
     console.OutputMode = NTConsole.OutputModes.Processed;
     console.Write(helptext);
-    console.ReadChar();
+    ReadChar();
     console.OutputMode = mode;
     RestoreScreen();
   }
@@ -1106,7 +1107,7 @@ Ctrl-P - see old messages";
     x += Write(healthpct<25 ? Color.Dire : healthpct<50 ? Color.Warning : Color.Normal, "HP:{0}/{1} ",
                player.HP, player.MaxHP);
     int magicpct = player.MP*100/player.MaxMP;
-    x += Write(magicpct<25 ? Color.Dire : healthpct<50 ? Color.Warning : Color.Normal, "MP:{0}/{1} ",
+    x += Write(magicpct<25 ? Color.Dire : magicpct<50 ? Color.Warning : Color.Normal, "MP:{0}/{1} ",
                player.MP, player.MaxMP);
     x += Write(Color.Normal, "Exp:{0} ({1}/{2},{3}) T:{4}", player.ExpLevel, player.Exp, player.NextExp,
                player.ExpPool, player.Age);
@@ -1128,6 +1129,7 @@ Ctrl-P - see old messages";
 
   void RestoreScreen()
   { if(buf!=null) console.PutBlock(0, 0, 0, 0, mapW, mapH, buf); // replace what we've overwritten
+    RenderStats(App.Player);
     DrawLines();
   }
 

@@ -5,6 +5,7 @@ using System.Runtime.Serialization;
 namespace Chrono
 {
 
+[NoClone]
 public abstract class Spellbook : Readable
 { public Spellbook()
   { Class=ItemClass.Spellbook; Weight=35; Prefix="book of ";

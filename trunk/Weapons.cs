@@ -54,6 +54,7 @@ public abstract class FiringWeapon : Weapon
   public string AmmoName;
 }
 
+[NoClone]
 public abstract class Ammo : Item
 { public Ammo() { Class=ItemClass.Ammo; }
   protected Ammo(SerializationInfo info, StreamingContext context) : base(info, context) { }
@@ -96,7 +97,7 @@ public class PoisonDart : Weapon
   public PoisonDart(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override Damage CalculateDamage(Entity user, Ammo ammo, Entity target)
-  { Damage d = new Damage(Global.NdN(1, 3+(int)CompatibleWith(user)) + user.StrBonus/2 + DamageBonus);
+  { Damage d = new Damage(Global.NdN(1, 3+(int)CompatibleWith(user)) + user.StrBonus/3 + DamageBonus);
     if(target==null || Global.Rand(100)<100/(target.Poison+1)) d.Poison = 1;
     return d;
   }
@@ -118,7 +119,8 @@ public class Bow : FiringWeapon
   }
 
   public override Damage CalculateDamage(Entity user, Ammo ammo, Entity target)
-  { Damage dam = new Damage(ammo==null ? 1 : Global.NdN(1, 5+(int)CompatibleWith(user)+(int)CompatibleWith(ammo))
+  { if(ammo==null) return new Damage(1 + Math.Max(0, user.StrBonus/5));
+    Damage dam = new Damage(ammo==null ? 1 : Global.NdN(1, 5+(int)CompatibleWith(user)+(int)CompatibleWith(ammo))
                             + user.DexBonus + DamageBonus);
     return ammo.ModDamage(dam);
   }

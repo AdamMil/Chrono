@@ -66,10 +66,17 @@ public abstract class Spell : UniqueObject
   }
 
   public int CastPenalty(Entity user)
-  { int penalty = user.Shield==null ? 0 : 20; // -20% for having a shield
-    for(int i=0; i<user.Hands.Length; i++)
-      if(user.Hands[i]==null) break;
-      else if(i==user.Hands.Length-1) penalty += 15; // -15% for having your hands full
+  { int penalty = user.Shield==null ? 0 : 15; // -15% for having a shield
+
+    bool full=true;
+    foreach(Wieldable w in user.Hands)
+      if(w==null) full=false;
+      else if(w.AllHandWield && (w.Class!=ItemClass.Weapon || ((Weapon)w).wClass!=WeaponClass.Staff))
+      { full=true;
+        break;
+      }
+    if(full) penalty += 20; // -20% for having your hands full (except from staves)
+
     for(int i=0; i<armorPenalty.Length; i+=2)
       if(user.Slots[armorPenalty[i]]!=null && user.Slots[armorPenalty[i]].Material>=Material.HardMaterials)
         penalty += armorPenalty[i+1];
@@ -195,9 +202,10 @@ public class ForceBolt : BeamSpell
   }
 
   protected override void Affect(Entity user, object obj)
-  { Damage damage = new Damage(Global.NdN(1, 6));
+  { Entity e = obj as Entity;
+    Damage damage = new Damage(Global.NdN(1, 6));
     damage.Direct = 2;
-    user.TrySpellDamage(this, (Point)obj, damage);
+    user.TrySpellDamage(this, e!=null ? e.Position : (Point)obj, damage);
   }
 
   public static ForceBolt Default = new ForceBolt();

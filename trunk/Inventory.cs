@@ -10,11 +10,9 @@ public interface IInventory : ICollection
   int Weight { get; }
 
   Item Add(Item item);
-
+  void Clear();
   Item[] GetItems(params ItemClass[] classes);
-
   bool Has(params ItemClass[] itemClass);
-
   void Remove(Item item);
   void RemoveAt(int index);
 }
@@ -49,6 +47,7 @@ public sealed class ItemPile : IInventory
       return weight;
     }
   }
+
   public Item Add(Item item)
   { if(items==null) items = new ArrayList();
     else 
@@ -57,6 +56,8 @@ public sealed class ItemPile : IInventory
     items.Add(item);
     return item;
   }
+
+  public void Clear() { if(items!=null) items.Clear(); }
 
   public Item[] GetItems(params Chrono.ItemClass[] classes)
   { if(items==null || items.Count==0) return new Item[0];
@@ -117,7 +118,7 @@ public sealed class Inventory : IKeyedInventory
     foreach(Item i in items.Values)
       if(item.CanStackWith(i)) { i.Count += item.Count; return i; }
     if(IsFull) return null;
-    if(item.Char==0 || this[item.Char]!=null)
+    if(!char.IsLetter(item.Char) || this[item.Char]!=null)
     { for(char c='a'; c<='z'; c++) if(items[c]==null) { item.Char=c; goto done; }
       for(char c='A'; c<='A'; c++) if(items[c]==null) { item.Char=c; break; }
     }
@@ -136,6 +137,8 @@ public sealed class Inventory : IKeyedInventory
     for(int i=0; i<classes.Length; i++) ret += CharString(classes[i]);
     return ret;
   }
+
+  public void Clear() { if(items!=null) items.Clear(); }
 
   public Item[] GetItems(params ItemClass[] classes)
   { if(items==null || items.Count==0) return new Item[0];

@@ -20,7 +20,7 @@ public sealed class App
     IO.Print("Chrono 0.02 by Adam Milazzo");
     IO.Print();
     
-    if(File.Exists("c:/chrono.sav"))
+    if(false&&File.Exists("c:/chrono.sav"))
     { FileStream f = File.Open("c:/chrono.sav", FileMode.Open);
       Load(f);
       f.Close();
@@ -52,6 +52,7 @@ public sealed class App
         Player.SetSkill(Skill.Divination, 1);
         Player.Pickup(new PoisonDart()).Count = 10;
         Player.Pickup(new FoolsBook());
+        Player.MemorizeSpell(ForceBolt.Default, 5000);
       }
       Player.Pickup(new Hamburger()).Count = 2;
       Player.Pickup(new TeleportScroll());

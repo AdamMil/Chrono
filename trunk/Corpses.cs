@@ -8,6 +8,7 @@ namespace Chrono
 public class Corpse : Item
 { [Flags] public enum Flag { Rotting=1, Skeleton=2, Tainted=4 };
 
+  public Corpse() { }
   public Corpse(Entity of)
   { Class = ItemClass.Corpse; Color = of.Color; Weight=raceWeight[(int)of.Race];
     name  = of.Race.ToString().ToLower() + " corpse";

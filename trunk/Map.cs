@@ -360,9 +360,10 @@ public sealed class Map : UniqueObject
     if(!IsPassable(map[pt.Y,pt.X].Type)) map[pt.Y,pt.X].Sound=0;
     
     foreach(Entity e in entities)
-    { int vol = map[e.Position.Y, e.Position.X].Sound;
-      if(vol>0) e.OnNoise(source, type, vol);
-    }
+      if(e!=source)
+      { int vol = map[e.Position.Y, e.Position.X].Sound;
+        if(vol>0) e.OnNoise(source, type, vol);
+      }
   }
 
   public Point RandomTile(TileType type)

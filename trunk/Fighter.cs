@@ -57,19 +57,26 @@ public abstract class Fighter : AI
         if(Map.IsPassable(t.Type) && t.Scent>maxScent) { maxScent=t.Scent; dir=(Direction)i; }
       }
       if(!Alerted && maxScent<(Map.MaxScent/10)) dir=Direction.Invalid; // ignore light scents (<10%) when not Alerted
-      else { int p=5; }
     }
 
     if(dir==Direction.Invalid) dir = lastDir; // then try memory
 
     if(dir!=Direction.Invalid)
-    { bool giveup = false;
-      lastDir = dir;
+    { bool giveup=false, usedNoise = noiseDir!=Direction.Invalid;
+      Direction pdir=lastDir; // pdir==lastDir, before lastDir is changed on the next line
+      lastDir=dir; // lastDir is no longer the last direction. now it's the new one
       if(!Alerted) { Alerted=true; goto done; } // take a turn to wake up
       for(int i=-1; i<=1; i++) // if player is in front, attack
-      { Point pp = Global.Move(Position, dir+i);
-        if(Map.GetEntity(pp)==App.Player) { Attack(App.Player); lastDir=dir; tries=0; goto done; }
-      }
+        if(Map.GetEntity(Global.Move(Position, dir+i))==App.Player)
+        { if(!saw || pdir==dir+i || Global.Rand(100)<(usedNoise?75:50)) // if we can't see the target, and it moved,
+          { Attack(App.Player); lastDir=dir+i;                          // we have a 75% chance of finding it if we
+          }                                                             // sensed it with sound and 50% otherwise
+          else if(!saw && pdir!=dir+i && Map.GetEntity(Global.Move(Position, pdir))==null)
+          { Attack(pdir); App.IO.Print(TheName+" attacks empty space."); // otherwise we attack where we thought it
+          }                                                              // was
+          tries=0;
+          goto done;
+        }
       Point np = Global.Move(Position, dir);
       if(tries>5) giveup=true; // if we've tried walking 5 tiles without detecting anything, give up
       else if(TryMove(np)) goto done; // otherwise, try moving forward

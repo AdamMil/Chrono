@@ -1104,7 +1104,8 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
       default: ci = new NTConsole.CharInfo(' ', NTConsole.Attribute.Black); break;
     }
     if(!visible && tile.Type!=TileType.ClosedDoor) ci.Attributes = NTConsole.Attribute.DarkGrey;
-    ci.Attributes |= NTConsole.ForeToBack((NTConsole.Attribute)((tile.Sound*15+Map.MaxSound-1)/Map.MaxSound));
+    //ci.Attributes |= NTConsole.ForeToBack((NTConsole.Attribute)((tile.Sound*15+Map.MaxSound-1)/Map.MaxSound));
+    ci.Attributes |= NTConsole.ForeToBack((NTConsole.Attribute)((tile.Scent*15+Map.MaxScent-1)/Map.MaxScent));
     return ci;
   }
 

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8" ?> 
+<xs:schema targetNamespace="http://www.adammil.net/Chrono/dungeon"
+           xmlns="http://www.adammil.net/Chrono/dungeon"
+           xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+<!-- intRange -->
+<xs:simpleType name="intRange">
+  <xs:restriction base="xs:string">
+    <xs:pattern value="\d+(-\d+)?"/>
+  </xs:restriction>
+</xs:simpleType>
+
+<!-- levels -->
+<xs:complexType name="levels">
+  <xs:attribute name="depth" type="intRange" use="required"/>
+  <xs:attribute name="map" type="xs:string"/>
+</xs:complexType>
+
+<!-- section -->
+<xs:complexType name="section">
+  <xs:sequence>
+    <xs:element name="levels" type="levels" maxOccurs="unbounded"/>
+  </xs:sequence>
+  <xs:attribute name="name" type="xs:string" use="required"/>
+</xs:complexType>
+
+<!-- dungeon -->
+<xs:complexType name="dungeon">
+  <xs:sequence>
+    <xs:element name="section" type="section" maxOccurs="unbounded"/>
+  </xs:sequence>
+  <xs:attribute name="id" type="xs:ID" use="required"/>
+  <xs:attribute name="name" type="xs:string" use="required"/>
+  <xs:attribute name="start" type="xs:string"/>
+</xs:complexType>
+
+<xs:element name="dungeon" type="dungeon"/>
+
+</xs:schema>

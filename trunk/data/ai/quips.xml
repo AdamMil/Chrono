@@ -1,0 +1,163 @@
+﻿<?xml version="1.0" encoding="utf-8" ?> 
+
+<quips
+  xmlns="http://www.adammil.net/Chrono/quips"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.adammil.net/Chrono/quips quips.xsd">
+
+  <list appliesTo="Other Worker Farmer Housewife Fighter Shopkeeper">
+    <quip>How ya doin?</quip>
+    <quip>What are you doing later?</quip>
+    <quip>I'm sorry, but I don't have time to talk.</quip>
+    <quip>Hi there!</quip>
+    <quip>Good luck in your travels.</quip>
+    <quip>Huh?</quip>
+  </list>
+
+  <list appliesTo="Attacking KidAttacking">
+    <quip>Die!</quip>
+  </list>
+
+  <list appliesTo="Attacking">
+    <quip>I'm gonna rip your head off!</quip>
+    <quip>Now you die.</quip>
+    <quip>Prick.</quip>
+    <quip>Fine. Be antisocial.</quip>
+    <quip>Say your prayers.</quip>
+  </list>
+
+  <list appliesTo="KidAttacking">
+    <quip>You're a meanie!</quip>
+    <quip>Waaaaaah!</quip>
+    <quip>Don't hurt me!</quip>
+  </list>
+
+  <list appliesTo="Kid">
+    <quip>How old are you?</quip>
+    <quip>Do you have some candy?</quip>
+    <quip>You look funny.</quip>
+    <quip>I've got a shiny pebble.</quip>
+    <quip>Can I join you?</quip>
+    <quip>Are you from far away?</quip>
+    <quip>Where ya goin?</quip>
+    <quip>Whatcha doin?</quip>
+    <quip>Do you wanna play a game?</quip>
+    <quip>Where did you get that?</quip>
+    <quip>I can run fast. Wanna see?</quip>
+    <quip>What do you do?</quip>
+    <quip>Where is your home?</quip>
+    <quip>Heeee! Heeee!</quip>
+    <quip>Are you gonna stay here?</quip>
+    <quip>Do you have kids?</quip>
+    <quip>Why did you come here?</quip>
+    <quip>One, two, three... Weee!</quip>
+    <quip>My cat's breath smells like cat food.</quip>
+    <quip>What's that smell?</quip>
+    <quip>Daddy says you're a bad person.</quip>
+    <quip>My mom said you'll eat me if I'm bad.</quip>
+    <quip>I'm gonna be great, just like my dad!</quip>
+  </list>
+
+  <list appliesTo="Fighter">
+    <quip>I sure wish this wound would heal.</quip>
+  </list>
+  
+  <list appliesTo="Worker">
+    <quip>Seems like nobody appreciates my work.</quip>
+    <quip>I take my job seriously.</quip>
+    <quip>Have you been helped?</quip>
+  </list>
+
+  <list appliesTo="Farmer">
+    <quip>Man, I hope this drought ends soon.</quip>
+    <quip>I sure hope it rains soon.</quip>
+    <quip>Life here is slow -- just the way I like it.</quip>
+    <quip>I feel dirty.</quip>
+  </list>
+
+  <list appliesTo="Holyman">
+    <quip>God sees all things. Repent, lest you rot for eternity in Gehennom.</quip>
+    <quip>Our religion is the ONLY true way to eternal life.</quip>
+  </list>
+
+  <list appliesTo="Hobo">
+    <quip>Hey, can you spare a copper?</quip>
+    <quip>I sleep in a box when the rains come.</quip>
+  </list>
+
+  <list appliesTo="Housewife">
+    <quip>Hrmph. Cook, clean, fetch... that's all I seem to do these days!</quip>
+  </list>
+
+  <list appliesTo="Prostitute">
+    <quip>How about a roll in the hay?</quip>
+    <quip>Looking for some action?</quip>
+    <quip>You're the biggest hottie in the world.</quip>
+    <quip>Mmmm-mmmm.</quip>
+    <quip>Ooops. I dropped something in your pants. Let me get it.</quip>
+    <quip>Oh {NAME}... how do you keep so fit?</quip>
+    <quip>Can I have your autograph? On my chest?</quip>
+    <quip>I would never fake it for YOU.</quip>
+    <quip>Looking for me?</quip>
+    <quip>Need someone to take care of that for you?</quip>
+    <quip>Need some company?</quip>
+    <quip>Looking for a date?</quip>
+    <quip>Looking for some company?</quip>
+    <quip>Let me cheer you up.</quip>
+    <quip>That a knife in your pocket?</quip>
+    <quip>Want to help a virgin lose her virginity?</quip>
+    <quip>Wanna pretend we're marhoos in mating season?</quip>
+    <quip>Want a taste of paradise?</quip>
+    <quip>Looking for some TLC?</quip>
+    <quip>Hey {NAME}! Come chat with me.</quip>
+    <quip>Only takes a few gold to get my attention.</quip>
+    <quip>I'll give you some play.</quip>
+    <quip>I'm Filthy Spice.</quip>
+    <quip>I'm Homely Spice.</quip>
+    <quip>I'm Slutty Spice.</quip>
+    <quip>I'm Old Spice.</quip>
+    <quip>I'm Syphilis, er, Slutty Spice.</quip>
+    <quip>I'm Dirty Spice.</quip>
+    <quip>Buy a girl a drink?</quip>
+    <quip>Take a lonely lady on the town?</quip>
+    <quip>Need a friend for tonight?</quip>
+    <quip>Still got that bruise from the headboard...</quip>
+    <quip>Been worn out ever since that last convention...</quip>
+    <quip>Make me melt.</quip>
+    <quip>I'll take care of you, {NAME}.</quip>
+    <quip>I'm a virgin. I'm just not very good at it.</quip>
+    <quip>Show a lady a good time, {NAME}?</quip>
+    <quip>You got the money, {NAME}, I've got the time.</quip>
+    <quip>I'm a virgin, but I need the money.</quip>
+    <quip>Be gentle, it's my first time. Today.</quip>
+    <quip>Me so horny.</quip>
+    <quip>Me love you long time!</quip>
+    <quip>Twenty dollar, make you hollar!</quip>
+    <quip>Wanna dance, sweetheart?</quip>
+    <quip>::Purrrrr::</quip>
+    <quip>::Rrrrrowrr::</quip>
+    <quip>Wanna get together?</quip>
+    <quip>I'm not cheap, but I am on special.</quip>
+    <quip>I'm not free, but I'm available.</quip>
+    <quip>Tying you up costs extra.</quip>
+    <quip>You want WHAT?!</quip>
+    <quip>Ready like a freddie.</quip>
+    <quip>Want to help me lose your virginity?</quip>
+    <quip>Biting is extra.</quip>
+    <quip>Need a little company?</quip>
+    <quip>Lost? I can take you where you wanna go.</quip>
+    <quip>Hurry up. Meter's running.</quip>
+    <quip>Whoa. THAT's gonna cost extra.</quip>
+    <quip>No, I'm NOT going to wear the Mickey Mouse ears.</quip>
+    <quip>Honey, you just couldn't afford me.</quip>
+  </list>
+  
+  <list appliesTo="Shopkeeper">
+    <quip>I think you and I could become best of friends. Buy something!</quip>
+    <quip>How about buying something from your favorite merchant, me?</quip>
+    <quip>You look like you could use some of my supplies.</quip>
+    <quip>Welcome to my shop.</quip>
+    <quip>All my products come with a limited, lifetime guarantee!</quip>
+    <quip>{NAME}! I've got just the thing you need! Take a look at my stock.</quip>
+  </list>
+</quips>

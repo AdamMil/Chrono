@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xs:schema xmlns="http://www.adammil.net/Chrono/quips"
+           xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://www.adammil.net/Chrono/quips"
+           elementFormDefault="qualified">
+
+  <xs:complexType name="list">
+    <xs:sequence>
+      <xs:element name="quip" type="xs:string" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attribute name="appliesTo" type="xs:string" use="required"/>
+  </xs:complexType>
+
+  <xs:complexType name="quips">
+    <xs:sequence>
+      <xs:element name="list" type="list" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:element name="quips" type="quips"/>
+</xs:schema>

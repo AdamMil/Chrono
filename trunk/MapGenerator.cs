@@ -234,6 +234,7 @@ public class MetaCaveGenerator : MapGenerator
 }
 #endregion
 
+#region TownGenerator
 public class TownGenerator : MapGenerator
 { public override Size DefaultSize { get { return new Size(100, 60); } }
 
@@ -338,5 +339,6 @@ public class TownGenerator : MapGenerator
   ArrayList rooms = new ArrayList();
   Map map;
 }
+#endregion
 
 } // namespace Chrono

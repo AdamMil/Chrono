@@ -1,0 +1,344 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xs:schema xmlns="http://www.adammil.net/Chrono/ai"
+           xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://www.adammil.net/Chrono/ai">
+
+  <!-- aiState -->
+  <xs:simpleType name="aiState">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Wandering"/>
+      <xs:enumeration value="Idle"/>
+      <xs:enumeration value="Asleep"/>
+      <xs:enumeration value="Patrolling"/>
+      <xs:enumeration value="Attacking"/>
+      <xs:enumeration value="Escaping"/>
+      <xs:enumeration value="Working"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- color -->
+  <xs:simpleType name="color">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Black"/>
+      <xs:enumeration value="Red"/>
+      <xs:enumeration value="Green"/>
+      <xs:enumeration value="Blue"/>
+      <xs:enumeration value="Cyan"/>
+      <xs:enumeration value="Purple"/>
+      <xs:enumeration value="Brown"/>
+      <xs:enumeration value="Grey"/>
+      <xs:enumeration value="DarkGrey"/>
+      <xs:enumeration value="LightRed"/>
+      <xs:enumeration value="LightGreen"/>
+      <xs:enumeration value="LightBlue"/>
+      <xs:enumeration value="LightCyan"/>
+      <xs:enumeration value="Magenta"/>
+      <xs:enumeration value="Yellow"/>
+      <xs:enumeration value="White"/>
+      <xs:enumeration value="Normal"/>
+      <xs:enumeration value="Warning"/>
+      <xs:enumeration value="Dir"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- item -->
+  <xs:complexType name="item">
+    <xs:sequence>
+      <xs:element name="count" type="expression" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="class" type="xs:string" use="required"/>
+    <xs:attribute name="count" type="xs:integer" default="1"/>
+    
+    <xs:anyAttribute processContents="skip"/>
+  </xs:complexType>
+  
+  <!-- charData -->
+  <xs:complexType name="charData">
+    <xs:sequence>
+      <xs:element name="give" type="item" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+
+    <xs:attribute name="class" type="xs:string" use="required"/>
+    <xs:attribute name="color" type="color"/>
+    <xs:attribute name="defaultState" type="aiState"/>
+
+    <xs:attribute name="gender">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="male"/>
+          <xs:enumeration value="female"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    
+    <xs:attribute name="level" type="xs:integer"/>
+
+    <xs:attribute name="STR" type="xs:integer"/>
+    <xs:attribute name="INT" type="xs:integer"/>
+    <xs:attribute name="DEX" type="xs:integer"/>
+    <xs:attribute name="EV"  type="xs:integer"/>
+    <xs:attribute name="AC"  type="xs:integer"/>
+
+    <xs:anyAttribute processContents="skip"/>
+  </xs:complexType>
+
+  <!--xs:include schemaLocation="../common.xsd"/--> <!-- above definitions should go in common.xsd -->
+  
+  <!-- empty -->
+  <xs:complexType name="empty"/>
+
+  <!-- textAccess -->
+  <xs:complexType name="textAccess">
+    <xs:attribute name="text" type="xs:IDREF" use="required"/>
+  </xs:complexType>
+
+  <!-- quip -->
+  <xs:complexType name="quip">
+    <xs:simpleContent>
+      <xs:extension base="xs:string">
+        <xs:attribute name="text" type="xs:IDREF"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+
+  <!-- varAccess -->
+  <xs:complexType name="varAccess">
+    <xs:attribute name="var" type="xs:string" use="required"/>
+  </xs:complexType>
+
+  <!-- expressionGroup -->
+  <xs:group name="expressionGroup">
+    <xs:choice>
+      <xs:element name="get" type="varAccess"/>
+    </xs:choice>
+  </xs:group>
+
+  <!-- expression -->
+  <xs:complexType name="expression">
+    <xs:group ref="actionGroup" maxOccurs="unbounded"/>
+  </xs:complexType>
+
+  <!-- operator -->
+  <xs:simpleType name="operator">
+    <xs:restriction base="xs:string">
+      <!--logical-->
+      <xs:enumeration value="!"/>
+
+      <!--numeric comparison-->
+      <xs:enumeration value="=="/>
+      <xs:enumeration value="!="/>
+      <xs:enumeration value="&lt;"/>
+      <xs:enumeration value="&lt;="/>
+      <xs:enumeration value="&gt;"/>
+      <xs:enumeration value="&gt;="/>
+
+      <!--string comparison-->
+      <xs:enumeration value="eq"/>
+      <xs:enumeration value="ne"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- conditionAttrs -->
+  <xs:attributeGroup name="conditionAttrs">
+    <!--lhs-->
+    <xs:attribute name="lhs" type="xs:string"/>
+    <xs:attribute name="haveQuest" type="xs:IDREF"/>
+    <xs:attribute name="quest" type="xs:IDREF"/>
+    <xs:attribute name="questDone" type="xs:IDREF"/>
+    <xs:attribute name="questNotDone" type="xs:IDREF"/>
+    <xs:attribute name="questSuccess" type="xs:IDREF"/>
+    <xs:attribute name="questFailed" type="xs:IDREF"/>
+    <xs:attribute name="var" type="xs:string"/>
+
+    <xs:attribute name="op"  type="operator"/>
+
+    <!--rhs-->
+    <xs:attribute name="rhs" type="xs:string"/>
+    <xs:attribute name="var2" type="xs:string"/>
+  </xs:attributeGroup>
+
+  <!-- condition -->
+  <xs:complexType name="condition">
+    <xs:group ref="actionGroup" maxOccurs="unbounded"/>
+    <xs:attributeGroup ref="conditionAttrs"/>
+  </xs:complexType>
+
+  <!-- give -->
+  <xs:complexType name="give">
+    <xs:complexContent>
+      <xs:extension base="item">
+        <xs:attribute name="spawn" default="maybe">
+          <xs:simpleType>
+            <xs:restriction base="xs:string">
+              <xs:enumeration value="yes"/>
+              <xs:enumeration value="no"/>
+              <xs:enumeration value="maybe"/>
+            </xs:restriction>
+          </xs:simpleType>
+        </xs:attribute>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- giveQuest -->
+  <xs:complexType name="giveQuest">
+    <xs:attribute name="name" type="xs:IDREF" use="required"/>
+    <xs:attribute name="state" type="xs:string" default="during"/>
+  </xs:complexType>
+
+  <!-- giveXP -->
+  <xs:complexType name="giveXP">
+    <xs:attribute name="xp" type="xs:integer"/>
+    <xs:attribute name="pool" type="xs:integer"/>
+  </xs:complexType>
+
+  <!-- goto -->
+  <xs:complexType name="goto">
+    <xs:attribute name="name" type="xs:string" use="required"/>
+  </xs:complexType>
+  
+  <!-- if -->
+  <xs:complexType name="if">
+    <xs:sequence>
+      <xs:group ref="actionGroup" minOccurs="0" maxOccurs="unbounded"/>
+      <xs:element name="else" minOccurs="0" maxOccurs="1" type="action"/>
+    </xs:sequence>
+    <xs:attributeGroup ref="conditionAttrs"/>
+  </xs:complexType>
+
+  <!-- say -->
+  <xs:complexType name="say">
+    <xs:simpleContent>
+      <xs:extension base="xs:string">
+        <xs:attribute name="text" type="xs:IDREF"/>
+        <xs:attribute name="dialog" type="xs:IDREF"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+
+  <!-- set -->
+  <xs:complexType name="set">
+    <xs:sequence>
+      <xs:element name="value" type="expression" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="var" type="xs:string" use="required"/>
+    <xs:attribute name="value" type="xs:string"/>
+  </xs:complexType>
+
+  <!-- quipGroup -->
+  <xs:complexType name="quipGroup">
+    <xs:choice maxOccurs="unbounded">
+      <xs:element name="quip" type="quip"/>
+      <xs:element name="say" type="say"/>
+    </xs:choice>
+  </xs:complexType>
+
+  <!-- actionGroup -->
+  <xs:group name="actionGroup">
+    <xs:choice>
+      <xs:element name="decrement" type="varAccess"/>
+      <xs:element name="end"   type="empty"/>
+      <xs:element name="goto"  type="goto"/>
+      <xs:element name="give"  type="give"/>
+      <xs:element name="giveQuest" type="giveQuest"/>
+      <xs:element name="giveXP" type="giveXP"/>
+      <xs:element name="if"    type="if"/>
+      <xs:element name="increment" type="varAccess"/>
+      <xs:element name="print" type="textAccess"/>
+      <xs:element name="quipGroup" type="quipGroup"/>
+      <xs:element name="say"   type="say"/>
+      <xs:element name="set"   type="set"/>
+    </xs:choice>
+  </xs:group>
+
+  <!-- action -->
+  <xs:complexType name="action">
+    <xs:group ref="actionGroup" maxOccurs="unbounded"/>
+  </xs:complexType>
+
+  <!-- var -->
+  <xs:complexType name="var">
+    <xs:attribute name="id" type="xs:IDREF" use="required"/>
+    <xs:attribute name="value" type="xs:string"/>
+  </xs:complexType>
+  
+  <!-- quest -->
+  <xs:complexType name="quest">
+    <xs:sequence>
+      <xs:any namespace="##any" processContents="skip" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attribute name="id" type="xs:ID" use="required"/>
+    <xs:attribute name="ext" type="xs:boolean"/>
+  </xs:complexType>
+
+  <!-- declare -->
+  <xs:complexType name="declare">
+    <xs:choice maxOccurs="unbounded">
+      <xs:element name="var" type="var"/>
+      <xs:element name="quest" type="quest"/>
+    </xs:choice>
+  </xs:complexType>
+
+  <!-- text -->
+  <xs:complexType name="text">
+    <xs:simpleContent>
+      <xs:extension base="xs:string">
+        <xs:attribute name="id" type="xs:ID" use="required"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+
+  <!-- option -->
+  <xs:complexType name="option">
+    <xs:group ref="actionGroup" maxOccurs="unbounded"/>
+    <xs:attribute name="text" type="xs:IDREF" use="required"/>
+  </xs:complexType>
+
+  <!-- simpleNode -->
+  <xs:complexType name="simpleNode">
+    <xs:attribute name="name" type="xs:string" use="required"/>
+    <xs:attribute name="text" type="xs:IDREF" use="required"/>
+    <xs:attribute name="options" type="xs:string" use="required"/>
+  </xs:complexType>
+
+  <!-- node -->
+  <xs:complexType name="node">
+    <xs:sequence>
+      <xs:element name="condition" type="condition" minOccurs="0"/>
+      <xs:element name="option" type="option" minOccurs="1"/>
+    </xs:sequence>
+    <xs:attribute name="name" type="xs:string" use="required"/>
+    <xs:attribute name="text" type="xs:IDREF" use="required"/>
+  </xs:complexType>
+  
+  <!-- dialog -->
+  <xs:complexType name="dialog">
+    <xs:sequence>
+      <xs:element name="text" type="text" minOccurs="0" maxOccurs="unbounded"/>
+      <xs:choice maxOccurs="unbounded">
+        <xs:element name="node" type="node"/>
+        <xs:element name="simpleNode" type="simpleNode"/>
+      </xs:choice>
+      <xs:element name="onInit" type="action" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="id" type="xs:ID" use="required"/>
+  </xs:complexType>
+
+  <!-- ai -->
+  <xs:complexType mixed="true" name="ai">
+    <xs:sequence>
+      <xs:element name="charData" minOccurs="0" type="charData"/>
+      <xs:element name="declare" minOccurs="0" type="declare"/>
+      <xs:element name="quip" minOccurs="0" maxOccurs="unbounded" type="quip"/>
+      <xs:element name="text" minOccurs="0" maxOccurs="unbounded" type="text"/>
+      <xs:element name="dialog" minOccurs="0" maxOccurs="unbounded" type="dialog"/>
+
+      <xs:element name="onInit" minOccurs="0" type="action"/>
+      <xs:element name="onSpeak" minOccurs="0" type="action"/>
+      <xs:element name="onDeath" minOccurs="0" type="action"/>
+    </xs:sequence>
+    <xs:attribute name="id" type="xs:string" use="required"/>
+  </xs:complexType>
+
+  <xs:element name="ai" type="ai"/>
+</xs:schema>

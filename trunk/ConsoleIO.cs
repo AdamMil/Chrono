@@ -570,7 +570,8 @@ public sealed class ConsoleIO : InputOutput
   }
 
   public override void Render(Entity viewer)
-  { mapW = Math.Min(console.Width, MapWidth); mapH = Math.Min(console.Height, MapHeight);
+  { if((viewer.Flags&Entity.Flag.Asleep)!=0) return;
+    mapW = Math.Min(console.Width, MapWidth); mapH = Math.Min(console.Height, MapHeight);
     RenderMap(viewer, viewer.Position, viewer.VisibleTiles());
     RenderStats(viewer);
     SetCursorToPlayer();
@@ -1119,7 +1120,7 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
 
   // Amulet, Weapon, Shield, Armor, Ammo, Food, Corpse, Scroll, Ring, Potion, Wand, Tool, Spellbook, Container, Treasure,
   static readonly char[] itemMap = new char[(int)ItemClass.NumClasses]
-  { '"', ')', '[', '[', '(', '%', '&', '?', '=', '!', '/', ']', '+', ']', '*',
+  { '$', '"', ')', '[', '[', '(', '%', '&', '?', '=', '!', '/', ']', '+', ']', '*',
   };
   static readonly char[] raceMap = new char[(int)Race.NumRaces]
   { '@', 'o'

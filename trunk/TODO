@@ -15,11 +15,10 @@ make monsters fill in around the player (if i'm next to player and an empty spac
   me is a monster that's not next to player, move into the empty space)
 Check all the Global.Rand(100)'s for correctness
 document interfaces!
-implement Gold item
 make visibility checks stop at boulders, etc (once we have them)
 make LevelDown decrease stats
 make an OnFlagsChanged event and use to drive flag-related output
-make carry weight affect smell gain
+make carry weight affect smell gain?
 add a way to determine whether a creature is hostile, friendly, or neutral
 make character hesitant to eat raw flesh
 handle case when inventory is full in various places
@@ -27,3 +26,4 @@ make Fire check for sufficient ammo
 alter AI so that ranged weapons can be used
 allow monsters to determine from which direction they were hit
 allow attacking ground/ceiling
+truly copy items when updating memory

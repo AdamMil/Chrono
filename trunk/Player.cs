@@ -29,7 +29,7 @@ public class Player : Entity
     if(--count<=0)
     { UpdateMemory(vis);
       App.IO.Render(this);
-      inp = App.IO.GetNextInput();
+      inp = (oldFlags&Flag.Asleep)!=0 ? new Input(Action.Rest) : App.IO.GetNextInput();
       count = inp.Count;
     }
     inp.Count=0; // inp.Count drops to zero unless set to 'count' by an action
@@ -498,6 +498,26 @@ public class Player : Entity
   public override void OnDrink(Potion potion) { App.IO.Print("You drink {0}.", potion); }
   public override void OnDrop(Item item) { App.IO.Print("You drop {0}.", item); }
   public override void OnEquip(Wieldable item) { App.IO.Print("You equip {0}.", item); }
+  public override void OnFlagsChanged(Chrono.Entity.Flag oldFlags, Chrono.Entity.Flag newFlags)
+  { Flag diff = oldFlags ^ newFlags;
+    if((diff&newFlags&Flag.Asleep)!=0) App.IO.Print("You wake up.");
+    if((diff&Flag.Confused)!=0)
+      App.IO.Print((newFlags&Flag.Confused)==0 ? "Your head clears a bit." : "You stumble, confused.");
+    if((diff&Flag.Hallucinating)!=0)
+      App.IO.Print((newFlags&Flag.Hallucinating)==0 ? "Everything looks SO boring now." : "Whoa, trippy, man!");
+    if((diff&(Flag.Invisible|Flag.SeeInvisible))!=0)
+    { if((diff&Flag.Invisible)!=0) // invisibility changed
+      { if((newFlags&Flag.Invisible)!=0 && (newFlags&Flag.SeeInvisible)==0) App.IO.Print("You vanish from sight.");
+        else if((newFlags&Flag.Invisible)==0 && (oldFlags&newFlags&Flag.SeeInvisible)==0)
+          App.IO.Print("Suddenly you can see yourself again.");
+      }
+      else if((newFlags&Flag.SeeInvisible)==0)
+      { if((newFlags&Flag.Invisible)!=0) App.IO.Print("You vanish from sight.");
+      }
+      else if((oldFlags&newFlags&Flag.Invisible)!=0) App.IO.Print("Suddenly, you can see yourself again.");
+    }
+  }
+
   public override void OnHit(Entity hit, Item item, int damage)
   { if(item==null || item is Weapon)
       App.IO.Print(damage>0 ? "You hit {0}." : "You hit {0}, but do no damage.", hit.theName);

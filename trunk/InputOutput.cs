@@ -11,7 +11,7 @@ public enum Action
 }
 
 public struct Input
-{ public Input(Action action) { Action=action; Direction=Direction.Invalid; Count=0; }
+{ public Input(Action action) { Action=action; Direction=Direction.Invalid; Count=1; }
   public Action Action;
   public Direction Direction;
   public int    Count;

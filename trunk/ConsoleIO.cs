@@ -963,10 +963,18 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
 
     seeInvisible = viewer.Is(Entity.Flag.SeeInvisible);
 
-    Map map = viewer.Memory==null ? viewer.Map : viewer.Memory;
+    Map map = viewer.Map;//viewer.Memory==null ? viewer.Map : viewer.Memory;
     if(map==viewer.Map)
     { for(int i=0,y=rect.Top; y<rect.Bottom; y++)
-        for(int x=rect.Left; x<rect.Right; i++,x++) buf[i] = TileToChar(map[x,y], vis[i]);
+        for(int x=rect.Left; x<rect.Right; i++,x++)
+        { buf[i] = TileToChar(map[x,y], vis[i]);
+          Tile tile = viewer.Memory[x,y];
+          if(tile.Node!=null)
+            buf[i].Attributes |= NTConsole.ForeToBack(ColorToAttr(
+              tile.Node.PathCost>50 ? tile.Node.Type==PathNode.State.Open ? Color.Green : tile.Node.Type==PathNode.State.Closed ? Color.Red : Color.DarkGrey :
+                                      tile.Node.Type==PathNode.State.Open ? Color.LightGreen : tile.Node.Type==PathNode.State.Closed ? Color.LightRed : Color.Grey));
+          else buf[i].Attributes |= NTConsole.ForeToBack(ColorToAttr(Color.Purple));
+        }
       RenderMonsters(map.Entities, vpts, rect);
     }
     else
@@ -979,10 +987,10 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
           buf[i] = tile.Type==TileType.UpStairs || tile.Type==TileType.DownStairs || tile.Entity==null ?
                     TileToChar(tile, vis[i]) : CreatureToChar(tile.Entity, vis[i]);
         }
-      map = viewer.Map;
+      /*map = viewer.Map;
       for(int i=0,y=rect.Top; y<rect.Bottom; y++)
         for(int x=rect.Left; x<rect.Right; i++,x++) if(vis[i]) buf[i] = TileToChar(map[x,y], vis[i]);
-      RenderMonsters(map.Entities, vpts, rect);
+      RenderMonsters(map.Entities, vpts, rect);*/
     }
     console.PutBlock(new Rectangle(0, 0, rect.Width, rect.Height), buf);
   }

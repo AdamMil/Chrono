@@ -50,7 +50,7 @@ public class Player : Entity
   public override void Think()
   { if(interrupt) { inp.Count=0; interrupt=false; }
     base.Think();
-    Point[] vis = VisibleTiles();
+    Point[] vis = VisibleTiles(); UpdateMemory(vis);
     goto next;
 
     nevermind: App.IO.Print("Never mind."); goto next;
@@ -463,7 +463,7 @@ public class Player : Entity
             { Map.SetType(od, TileType.OpenDoor);
               continue;
             }
-            else if(!path.Blocked(node) || node.Parent.Point==od) break;
+            else if(!path.Blocked(node, Map) || node.Parent.Point==od) break;
           }
           node = node.Parent;
 App.IO.Render(this);
@@ -743,8 +743,8 @@ App.IO.Render(this);
   protected bool ThinkUpdate(ref Point[] vis)
   { Map.Simulate(this);
     base.Think();
-    if(vis!=null) UpdateMemory(vis);
     vis = VisibleTiles();
+    UpdateMemory(vis);
     if(IsCreatureVisible(vis)) interrupt=true;
     OnAge();
     if(interrupt) { interrupt=false; return true; }

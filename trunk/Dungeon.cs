@@ -21,7 +21,7 @@ public class Dungeon
     maps[mi] = map = new RoomyMapGenerator().Generate();
     map.Index = mi;
 
-    for(int i=0; i<10; i++) map.SpawnMonster();
+    //for(int i=0; i<10; i++) map.SpawnMonster();
     for(int i=0; i<2; i++) map.AddItem(map.FreeSpace(true, true), new Hamburger());
     for(int i=0; i<5; i++)
     { Item item = new Gold();

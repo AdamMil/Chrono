@@ -906,6 +906,7 @@ public abstract class Entity
     foreach(Point pt in vis)
     { Tile tile = Map[pt];
       tile.Items = tile.Items==null || tile.Items.Count==0 ? null : tile.Items.Clone();
+      tile.Node  = Memory[pt].Node;
       Memory[pt] = tile;
     }
     Entity[] creats = VisibleCreatures(vis);

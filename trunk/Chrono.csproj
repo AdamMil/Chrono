@@ -159,6 +159,10 @@
                     BuildAction = "Compile"
                 />
                 <File
+                    RelPath = "MapFormat.txt"
+                    BuildAction = "Content"
+                />
+                <File
                     RelPath = "MapGenerator.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
@@ -177,6 +181,10 @@
                     RelPath = "NTConsole.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
+                />
+                <File
+                    RelPath = "Overworld.txt"
+                    BuildAction = "Content"
                 />
                 <File
                     RelPath = "Player.cs"

@@ -34,9 +34,9 @@ public sealed class App
       Player = Player.Generate(c=='w' ? EntityClass.Wizard : EntityClass.Fighter, Race.Human);
       Player.Name = IO.Ask("Enter your name:", false, "I need to know what to call you!");
 
-      for(int y=0; y<map.Height; y++) // place Player on the up staircase of the first level
+      /*for(int y=0; y<map.Height; y++) // place Player on the up staircase of the first level
         for(int x=0; x<map.Width; x++)
-          if(map[x, y].Type==TileType.UpStairs) { Player.X = x; Player.Y = y; break; }
+          if(map[x, y].Type==TileType.UpStairs) { Player.X = x; Player.Y = y; break; }*/
 
       if(Player.Class==EntityClass.Fighter)
       { Player.SetSkill(Skill.Fighting, 1);

@@ -29,16 +29,18 @@ public abstract class Fighter : AI
 
   public override void Think()
   { base.Think();
-    Direction dir = HasEyes ? LookAt(App.Player) : Direction.Invalid; // first try vision
+    bool dontign = alerted || Globals.Rand(100)>=App.Player.Stealth*10-5;
+    Direction dir = dontign && HasEyes ? LookAt(App.Player) : Direction.Invalid; // first try vision
 
     bool saw = dir!=Direction.Invalid;
-    if(saw)
+    if(saw) 
     { if(alerted) tries=0;
       if(!shouted) { Map.MakeNoise(Position, this, Noise.Alert, 150); shouted=true; }
     }
-    else if(noiseDir!=Direction.Invalid) { tries=0; dir=noiseDir; } // then try sound
+    // then try sound (not affected by stealth because sound is already dampened by stealth)
+    else if(noiseDir!=Direction.Invalid) { tries=0; dir=noiseDir; }
 
-    if(dir==Direction.Invalid && HasNose && lastDir==Direction.Invalid) // then try scent
+    if(dir==Direction.Invalid && dontign && HasNose && lastDir==Direction.Invalid) // then try scent
     { int maxScent=0;
       for(int i=0; i<8; i++)
       { Tile t = Map[Global.Move(Position, i)];

@@ -844,8 +844,10 @@ public class Player : Entity
     }
     
     Smell += Map.MaxScentAdd/200; // smelliness refills from 0 over 200 turns
-    Map.AddScent(X, Y, Smell);
-    Map.SpreadScent();
+    if(Map.Index!=0) // don't add scent to the overworld
+    { Map.AddScent(X, Y, Smell);
+      Map.SpreadScent();
+    }
   }
 
   public override void OnAttrChange(Attr attribute, int amount, bool fromExercise)

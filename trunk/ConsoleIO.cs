@@ -1309,13 +1309,30 @@ Ctrl-P - see old messages";
     else switch(tile.Type)
     { case TileType.Wall:       ci = new NTConsole.CharInfo('#', NTConsole.Attribute.Brown); break;
       case TileType.ClosedDoor: ci = new NTConsole.CharInfo('+', NTConsole.Attribute.Yellow); break;
-      case TileType.OpenDoor:   ci = new NTConsole.CharInfo((char)254, NTConsole.Attribute.Yellow); break;
-      case TileType.RoomFloor:  ci = new NTConsole.CharInfo((char)250, NTConsole.Attribute.Grey); break;
-      case TileType.Corridor:   ci = new NTConsole.CharInfo((char)176, NTConsole.Attribute.Grey); break;
+      case TileType.OpenDoor:   ci = new NTConsole.CharInfo((char)0xFE, NTConsole.Attribute.Yellow); break;
+      case TileType.RoomFloor:  ci = new NTConsole.CharInfo((char)0xFA, NTConsole.Attribute.Grey); break;
+      case TileType.Corridor:   ci = new NTConsole.CharInfo((char)0xB0, NTConsole.Attribute.Grey); break;
       case TileType.UpStairs:
         return new NTConsole.CharInfo('<', visible ? NTConsole.Attribute.Grey : NTConsole.Attribute.LightBlue);
       case TileType.DownStairs:
         return new NTConsole.CharInfo('>', visible ? NTConsole.Attribute.Grey : NTConsole.Attribute.Red);
+      case TileType.ShallowWater: ci = new NTConsole.CharInfo((char)0xF7, NTConsole.Attribute.Cyan); break;
+      case TileType.DeepWater: ci = new NTConsole.CharInfo((char)0xF7, NTConsole.Attribute.Blue); break;
+      case TileType.Ice: ci = new NTConsole.CharInfo((char)'/', NTConsole.Attribute.White); break;
+      case TileType.Lava: ci = new NTConsole.CharInfo((char)0xF7, NTConsole.Attribute.LightRed); break;
+      case TileType.Pit: ci = new NTConsole.CharInfo('o', NTConsole.Attribute.Grey); break;
+      case TileType.Hole: ci = new NTConsole.CharInfo('O', NTConsole.Attribute.Grey); break;
+      case TileType.Trap: ci = new NTConsole.CharInfo('^', NTConsole.Attribute.LightCyan); break;
+      case TileType.Altar: ci = new NTConsole.CharInfo('_', NTConsole.Attribute.Grey); break;
+      case TileType.Tree: case TileType.Forest: ci = new NTConsole.CharInfo('T', NTConsole.Attribute.Green); break;
+      case TileType.Sand: ci = new NTConsole.CharInfo((char)0xFA, NTConsole.Attribute.Brown); break;
+      case TileType.Grass: ci = new NTConsole.CharInfo('\"', NTConsole.Attribute.LightGreen); break;
+      case TileType.Hill: ci = new NTConsole.CharInfo('^', NTConsole.Attribute.Brown); break;
+      case TileType.Mountain: ci = new NTConsole.CharInfo('^', NTConsole.Attribute.White); break;
+      case TileType.Road: ci = new NTConsole.CharInfo((char)0xB0, NTConsole.Attribute.Brown); break;
+      case TileType.Town:
+        return new NTConsole.CharInfo('o', visible ? NTConsole.Attribute.Grey : NTConsole.Attribute.LightRed);
+      case TileType.Portal: return new NTConsole.CharInfo('\\', NTConsole.Attribute.Yellow);
       default: ci = new NTConsole.CharInfo(' ', NTConsole.Attribute.Black); break;
     }
     if(!visible && tile.Type!=TileType.ClosedDoor) ci.Attributes = NTConsole.Attribute.DarkGrey;

@@ -1,20 +1,22 @@
 using System;
 using System.Collections;
 using System.Drawing;
+using System.IO;
 using System.Runtime.Serialization;
 using GameLib.Collections;
 
 namespace Chrono
 {
 
+#region Types and Enums
 public enum TileType : byte
 { Border,
 
   SolidRock, Wall, ClosedDoor, OpenDoor, RoomFloor, Corridor, UpStairs, DownStairs,
-  ShallowWater, DeepWater, Ice, Lava, Pit, Hole,
-
-  Trap, Altar,
+  ShallowWater, DeepWater, Ice, Lava, Pit, Hole, Trap, Altar,
   
+  Tree, Forest, Sand, Grass, Hill, Mountain, Road, Town, Portal,
+
   NumTypes
 }
 
@@ -49,7 +51,9 @@ public struct Link
   public int  ToLevel;
   public bool Down;
 }
+#endregion
 
+#region Pathfinding
 public class PathNode
 { public PathNode(int x, int y) { Point=new Point(x, y); }
   public enum State : byte { New, Open, Closed };
@@ -142,7 +146,9 @@ public sealed class PathFinder // FIXME: having this latch onto the .Node bits o
   BinaryTree queue;
   Map map;
 }
+#endregion
 
+#region Map
 [Serializable]
 public sealed class Map : UniqueObject
 { // maximum scent on a tile, maximum scent add on a single call (maximum entity smelliness), maximum sound on a tile
@@ -384,11 +390,6 @@ public sealed class Map : UniqueObject
 
   public void SaveMemory(Map memory) { Memory = memory; }
 
-  public static bool IsDangerous(TileType type) { return (tileFlag[(int)type]&TileFlag.Dangerous) != TileFlag.None; }
-  public static bool IsPassable(TileType type) { return (tileFlag[(int)type]&TileFlag.Passable) != TileFlag.None; }
-  public static bool IsWall(TileType type) { return (tileFlag[(int)type]&TileFlag.Wall) != TileFlag.None; }
-  public static bool IsDoor(TileType type) { return (tileFlag[(int)type]&TileFlag.Door) != TileFlag.None; }
-
   public void Simulate() { Simulate(null); }
   public void Simulate(Player player)
   { bool addedPlayer = player==null;
@@ -469,6 +470,58 @@ public sealed class Map : UniqueObject
     for(int y=0,i=0; y<height; y++) for(int x=0; x<width; x++) map[y,x].Scent=scentbuf[i++];
   }
 
+  public static bool IsDangerous(TileType type) { return (tileFlag[(int)type]&TileFlag.Dangerous) != TileFlag.None; }
+  public static bool IsPassable(TileType type) { return (tileFlag[(int)type]&TileFlag.Passable) != TileFlag.None; }
+  public static bool IsWall(TileType type) { return (tileFlag[(int)type]&TileFlag.Wall) != TileFlag.None; }
+  public static bool IsDoor(TileType type) { return (tileFlag[(int)type]&TileFlag.Door) != TileFlag.None; }
+  
+  public static Map Load(Stream stream)
+  { StreamReader sr = new StreamReader(stream, System.Text.Encoding.ASCII);
+    ArrayList lines = new ArrayList();
+    string line;
+    while((line=sr.ReadLine())!=null && line!="--BEGIN MAP--");
+    while((line=sr.ReadLine())!=null && line!="--END MAP--") lines.Add(line);
+
+    Map map = new Map(((string)lines[0]).Length, lines.Count);
+    for(int y=0; y<map.Height; y++)
+    { line = (string)lines[y];
+      for(int x=0; x<map.Width; x++)
+      { TileType type;
+        switch(line[x])
+        { case '*': type=TileType.Border; break;
+          case ' ': type=TileType.SolidRock; break;
+          case '#': type=TileType.Wall; break;
+          case '+': type=TileType.ClosedDoor; break;
+          case '-': type=TileType.OpenDoor; break;
+          case '.': type=TileType.RoomFloor; break;
+          case 'c': type=TileType.Corridor; break;
+          case '<': type=TileType.UpStairs; break;
+          case '>': type=TileType.DownStairs; break;
+          case 'w': type=TileType.ShallowWater; break;
+          case 'W': type=TileType.DeepWater; break;
+          case 'I': type=TileType.Ice; break;
+          case 'L': type=TileType.Lava; break;
+          case 'P': type=TileType.Pit; break;
+          case 'H': type=TileType.Hole; break;
+          case '^': type=TileType.Trap; break;
+          case '_': type=TileType.Altar; break;
+          case 'T': type=TileType.Tree; break;
+          case 'F': type=TileType.Forest; break;
+          case 'S': type=TileType.Sand; break;
+          case 'G': type=TileType.Grass; break;
+          case 'm': type=TileType.Hill; break;
+          case 'M': type=TileType.Mountain; break;
+          case 'R': type=TileType.Road; break;
+          case 'o': type=TileType.Town; break;
+          case '\\': type=TileType.Portal; break;
+          default: throw new ArgumentException(string.Format("Unknown tile type {0} at {1},{2}", line[x], x, y));
+        }
+        map.SetType(x, y, type);
+      }
+    }
+    return map;
+  }
+
   public Map Memory;
   public int Index;
 
@@ -515,8 +568,18 @@ public sealed class Map : UniqueObject
     TileFlag.Passable|TileFlag.Dangerous, // Pit
     TileFlag.Passable|TileFlag.Dangerous, // Hole
     TileFlag.Passable|TileFlag.Dangerous, // Trap
-    TileFlag.Passable // Altar
+    TileFlag.Passable, // Altar
+    TileFlag.Passable, // Tree
+    TileFlag.Passable, // Forest
+    TileFlag.Passable, // Sand
+    TileFlag.Passable, // Grass
+    TileFlag.Passable, // Hill
+    TileFlag.Passable, // Mountain
+    TileFlag.Passable, // Road
+    TileFlag.Passable, // Town
+    TileFlag.Passable, // Portal
   };
 }
+#endregion
 
 } // namespace Chrono

@@ -10,7 +10,7 @@ public abstract class AI : Entity
 { public AIState State { get { return state; } }
 
   public override void Die(object killer, Death cause)
-  { if((cause==Death.Sickness || cause==Death.Starvation) && App.Player.CanSee(this))
+  { if((cause==Death.Poison || cause==Death.Sickness || cause==Death.Starvation) && App.Player.CanSee(this))
       App.IO.Print(TheName+" falls to the ground, dead.");
     Die();
   }
@@ -33,7 +33,7 @@ public abstract class AI : Entity
     else skills=null;
     AddSkills(300*level, skills);
   }
-  
+
   public override void OnDrink(Potion potion)
   { if(App.Player.CanSee(this)) App.IO.Print("{0} drinks {1}.", TheName, potion.FullName);
   }

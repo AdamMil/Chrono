@@ -194,11 +194,21 @@
                     BuildAction = "Compile"
                 />
                 <File
+                    RelPath = "Spells.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
                     RelPath = "TODO"
                     BuildAction = "None"
                 />
                 <File
                     RelPath = "Tools.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
+                    RelPath = "Wands.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
                 />

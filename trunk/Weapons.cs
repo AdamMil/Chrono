@@ -35,6 +35,8 @@ public abstract class Weapon : Wieldable
 public abstract class FiringWeapon : Weapon
 { public FiringWeapon() { Ranged=true; }
   public abstract Compatibility CompatibleWith(Ammo ammo);
+  
+  public string AmmoName;
 }
 
 public abstract class Ammo : Item
@@ -73,16 +75,16 @@ public class Dart : Weapon
 
 public class Bow : FiringWeapon
 { public Bow()
-  { name="recurved bow";
+  { name="recurved bow"; AmmoName="arrows";
     Color=Color.LightCyan; Weight=20; Delay=25; wClass=WeaponClass.Bow; Exercises=Attr.Dex; Noise=2;
   }
-  
+
   public override Compatibility CompatibleWith(Ammo ammo)
   { return ammo is GoodArrow ? Compatibility.Perfect : ammo is Arrow ? Compatibility.Okay : Compatibility.None;
   }
 
   public override int CalculateDamage(Entity user, Ammo ammo, Entity target)
-  { return Global.NdN(1, 6+(int)CompatibleWith(user)) + user.DexBonus;
+  { return ammo==null ? 1 : Global.NdN(1, 5+(int)CompatibleWith(user)+(int)CompatibleWith(ammo)) + user.DexBonus;
   }
 }
 

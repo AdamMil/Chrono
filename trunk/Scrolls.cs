@@ -8,24 +8,25 @@ public abstract class Scroll : Readable
   { Class=ItemClass.Scroll; Prefix="a scroll of "; PluralSuffix=""; PluralPrefix="scrolls of "; Weight=1;
     Durability=75;
   }
-  protected Scroll(Item item) : base(item) { }
+  protected Scroll(Item item) : base(item) { Spell=((Scroll)item).Spell; }
+
+  public override string Name { get { return Spell.Name; } }
 
   public override bool CanStackWith(Item item)
   { return base.CanStackWith(item) && ((Scroll)item).Name==Name;
   }
+
+  public override void Read(Entity user)
+  { user.OnReadScroll(this);
+    Spell.Cast(user, user.Position, Direction.Self);
+  }
+
+  public Spell Spell;
 }
 
 public class TeleportScroll : Scroll
-{ public TeleportScroll()
-  { name="teleport"; Color=Color.White;
-  }
+{ public TeleportScroll() { name="teleport"; Color=Color.White; Spell=TeleportSpell.Default; }
   public TeleportScroll(Item item) : base(item) { }
-  
-  public override void Read(Entity user)
-  { user.OnReadScroll(this);
-    user.Position = user.Map.FreeSpace();
-    if(user!=App.Player) App.IO.Print("{0} disappears.", user.TheName);
-  }
 }
 
 } // namespace Chrono

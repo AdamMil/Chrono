@@ -331,7 +331,10 @@ public sealed class Map
   
   public void SpawnMonster()
   { int idx = entities.Add(Entity.Generate(typeof(Orc), Index+1, EntityClass.Fighter));
-    entities[idx].Position = FreeSpace();
+    for(int i=0; i<10; i++)
+    { entities[idx].Position = FreeSpace();
+      if(App.Player==null || !App.Player.CanSee(entities[idx])) break;
+    }
   }
 
   public void SpreadScent()

@@ -87,8 +87,11 @@ public class Player : Entity
         { inv.Remove(corpse);
           Flesh food = new Flesh(corpse);
           food.Count = Global.Rand(turns/2)+1;
-          inv.Add(food);
           if(turns>1) App.IO.Print("You finish carving the {0}.", corpse.Name);
+          if(inv.Add(food)==null)
+          { App.IO.Print("The {0} does not fit in your pack, so you put it down.", food);
+            Map.AddItem(Position, food);
+          }
         }
         break;
       }
@@ -140,7 +143,10 @@ public class Player : Entity
           if(ThinkUpdate(ref vis)) { App.IO.Print("You stop eating."); stopped=true; break; }
         }
         if(consumed && !split) inv.Remove(toEat);
-        else if(split && !consumed) inv.Add(toEat);
+        else if(split && !consumed && inv.Add(toEat)==null)
+        { App.IO.Print("The {0} does not fit in your pack, so you put it down.", toEat);
+          Map.AddItem(Position, toEat);
+        }
         if(consumed) App.IO.Print("You finish eating.");
         if(Hunger<Food.MaxFoodPerTurn) App.IO.Print("You feel full.");
         if(stopped) goto next;
@@ -223,7 +229,10 @@ public class Player : Entity
         Entity c = Map.GetEntity(np);
         if(c!=null)
         { Weapon w = Weapon;
-          Attack(np, w, SelectAmmo(w)); // FIXME: this sucks
+          Ammo   a = SelectAmmo(w);
+          if(w!=null && a==null && w.Ranged && w.wClass!=WeaponClass.Thrown)
+            App.IO.Print(Color.Warning, "You're out of "+((FiringWeapon)w).AmmoName+'!');
+          Attack(np, w, a);
         }
         else if(Map.IsPassable(np))
         { Position = np;
@@ -501,6 +510,24 @@ public class Player : Entity
         }
         break;
       }
+      
+      case Action.ZapWand:
+      { if(CarryStress==CarryStress.Overtaxed) goto carrytoomuch;
+        MenuItem[] items = App.IO.ChooseItem("Zap what?", Inv, MenuFlag.None, ItemClass.Wand);
+        if(items.Length==0) goto nevermind;
+        Wand wand = items[0].Item as Wand;
+        if(wand==null) { App.IO.Print("You can't zap that!"); goto next; }
+        RangeTarget rt = App.IO.ChooseTarget(this, true);
+        bool destroy;
+        if(rt.Dir!=Direction.Invalid)
+        { Point np = rt.Dir>=Direction.Above ? Position : Global.Move(Position, rt.Dir);
+          destroy=wand.Zap(this, np, rt.Dir);
+        }
+        else if(rt.Point.X!=-1) destroy=wand.Zap(this, rt.Point);
+        else goto nevermind;
+        if(destroy) Inv.Remove(wand);
+        break;
+      }
     }
 
     OnAge();
@@ -596,21 +623,27 @@ public class Player : Entity
     }
   }
 
-  public override void OnHit(Entity hit, Item item, int damage)
+  public override void OnHit(Entity hit, object item, int damage)
   { if(item==null || item is Weapon)
-      App.IO.Print(damage>0 ? "You hit {0}." : "You hit {0}, but do no damage.", hit.theName);
+      App.IO.Print(damage>0 ? "You hit {0}." : "You hit {0}, but do no damage.", hit==this ? "yourself" : hit.theName);
+    else if(item is Spell)
+      App.IO.Print(damage>0 ? "The spell hits {0}." : "The spell hits {0}, but {1} unaffected.",
+                   hit==this ? "you" : hit.theName, hit==this ? "you are" : "it appears");
   }
-  public override void OnHitBy(Entity hit, Item item, int damage)
+  public override void OnHitBy(Entity attacker, object item, int damage)
   { Interrupt();
-    App.IO.Print(damage>0 ? "{0} hits you!" : "{0} hits you, but does no damage.", hit.TheName);
+    if(attacker!=this)
+      App.IO.Print(damage>0 ? "{0} hits you!" : "{0} hits you, but does no damage.", attacker.TheName);
   }
   public override void OnInvoke(Item item) { App.IO.Print("You invoke {0}.", item); }
   public override void OnKill(Entity killed) { App.IO.Print("You kill {0}!", killed.TheName); }
-  public override void OnMiss(Entity hit, Item item)
+  public override void OnMiss(Entity hit, object item)
   { if(item==null || item is Weapon) App.IO.Print("You miss {0}.", hit.theName);
+    else if(item is Spell && CanSee(hit)) 
+      App.IO.Print("The spell {0} {1}.", Global.Coinflip() ? "misses" : "whizzes by", hit==this ? "you" : hit.theName);
   }
-  public override void OnMissBy(Entity hit, Item item)
-  { App.IO.Print("{0} misses you.", hit.TheName);
+  public override void OnMissBy(Entity attacker, object item)
+  { if(attacker!=this) App.IO.Print("{0} misses you.", attacker.TheName);
   }
   public override void OnNoise(Entity source, Noise type, int volume)
   { if(type==Noise.Alert) { App.IO.Print("You hear a shout!"); Interrupt(); }

@@ -15,6 +15,14 @@ public enum Direction
   Above, Below, Self, Invalid
 };
 
+public enum TraceAction { Stop=1, Go=2, HBounce=4, VBounce=8, Bounce=HBounce|VBounce };
+public struct TraceResult
+{ public TraceResult(Point pt, Point prev) { Point=pt; Previous=prev; }
+  public Point Point;
+  public Point Previous;
+}
+public delegate TraceAction LinePoint(Point point, object context);
+
 public sealed class Global
 { private Global() { }
 
@@ -48,8 +56,46 @@ public sealed class Global
     return Direction.Invalid;
   }
   public static bool OneIn(int n) { return Random.Next(n)==0; }
-  public static int Rand(int min, int max) { return Random.Next(min, max); }
+  public static int Rand(int min, int max) { return Random.Next(min, max+1); }
   public static int Rand(int max) { return Random.Next(max); }
+
+  // bouncing is incompatible with stopAtDest
+  public static TraceResult TraceLine(Point start, Point dest, int maxDist, bool stopAtDest,
+                                      LinePoint func, object context)
+  { int dx=dest.X-start.X, dy=dest.Y-start.Y, xi=Math.Sign(dx), yi=Math.Sign(dy), r, ru, p, dist=0;
+    Point op=start;
+    TraceAction ta;
+    if(dx<0) dx=-dx;
+    if(dy<0) dy=-dy;
+    if(dx>=dy)
+    { r=dy*2; ru=r-dx*2; p=r-dx;
+      while(true)
+      { if(p>0) { start.Y+=yi; p+=ru; }
+        else p+=r;
+        start.X+=xi; dx--;
+        ta = func(start, context);
+        if(ta==TraceAction.Stop || maxDist!=-1 && ++dist>=maxDist || stopAtDest && dx<0)
+          return new TraceResult(start, op);
+        if(ta==TraceAction.Go) op=start;
+        if((ta&TraceAction.HBounce)!=0) xi=-xi;
+        if((ta&TraceAction.VBounce)!=0) yi=-yi;
+      }
+    }
+    else
+    { r=dx*2; ru=r-dy*2; p=r-dy;
+      while(true)
+      { if(p>0) { start.X+=xi; p+=ru; }
+        else p+=r;
+        start.Y+=yi; dy--;
+        ta = func(start, context);
+        if(ta==TraceAction.Stop || maxDist!=-1 && ++dist>=maxDist || stopAtDest && dy<0)
+          return new TraceResult(start, op);
+        if(ta==TraceAction.Go) op=start;
+        if((ta&TraceAction.HBounce)!=0) xi=-xi;
+        if((ta&TraceAction.VBounce)!=0) yi=-yi;
+      }
+    }
+  }
 
   public static readonly Point[] DirMap = new Point[8]
   { new Point(0, -1), new Point(1, -1), new Point(1, 0),  new Point(1, 1),

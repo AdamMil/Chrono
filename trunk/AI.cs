@@ -6,7 +6,7 @@ using System.Runtime.Serialization;
 namespace Chrono
 {
 
-public enum AIState  { Wandering, Idle, Asleep, Patrolling, Attacking, Escaping };
+public enum AIState  { Wandering, Idle, Asleep, Patrolling, Attacking, Escaping, Working };
 
 public abstract class AI : Entity
 { protected AI() { }

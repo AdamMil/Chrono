@@ -310,7 +310,8 @@ public class Map : UniqueObject
   { AddShop(rect, type, Entity.Generate(typeof(Shopkeeper), Global.Rand(3), EntityClass.Fighter), stock);
   }
   public void AddShop(Rectangle rect, ShopType type, Entity shopkeeper, bool stock)
-  { Shop[] narr = new Shop[shops==null ? 1 : shops.Length+1];
+  { 
+    Shop[] narr = new Shop[shops==null ? 1 : shops.Length+1];
     if(narr.Length!=1) Array.Copy(shops, narr, narr.Length-1);
     shops = narr;
     narr[narr.Length-1] = new Shop(rect, shopkeeper, type);

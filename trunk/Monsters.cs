@@ -154,8 +154,15 @@ public class Townsperson : AI
 #region Shopkeeper
 [Serializable]
 public class Shopkeeper : AI
-{ public Shopkeeper() { Race=Race.Human; }
+{ public Shopkeeper() { Race=Race.Human; GotoState(defaultState=AIState.Working); } // TODO: not always human...
   public Shopkeeper(SerializationInfo info, StreamingContext context) : base(info, context) { }
+  
+  protected override bool HandleState(AIState state)
+  { if(state==AIState.Working)
+    { 
+    }
+    else return base.HandleState(state);
+  }
 }
 #endregion
 

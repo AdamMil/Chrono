@@ -45,6 +45,7 @@ public sealed class ConsoleIO : InputOutput
   { string sprompt = prompt + (chars!=null ? " [" + chars + "] " : " ");
     bool doRebuke  = false;
     TextInput = true;
+    if(caseInsensitive) chars = chars.ToLower();
     if(rebuke==null) rebuke = "Invalid selection!";
     while(true)
     { if(doRebuke) AddLine(color, rebuke);
@@ -53,10 +54,10 @@ public sealed class ConsoleIO : InputOutput
       char c = ReadChar(true);
       if(c=='\r' || c=='\n' || rec.Key.VirtualKey==NTConsole.Key.Escape) c = defaultChar;
       else AppendToBL(c);
-      if(chars==null || c==defaultChar ||
-         (caseInsensitive ? chars.ToLower() : chars).IndexOf(c) != -1)
+      int index = chars==null ? -1 : chars.IndexOf(caseInsensitive ? char.ToLower(c) : c);
+      if(chars==null || c==defaultChar || index!=-1)
       { TextInput = false;
-        return c;
+        return index==-1 ? c : chars[index];
       }
       doRebuke = true;
     }

@@ -5,7 +5,7 @@ namespace Chrono
 {
 
 public class Player : Entity
-{ public Player() { Color=Color.White; Timer=50; SetRawAttr(Attr.Light, 12); /*we get a headstart*/ }
+{ public Player() { Color=Color.White; Timer=50; /*we get a headstart*/ }
 
   public override void Die(object killer, Death cause)
   { switch(cause)

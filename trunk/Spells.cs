@@ -14,14 +14,37 @@ public abstract class Spell
 { public virtual void Cast(Entity user, Item item) { }
   public virtual void Cast(Entity user, Point tile, Direction dir) { }
 
+  public int Level { get { return Difficulty/100+1; } }
+
+  public int CastChance(Entity user) // assuming the user knows it
+  { double div = Math.Pow(1.25, user.Int)/8;
+    int skill = (user.GetSkill(Skill.Casting)+GetSpellSkill(user)+1)/2;
+    if(skill>0) div += skill*Math.Pow(1.02, skill)*16*div/100;
+    int chance = 100-(int)Math.Round((Difficulty+50)/div);
+    return chance<0 ? 0 : chance>100 ? 100 : chance;
+  }
+  public bool CastTest(Entity user) { return Global.Rand(100)<CastChance(user); }
+
+  public int LearnChance(Entity user)
+  { double div = Math.Pow(1.25, user.Int)/8;                // 1.25 ** INT
+    div += GetSpellSkill(user)*25*div/100;                  // + 25% per skill level
+    int chance = 100-(int)Math.Round((Difficulty+100)/div); // 100 - (Difficulty+100)/that value
+    chance += chance*20/100;                                // + 20%
+    return chance<0 ? 0 : chance>100 ? 100 : chance;
+  }
+  public bool LearnTest(Entity user) { return Global.Rand(100)<LearnChance(user); }
+
   public virtual ICollection TracePath(Entity user, Point pt) { return null; }
 
   public string Name;
   public SpellClass  Class;
   public SpellTarget Target;
-  public int Level;  // level at which spell can be cast with 0% chance of failure
+  public int Difficulty; // 0-99=level 1, 100-199=level 2, 200-299=level 3, etc
   public int Memory; // memory of this spell, decreased every turn that the spell isn't cast, forgotten at zero
+  public int Power;  // MP usage
   
+  protected int GetSpellSkill(Entity user) { return user.GetSkill((Skill)((int)Class+(int)Skill.WeaponSkills)); }
+
   protected static ArrayList path = new ArrayList();
 }
 
@@ -53,36 +76,37 @@ public abstract class BeamSpell : Spell
 
   TraceAction TracePoint(Point pt, object context)
   { Entity user = (Entity)context;
+    path.Add(pt);
+    TraceAction ret;
     if(!Map.IsPassable(user.Map[pt].Type))
-    { TraceAction ret = (TraceAction)0;
+    { ret = (TraceAction)0;
       if(Map.IsPassable(user.Map[oldPt.X, pt.Y].Type)) ret |= TraceAction.HBounce;
       if(Map.IsPassable(user.Map[pt.X, oldPt.Y].Type)) ret |= TraceAction.VBounce;
-      oldPt=pt;
       if(ret>0)
       { if(++bounces==3) return TraceAction.Stop;
-        return ret;
       }
-      return TraceAction.Go;
+      else ret = TraceAction.Go;
     }
+    else ret = TraceAction.Go;
     oldPt=pt;
     path.Add(pt);
-    return TraceAction.Go;
+    return ret;
   }
 
   TraceAction ZapPoint(Point pt, object context)
   { Entity user = (Entity)context;
+    TraceAction ret;
     if(!Map.IsPassable(user.Map[pt].Type))
-    { TraceAction ret = (TraceAction)0;
+    { ret = (TraceAction)0;
       if(Map.IsPassable(user.Map[oldPt.X, pt.Y].Type)) ret |= TraceAction.HBounce;
       if(Map.IsPassable(user.Map[pt.X, oldPt.Y].Type)) ret |= TraceAction.VBounce;
-      oldPt=pt;
       if(ret>0)
       { if(++bounces==3) return TraceAction.Stop;
         if(user==App.Player) App.IO.Print("The spell bounces!");
-        return ret;
       }
-      return TraceAction.Go;
+      else ret=TraceAction.Go;
     }
+    else ret=TraceAction.Go;
     oldPt=pt;
     object affected = Hit(user, pt);
     if(affected!=null) Affect(user, affected);

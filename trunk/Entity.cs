@@ -11,7 +11,9 @@ public enum Attr
   NumAttributes=NumModifiable
 }
 
-public enum Death { Starvation, Sickness, Trap } // causes of death (besides combat)
+public enum CarryStress { Normal, Burdened, Stressed, Overtaxed } // states related to how much we're carrying
+
+public enum Death { Starvation, Sickness, Trap, Falling } // causes of death (besides combat)
 
 public enum EntityClass
 { Other=-2, // not a monster (boulder or some other entity)
@@ -48,6 +50,17 @@ public abstract class Entity
 
   // all of these apply modifiers from items where applicable
   public int AC { get { return GetAttr(Attr.AC); } }
+  public int CarryMax { get { return Str*100; } }
+  public CarryStress CarryStress
+  { get
+    { int pct = CarryWeight*100/CarryMax;
+      if(pct<BurdenedAt) return CarryStress.Normal;
+      if(pct<StressedAt) return CarryStress.Burdened;
+      if(pct<OvertaxedAt) return CarryStress.Stressed;
+      return CarryStress.Overtaxed;
+    }
+  }
+  public int CarryWeight { get { return Inv.Weight; } }
   public int Dex { get { return GetAttr(Attr.Dex); } }
   public int DexBonus // general bonus from dexterity (dex <8 is a penalty, >8 is a bonus)
   { get
@@ -128,7 +141,13 @@ public abstract class Entity
   { get { return smell; }
     set { smell = Math.Max(0, Math.Min(value, Map.MaxScentAdd)); }
   }
-  public int Speed { get { return GetAttr(Attr.Speed); } }
+  public int Speed
+  { get
+    { int div=1, stress=(int)CarryStress;
+      while(stress-->0) div*=2;
+      return GetAttr(Attr.Speed) * div;
+    }
+  }
   public int Stealth { get { return GetAttr(Attr.Stealth); } }
   public int Str { get { return GetAttr(Attr.Str); } }
   public int StrBonus // general bonus from strength (str <10 is a penalty, >10 is a bonus)
@@ -233,6 +252,11 @@ public abstract class Entity
 
   public abstract void Die(Entity killer, Item impl); // death from item/weapon (impl==null means hand-to-hand combat)
   public abstract void Die(Death cause); // death
+
+  public void DoDamage(Death cause, int amount)
+  { HP =- amount;
+    if(HP<=0) Die(cause);
+  }
 
   public Item Drop(char c) // drops an item (assumes it's droppable), returns item dropped
   { Item i = Inv[c];
@@ -703,7 +727,10 @@ public abstract class Entity
   };
 
   // the hunger values at which we're hungry, starving, and dead from starvation
-  protected const int HungryAt=500, StarvingAt=800, StarveAt=1000;
+  protected const int HungryAt=1000, StarvingAt=1500, StarveAt=1800;
+  // the carry weight percentages at which we're burdened, stressed, and overtaxed
+  protected const int BurdenedAt=60, StressedAt=75, OvertaxedAt=90;
+
   protected struct TraceResult
   { public TraceResult(Point pt, Point prev) { Point=pt; Previous=prev; }
     public Point Point;

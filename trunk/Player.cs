@@ -22,7 +22,8 @@ public class Player : Entity
     Point[] vis = VisibleTiles();
     goto next;
 
-    nevermind: App.IO.Print("Never mind.");
+    nevermind: App.IO.Print("Never mind."); goto next;
+    carrytoomuch: App.IO.Print("You're carrying too much!"); goto next;
 
     next:
     int count = inp.Count;
@@ -36,7 +37,8 @@ public class Player : Entity
 
     switch(inp.Action)
     { case Action.Carve:
-      { Item item;
+      { if(CarryStress==CarryStress.Overtaxed) goto carrytoomuch;
+        Item item;
         IInventory inv;
         if(!GroundPackUse(typeof(Corpse), "Butcher", out item, out inv, ItemClass.Corpse)) goto next;
         Corpse corpse = (Corpse)item;
@@ -61,7 +63,8 @@ public class Player : Entity
       }
       
       case Action.CloseDoor:
-      { Direction dir = App.IO.ChooseDirection(false, false);
+      { if(CarryStress==CarryStress.Overtaxed) goto carrytoomuch;
+        Direction dir = App.IO.ChooseDirection(false, false);
         if(dir!=Direction.Invalid)
         { Point newpos = Global.Move(Position, dir);
           Tile tile = Map[newpos];
@@ -90,6 +93,7 @@ public class Player : Entity
 
       case Action.Eat:
       { if(Hunger<Food.MaxFoodPerTurn) { App.IO.Print("You're still full."); goto next; }
+        if(CarryStress==CarryStress.Overtaxed) goto carrytoomuch;
 
         Item item=null;
         IInventory inv=null;
@@ -115,7 +119,8 @@ public class Player : Entity
       case Action.ExamineTile: App.IO.ExamineTile(this, Position); goto next;
 
       case Action.Fire:
-      { Weapon w = Weapon;
+      { if(CarryStress==CarryStress.Overtaxed) goto carrytoomuch;
+        Weapon w = Weapon;
         if(w==null) { App.IO.Print("You have no weapon equipped!"); goto next; }
         else if(w.Ranged)
         { RangeTarget rt = App.IO.ChooseTarget(this, true);
@@ -132,17 +137,23 @@ public class Player : Entity
       }
 
       case Action.GoDown:
-      { if(Map[Position].Type!=TileType.DownStairs) { App.IO.Print("You can't go down here!"); goto next; }
+      { CarryStress stress = CarryStress;
+        if(Map[Position].Type!=TileType.DownStairs) { App.IO.Print("You can't go down here!"); goto next; }
         Map.SaveMemory(Memory);
         Link link = Map.GetLink(Position);
         Map.Entities.Remove(this);
         App.Dungeon[App.CurrentLevel=link.ToLevel].Entities.Add(this);
         Position = link.To;
+        if(stress>=CarryStress.Stressed || stress==CarryStress.Burdened && Global.Coinflip())
+        { App.IO.Print("You fall down the stairs!");
+          DoDamage(Death.Falling, Global.NdN((int)stress, 20));
+        }
         break;
       }
 
       case Action.GoUp:
-      { if(Map[Position].Type!=TileType.UpStairs) { App.IO.Print("You can't go up here!"); goto next; }
+      { if(CarryStress>CarryStress.Stressed) goto carrytoomuch;
+        if(Map[Position].Type!=TileType.UpStairs) { App.IO.Print("You can't go up here!"); goto next; }
         if(App.CurrentLevel==0)
         { if(App.IO.YesNo("If you go up here, you will leave the dungeon. Are you sure?", false)) App.Quit=true;
         }
@@ -157,7 +168,8 @@ public class Player : Entity
       }
 
       case Action.Invoke:
-      { Inventory inv = new Inventory();
+      { if(CarryStress==CarryStress.Overtaxed) goto carrytoomuch;
+        Inventory inv = new Inventory();
         for(int i=0; i<Hands.Length; i++) if(Hands[i]!=null) inv.Add(Hands[i]);
         if(inv.Count==0) { App.IO.Print("You have no items equipped!"); goto next; }
         if(inv.Count==1) { Invoke(inv[0]); break; }
@@ -170,7 +182,8 @@ public class Player : Entity
       case Action.ManageSkills: App.IO.ManageSkills(this); goto next;
 
       case Action.Move:
-      { Point np = Global.Move(Position, inp.Direction);
+      { if(CarryStress==CarryStress.Overtaxed) goto carrytoomuch;
+        Point np = Global.Move(Position, inp.Direction);
         Entity c = Map.GetEntity(np);
         if(c!=null) Attack(np); // FIXME: this sucks
         else if(Map.IsPassable(np))
@@ -185,7 +198,8 @@ public class Player : Entity
       }
 
       case Action.MoveToInteresting: // this needs to be improved
-      { Point  np = Global.Move(Position, inp.Direction);
+      { if(CarryStress==CarryStress.Overtaxed) goto carrytoomuch;
+        Point  np = Global.Move(Position, inp.Direction);
         int noise = (10-Stealth)*12; // stealth = 0 to 10
         if(!Map.IsPassable(np)) goto next;
         Position = np;
@@ -223,7 +237,8 @@ public class Player : Entity
       case Action.Inventory: App.IO.DisplayInventory(Inv); goto next;
 
       case Action.OpenDoor:
-      { Direction dir = App.IO.ChooseDirection(false, false);
+      { if(CarryStress==CarryStress.Overtaxed) goto carrytoomuch;
+        Direction dir = App.IO.ChooseDirection(false, false);
         if(dir!=Direction.Invalid)
         { Point newpos = Global.Move(Position, dir);
           Tile tile = Map[newpos];
@@ -240,9 +255,11 @@ public class Player : Entity
       }
 
       case Action.Pickup:
-      { if(!Map.HasItems(Position)) { App.IO.Print("There are no items here."); goto next; }
+      { if(CarryStress==CarryStress.Overtaxed) goto carrytoomuch;
+        if(!Map.HasItems(Position)) { App.IO.Print("There are no items here."); goto next; }
         if(Inv.IsFull) { App.IO.Print("Your pack is full."); goto next; }
         ItemPile inv = Map[Position].Items;
+        CarryStress stress = CarryStress, newstress;
         if(inv.Count==1)
         { Item item = inv[0], newItem = Pickup(inv, 0);
           string s = string.Format("{0} - {1}", newItem.Char, item.FullName);
@@ -256,11 +273,16 @@ public class Player : Entity
             if(item.Count!=newItem.Count) s += string.Format(" (now {0})", newItem.Count);
             App.IO.Print(s);
           }
+        newstress = CarryStress;
+        if(newstress>stress)
+          App.IO.Print(newstress==CarryStress.Burdened ? Color.Warning : Color.Dire,
+                       "You are {0}{1}", newstress.ToString().ToLower(), newstress==CarryStress.Burdened ? '.' : '!');
         break;
       }
 
       case Action.Quaff:
-      { Item potion;
+      { if(CarryStress>=CarryStress.Stressed) goto carrytoomuch;
+        Item potion;
         IInventory inv;
         if(!GroundPackUse(typeof(Potion), "Drink", out potion, out inv, ItemClass.Potion)) goto next;
         if(potion.Count>1) ((Potion)potion.Split(1)).Drink(this);
@@ -273,7 +295,8 @@ public class Player : Entity
         break;
 
       case Action.Read:
-      { Item read;
+      { if(CarryStress>=CarryStress.Stressed) goto carrytoomuch;
+        Item read;
         IInventory inv;
         if(!GroundPackUse(typeof(Readable), "Read", out read, out inv, ItemClass.Scroll, ItemClass.Spellbook))
           goto next;
@@ -314,7 +337,8 @@ public class Player : Entity
       }
 
       case Action.Remove:
-      { Inventory inv = new Inventory();
+      { if(CarryStress>=CarryStress.Stressed) goto carrytoomuch;
+        Inventory inv = new Inventory();
         for(int i=0; i<Slots.Length; i++) if(Slots[i]!=null) inv.Add(Slots[i]);
         if(inv.Count==0) { App.IO.Print("You're not wearing anything!"); goto next; }
         MenuItem[] items = App.IO.ChooseItem("Remove what?", inv, MenuFlag.Multi, ItemClass.Any);
@@ -335,7 +359,8 @@ public class Player : Entity
       case Action.ShowMap: App.IO.DisplayMap(this); goto next;
       
       case Action.SwapAB:
-      { Wieldable w=null;
+      { if(CarryStress==CarryStress.Overtaxed) goto carrytoomuch;
+        Wieldable w=null;
         for(int i=0; i<Hands.Length; i++)
           if(Hands[i]!=null && (Hands[i].Char=='a' || Hands[i].Char=='b')) { w=Hands[i]; break; }
         if(w==null)
@@ -352,7 +377,8 @@ public class Player : Entity
       }
 
       case Action.Throw:
-      { MenuItem[] items = App.IO.ChooseItem("Throw which item?", Inv, MenuFlag.None, ItemClass.Any);
+      { if(CarryStress>=CarryStress.Stressed) goto carrytoomuch;
+        MenuItem[] items = App.IO.ChooseItem("Throw which item?", Inv, MenuFlag.None, ItemClass.Any);
         if(items.Length==0) goto nevermind;
         if(Wearing(items[0].Item)) { App.IO.Print("You can't throw something you're wearing!"); goto next; }
         RangeTarget rt = App.IO.ChooseTarget(this, true);
@@ -363,7 +389,8 @@ public class Player : Entity
       }
 
       case Action.UseItem:
-      { Inventory inv = new Inventory();
+      { if(CarryStress==CarryStress.Overtaxed) goto carrytoomuch;
+        Inventory inv = new Inventory();
         foreach(Item ii in Inv) if(ii.Usability!=ItemUse.NoUse) inv.Add(ii);
         if(inv.Count==0) { App.IO.Print("You have no useable items."); goto next; }
         MenuItem[] items = App.IO.ChooseItem("Use which item?", inv, MenuFlag.None, ItemClass.Any);
@@ -396,7 +423,8 @@ public class Player : Entity
       }
 
       case Action.Wear:
-      { MenuItem[] items = App.IO.ChooseItem("Wear what?", Inv, MenuFlag.None, wearableClasses);
+      { if(CarryStress>=CarryStress.Stressed) goto carrytoomuch;
+        MenuItem[] items = App.IO.ChooseItem("Wear what?", Inv, MenuFlag.None, wearableClasses);
         if(items.Length==0) goto nevermind;
         Wearable item = items[0].Item as Wearable;
         if(item==null) { App.IO.Print("You can't wear that!"); goto next; }
@@ -412,7 +440,8 @@ public class Player : Entity
       }
 
       case Action.Wield:
-      { MenuItem[] items = App.IO.ChooseItem("Wield what?", Inv, MenuFlag.AllowNothing, ItemClass.Weapon, ItemClass.Shield);
+      { if(CarryStress>=CarryStress.Stressed) goto carrytoomuch;
+        MenuItem[] items = App.IO.ChooseItem("Wield what?", Inv, MenuFlag.AllowNothing, ItemClass.Weapon, ItemClass.Shield);
         if(items.Length==0) goto nevermind;
         if(items[0].Item==null) TryEquip(null);
         else

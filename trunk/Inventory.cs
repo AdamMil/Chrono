@@ -7,6 +7,7 @@ namespace Chrono
 public interface IInventory : ICollection
 { Item this[int index] { get; }
   bool IsFull { get; }
+  int Weight { get; }
 
   Item Add(Item item);
 
@@ -39,6 +40,13 @@ public sealed class ItemPile : IInventory
   #region IInventory Members
   public Item this[int i] { get { return (Item)items[i]; } }
   public bool IsFull { get { return false; } }
+  public int Weight
+  { get
+    { int weight=0;
+      if(items!=null) foreach(Item i in items) weight += i.Weight*i.Count;
+      return weight;
+    }
+  }
   public Item Add(Item item)
   { if(items==null) items = new ArrayList();
     else 
@@ -93,6 +101,13 @@ public sealed class Inventory : IKeyedInventory
 
   public int  Count  { get { return items==null ? 0 : items.Count; } }
   public bool IsFull { get { return Count>=maxItems; } }
+  public int Weight
+  { get
+    { int weight=0;
+      if(items!=null) foreach(Item i in items.Values) weight += i.Weight*i.Count;
+      return weight;
+    }
+  }
 
   public Item Add(Item item)
   { if(IsFull) throw new InvalidOperationException("This inventory is full!");

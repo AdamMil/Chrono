@@ -317,7 +317,7 @@ public abstract class Entity
   public abstract void Die(object killer, Death cause);
 
   public void DoDamage(object killer, Death cause, int amount)
-  { HP =- amount;
+  { HP -= amount;
     if(HP<=0) Die(killer, cause);
   }
   public void DoDamage(Death cause, int amount) { DoDamage(null, cause, amount); }
@@ -519,10 +519,12 @@ public abstract class Entity
   }
 
   public void MemorizeSpell(Spell spell, int memory)
-  { if(spells==null) spells = new ArrayList();
+  { if(Spells==null) Spells = new ArrayList();
     Type type = spell.GetType();
-    foreach(Spell s in spells) if(s.GetType()==type) { s.Memory = memory; return; }
-    spells.Add(type.GetConstructor(Type.EmptyTypes).Invoke(null));
+    foreach(Spell s in Spells) if(s.GetType()==type) { s.Memory = memory; return; }
+    spell = (Spell)type.GetConstructor(Type.EmptyTypes).Invoke(null);
+    spell.Memory = memory;
+    Spells.Add(spell);
   }
 
   // event handlers (for output, etc)
@@ -596,9 +598,9 @@ public abstract class Entity
   }
 
   public int SpellKnowledge(Spell spell)
-  { if(spells==null) return 0;
+  { if(Spells==null) return 0;
     Type type = spell.GetType();
-    foreach(Spell s in spells) if(s.GetType()==type) return s.Memory;
+    foreach(Spell s in Spells) if(s.GetType()==type) return s.Memory;
     return 0;
   }
 
@@ -801,6 +803,7 @@ public abstract class Entity
   public Wearable[] Slots = new Wearable[(int)Slot.NumSlots]; // our worn item slots
   public int[] Skills = new int[(int)Skill.NumSkills], SkillExp = new int[(int)Skill.NumSkills]; // our skills
   public Wieldable[] Hands = new Wieldable[2]; // our hands (currently just 2, but maybe more in the future)
+  public ArrayList Spells;   // spells we've learned (don't modify this collection manually)
   public string Name, Title; // Name can be null (our race [eg "orc"] is displayed). Title can be null (no title)
   public Map    Map, Memory; // the map and our memory of it
   public Point  Position;    // our position within the map
@@ -917,9 +920,9 @@ public abstract class Entity
     }
   }
 
-  protected string prefix;   // my name prefix (usually null)
-  protected int baseKillExp; // the base experience gotten for killing me
-  protected bool interrupt;  // true if we've been interrupted
+  protected string prefix;      // my name prefix (usually null)
+  protected int baseKillExp;    // the base experience gotten for killing me
+  protected bool interrupt;     // true if we've been interrupted
 
   struct AttrMods
   { public AttrMods(params int[] mods) { Mods = mods; }
@@ -969,17 +972,14 @@ public abstract class Entity
       if(damage<0) damage = 0;            // normalize damage
       App.IO.Print(Color.DarkGrey, "DAMAGE: {0} -> {1}, HP: {2} -> {3}", odam, damage, c.HP, c.HP-damage);
       damage += damage * wepskill*10/100; // damage up 10% per skill level
-      c.HP -= damage;
       c.OnHitBy(this, item, damage);
       OnHit(c, item, damage);
       if(item!=null) if(item.Hit(this, c)) destroyed=true;
 
+      DoDamage(c, Death.Combat, damage);
       if(c.HP<=0)
-      { c.Die(this, Death.Combat);
-        if(c.HP<=0) // check health again because amulet of saving, etc could have taken effect
-        { OnKill(c);
-          GiveKillExp(c);
-        }
+      { OnKill(c);
+        GiveKillExp(c);
       }
     }
     else App.IO.Print(Color.DarkGrey, "BLOCKED");
@@ -1049,7 +1049,6 @@ public abstract class Entity
   int[] attr = new int[(int)Attr.NumAttributes], attrExp = new int[(int)Attr.NumAttributes];
   bool[] skillEnable; // are we training these skills?
   Effect[] effects;
-  ArrayList spells;   // spells we've learned
   int exp, expLevel, hp, mp, smell, numEffects;
   Flag flags;      // cached set of flags
 
@@ -1063,7 +1062,7 @@ public abstract class Entity
   };
   static readonly AttrMods[] classAttrs = new AttrMods[(int)EntityClass.NumClasses] // stat modifiers per class
   { new AttrMods(7, 3, -1, 15, 2, 40, 0, 1), // Fighter - 9, 15/2=17, 40, 0/1
-    new AttrMods(-1, 3, 7, 9, 8, 50),        // Wizard  - 9, 9/8=17,  50, 0/0
+    new AttrMods(-1, 3, 7, 9, 8, 45),        // Wizard  - 9, 9/8=17,  45, 0/0
   };
   // titles per exp level per class
   static readonly ClassLevel[][] classTitles = new ClassLevel[(int)EntityClass.NumClasses][]

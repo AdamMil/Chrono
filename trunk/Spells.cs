@@ -5,13 +5,20 @@ using System.Drawing;
 namespace Chrono
 {
 
-public enum SpellTarget { Item, Tile };
+public enum SpellTarget { Self, Item, Tile };
 public enum SpellClass
 { Summoning, Enchantment, Translocation, Transformation, Divination, Channeling, Necromancy, Elemental, Poison
 }
 
 public abstract class Spell
 { public void Cast(Entity user) { Cast(user, user.Position, Direction.Self); }
+  public void Cast(Entity user, RangeTarget rt)
+  { if(rt.Dir!=Direction.Invalid)
+    { Point np = rt.Dir>=Direction.Above ? user.Position : Global.Move(user.Position, rt.Dir);
+      Cast(user, np, rt.Dir);
+    }
+    else if(rt.Point.X!=-1) Cast(user, rt.Point, rt.Dir);
+  }
   public virtual void Cast(Entity user, Item item) { }
   public virtual void Cast(Entity user, Point tile, Direction dir) { }
 
@@ -117,6 +124,38 @@ public abstract class BeamSpell : Spell
   int bounces;
 }
 
+public class ForceBolt : BeamSpell
+{ public ForceBolt()
+  { Name="force bolt"; Class=SpellClass.Elemental; Difficulty=95; Power=2;
+    Description = "The fire spell hurls a great bolt of flames.";
+  }
+
+  protected override object Hit(Entity user, Point pt) { return user.Map.GetEntity(pt); }
+
+  protected override bool Affect(Entity user, Direction dir)
+  { if(dir==Direction.Above)
+    { if(user==App.Player) App.IO.Print("Bits of stone rain down on you as the spell slams into the ceiling.");
+      return false;
+    }
+    else if(dir==Direction.Below)
+    { if(user==App.Player) App.IO.Print("The bugs on the ground are crushed!");
+    }
+    return false;
+  }
+
+  protected override void Affect(Entity user, object obj)
+  { Entity e = obj as Entity;
+    if(e!=null)
+    { int damage = Global.NdN(1, 8);
+      e.OnHitBy(user, this, damage);
+      user.OnHit(e, this, damage);
+      e.DoDamage(user, Death.Combat, damage);
+    }
+  }
+
+  public static ForceBolt Default = new ForceBolt();
+}
+
 public class FireSpell : BeamSpell
 { public FireSpell()
   { Name="fire"; Class=SpellClass.Elemental; Difficulty=550; Power=12;
@@ -189,7 +228,7 @@ public class FireSpell : BeamSpell
 
 public class TeleportSpell : Spell
 { public TeleportSpell()
-  { Name="teleport"; Class=SpellClass.Translocation; Difficulty=450; Power=9;
+  { Name="teleport"; Class=SpellClass.Translocation; Difficulty=450; Power=9; Target=SpellTarget.Self;
     Description = "This spell will teleport the caster to a random location.";
   }
 
@@ -203,7 +242,7 @@ public class TeleportSpell : Spell
 
 public class AmnesiaSpell : Spell
 { public AmnesiaSpell()
-  { Name="amnesia"; Class=SpellClass.Divination; Difficulty=10; Power=2;
+  { Name="amnesia"; Class=SpellClass.Divination; Difficulty=10; Power=2; Target=SpellTarget.Self;
     Description = "This spell scrambles the caster's memory.";
   }
   

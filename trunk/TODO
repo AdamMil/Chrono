@@ -33,4 +33,11 @@ don't walk through invisible monsters while moving
 make path tracing part of the Map class (?)
 when path finding, if stopped on items, display them
 make spells give monster death messages
-confirm on lifting heavy load
+confirm on lifting heavy items
+implement 'D'rop command
+better item spawning
+develop a better, more centralized spell damage system
+add messages like "You are no longer burdened."
+improve spell description (add MP usage, etc)
+improve spell target prompting (add custom messages, etc)
+have corpses rot, too (not just go from plain -> skeleton)

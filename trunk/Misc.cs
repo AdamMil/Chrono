@@ -47,8 +47,7 @@ public sealed class Global
   }
   public static int NdN(int ndice, int nsides) // dice range from 1 to nsides, not 0 to nsides-1
   { int val=0;
-    nsides++;
-    while(ndice-->0) { val += Random.Next(nsides); }
+    while(ndice-->0) { val += Random.Next(nsides)+1; }
     return val;
   }
   public static Direction PointToDir(Point off)

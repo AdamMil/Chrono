@@ -12,10 +12,7 @@ public class Food : Item
 
   public const int FoodPerWeight=75, MaxFoodPerTurn=150;
 
-  public sealed class Flag
-  { private Flag() { }
-    public const uint None=0, Partial=1, Rotten=2, Tainted=4, NextFlag=8;
-  }
+  [Flags] public enum Flag { None=0, Partial=1, Rotten=2, Tainted=4 };
 
   public int FoodLeft { get { return Weight*FoodPerWeight; } }
 
@@ -54,13 +51,20 @@ public class Food : Item
       { if(holder==App.Player) App.IO.Print("Your {0} rots away.", name);
         return true;
       }
-      else if(Age>=DecayTime) Flags |= Flag.Rotten;
+      else if(Age>=DecayTime && (Flags&Flag.Rotten)==0) Rot(holder);
     }
     return false;
   }
 
-  public uint Flags;
+  public Flag Flags;
   public int DecayTime;
+  
+  protected void Rot(Entity holder)
+  { Flags |= Flag.Rotten;
+    if(holder==App.Player)
+      App.IO.Print(Global.Coinflip() ? "Eww! There's something really disgusting in your pack!"
+                                      : "You smell the putrid stench of decay.");
+  }
 }
 
 public class FortuneCookie : Food
@@ -68,15 +72,13 @@ public class FortuneCookie : Food
   public FortuneCookie(Item item) : base(item) { }
 
   public override bool Eat(Entity user)
-  { if((Flags&Read)==0)
+  { if((Flags&Flag.Partial)==0) // use Partial to indicate whether or not it's been opened
     { App.IO.Print("The fortune cookie says: {0}",
                    "A starship ride has been promised to you by the galactic wizard.");
-      Flags |= Read;
+      Flags |= Flag.Partial;
     }
     return base.Eat(user);
   }
-
-  const uint Read = Food.Flag.NextFlag;
 }
 
 public class Hamburger : Food
@@ -89,7 +91,8 @@ public class Flesh : Food
   { Color=from.Color; Weight=2; Prefix="a chunk of "; PluralPrefix="chunks of "; PluralSuffix="";
     name=from.CorpseOf.Race.ToString().ToLower()+" flesh"; FromCorpse=from; DecayTime=60;
     Age=from.Age/2; // meat from older corpses decays quicker
-    if(from.Tainted) Flags |= Flag.Tainted;
+    if((from.Flags&Corpse.Flag.Rotting)!=0) { Rot(null); Age=DecayTime; }
+    if((from.Flags&Corpse.Flag.Tainted)!=0) Flags |= Flag.Tainted;
   }
   public Flesh(Item item) : base(item) { FromCorpse=((Flesh)item).FromCorpse; }
 

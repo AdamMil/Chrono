@@ -87,17 +87,14 @@ public abstract class BeamSpell : Spell
     path.Add(pt);
     TraceAction ret;
     if(!Map.IsPassable(user.Map[pt].Type))
-    { ret = (TraceAction)0;
-      if(Map.IsPassable(user.Map[oldPt.X, pt.Y].Type)) ret |= TraceAction.HBounce;
-      if(Map.IsPassable(user.Map[pt.X, oldPt.Y].Type)) ret |= TraceAction.VBounce;
-      if(ret>0)
-      { if(++bounces==3) return TraceAction.Stop;
-      }
-      else ret = TraceAction.Go;
+    { if(++bounces==3) return TraceAction.Stop;
+      ret = TraceAction.Bounce;
+      if(!Map.IsPassable(user.Map[oldPt.X, pt.Y].Type)) ret &= ~TraceAction.HBounce;
+      if(!Map.IsPassable(user.Map[pt.X, oldPt.Y].Type)) ret &= ~TraceAction.VBounce;
+      if(ret==0) ret=TraceAction.Bounce;
     }
     else ret = TraceAction.Go;
     oldPt=pt;
-    path.Add(pt);
     return ret;
   }
 
@@ -105,20 +102,17 @@ public abstract class BeamSpell : Spell
   { Entity user = (Entity)context;
     TraceAction ret;
     if(!Map.IsPassable(user.Map[pt].Type))
-    { ret = (TraceAction)0;
-      if(Map.IsPassable(user.Map[oldPt.X, pt.Y].Type)) ret |= TraceAction.HBounce;
-      if(Map.IsPassable(user.Map[pt.X, oldPt.Y].Type)) ret |= TraceAction.VBounce;
-      if(ret>0)
-      { if(++bounces==3) return TraceAction.Stop;
-        if(user==App.Player) App.IO.Print("The spell bounces!");
-      }
-      else ret=TraceAction.Go;
+    { if(++bounces==3) return TraceAction.Stop;
+      ret = TraceAction.Bounce;
+      if(!Map.IsPassable(user.Map[oldPt.X, pt.Y].Type)) ret &= ~TraceAction.HBounce;
+      if(!Map.IsPassable(user.Map[pt.X, oldPt.Y].Type)) ret &= ~TraceAction.VBounce;
+      if(user==App.Player) App.IO.Print("The spell bounces!");
     }
     else ret=TraceAction.Go;
     oldPt=pt;
     object affected = Hit(user, pt);
     if(affected!=null) Affect(user, affected);
-    return TraceAction.Go;
+    return ret;
   }
   
   Point oldPt;
@@ -218,7 +212,7 @@ public class FireSpell : BeamSpell
   bool AffectItem(IInventory inv, Item i, bool print)
   { if(i.Class==ItemClass.Scroll || i.Class==ItemClass.Potion || i.Class==ItemClass.Spellbook)
     { if(print)
-      { string plural = i.Count>1 ? "s" : "";
+      { string plural = i.Count>1 ? "" : "s";
         App.IO.Print(i.Class==ItemClass.Potion ? "{0} heat{1} up and burst{1}!" : "{0} burn{1} up!",
                      Global.Cap1(i.ToString()), plural);
       }

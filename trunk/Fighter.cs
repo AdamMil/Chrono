@@ -70,10 +70,10 @@ public abstract class Fighter : AI
       for(int i=-1; i<=1; i++) // if player is in front, attack
         if(Map.GetEntity(Global.Move(Position, dir+i))==App.Player)
         { if(!saw || pdir==dir+i || Global.Rand(100)<(usedNoise?75:50)) // if we can't see the target, and it moved,
-          { Attack(lastDir=dir+i, null, null);                          // we have a 75% chance of finding it if we
+          { Attack(null, null, lastDir=dir+i);                          // we have a 75% chance of finding it if we
           }                                                             // sensed it with sound and 50% otherwise
           else if(!saw && pdir!=dir+i && Map.GetEntity(Global.Move(Position, pdir))==null)
-          { Attack(pdir, null, null); // otherwise we attack where we thought it was
+          { Attack(null, null, pdir); // otherwise we attack where we thought it was
             App.IO.Print(TheName+" attacks empty space."); 
           }
           tries=0;

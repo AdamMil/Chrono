@@ -379,7 +379,7 @@ public sealed class ConsoleIO : InputOutput
 
   public override Point DisplayMap(Entity viewer)
   { ClearLines();
-    int oldW = mapW; mapW = console.Width-1; 
+    int oldW=mapW; mapW=console.Width-1; 
     console.Fill(0, 0, mapW, mapH);
     SetCursorToPlayer();
     Point[] vpts = viewer.VisibleTiles();
@@ -427,7 +427,8 @@ public sealed class ConsoleIO : InputOutput
     console.Fill(0, 0, mapW, mapH);
     mapW=oldW;
     RestoreLines();
-    RestoreScreen();
+    RenderMap(viewer, pos, vpts); 
+    DrawLines(); // RestoreScreen can't be called here because buf[] doesn't contain data correct for mapW
     renderStats=true;
     return ret;
   }

@@ -21,18 +21,19 @@ public sealed class App
     IO.Print();
 
     Map map = Dungeon[0];
-    Player = Player.Generate(EntityClass.Wizard, Race.Human);
+    Player = Player.Generate(EntityClass.Fighter, Race.Orc);
     Player.Name = IO.Ask("Enter your name:", false, "I need to know what to call you!");
     
     for(int y=0; y<map.Height; y++) // place Player on the up staircase of the first level
       for(int x=0; x<map.Width; x++)
         if(map[x, y].Type==TileType.UpStairs) { Player.X = x; Player.Y = y; break; }
-    Player.SetRawAttr(Attr.AC, 5);
-    Player.SetRawAttr(Attr.EV, 6);
-    Player.SetRawAttr(Attr.Stealth, 5);
-    Player.SetSkill(Skill.Casting, 1);
+    Player.SetRawAttr(Attr.AC, 6);
+    Player.SetRawAttr(Attr.EV, 5);
+    /*Player.SetSkill(Skill.Casting, 1);
     Player.SetSkill(Skill.Elemental, 1);
-    Player.SetSkill(Skill.Transformation, 1);
+    Player.SetSkill(Skill.Telekinesis, 1);*/
+    Player.SetSkill(Skill.Fighting, 1);
+    Player.SetSkill(Skill.Armor, 1);
     Player.Pickup(new Bow());
     Player.Pickup(new ShortSword());
     Player.Pickup(new Dart()).Count = 20;

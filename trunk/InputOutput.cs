@@ -6,7 +6,8 @@ namespace Chrono
 
 public enum Action
 { None, Quit, Rest, Move, MoveToInteresting, MoveToDanger, MoveAFAP, OpenDoor, CloseDoor, Pickup, Drop, DropType,
-  GoUp, GoDown, Eat, Wear, Remove, Wield, Inventory, ShowMap, Fire, Quaff, Read, ViewItem, Invoke, SwapAB, Reassign
+  GoUp, GoDown, Eat, Wear, Remove, Wield, Inventory, ShowMap, Fire, Quaff, Read, ViewItem, Invoke, SwapAB, Reassign,
+  ManageSkills
 }
 
 public struct Input
@@ -83,6 +84,8 @@ public abstract class InputOutput
   public abstract void DisplayMap(Entity viewer);
 
   public abstract Input GetNextInput();
+
+  public abstract void ManageSkills(Entity player);
 
   public MenuItem[] Menu(IInventory items, MenuFlag flags)
   { return Menu(items, flags, ItemClass.Any);

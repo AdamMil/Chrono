@@ -18,6 +18,8 @@ public enum TileType : byte
 public enum Trap : byte { Dart, PoisonDart, Magic, MpDrain, Teleport, Pit }
 public enum God : byte { God1, God2, God3 }
 
+public enum Noise { Walking, Bang, Combat, Alert, NeedHelp }
+
 public struct Tile
 { [Flags()]
   public enum Flag : byte { None=0, PermaLit=1, Lit=2, Hidden=4, Locked=8 };
@@ -31,11 +33,12 @@ public struct Tile
 
   public ItemPile  Items;
   public Entity  Entity; // for memory only
-  public TileType  Type;
   public Point     Dest;     // destination on prev/next level
   public ushort    Scent;    // strength of player smell
+  public TileType  Type;
   public byte      Subtype;  // subtype of tile (ie, type of trap/altar/etc)
   public byte      Flags;
+  public byte      Sound;
 
   public static Tile Border { get { return new Tile(); } }
 }
@@ -49,9 +52,11 @@ public struct Link
 
 public sealed class Map
 { 
-  #region CreatureCollection
-  public class CreatureCollection : ArrayList
-  { public CreatureCollection(Map map) { this.map = map; }
+  public const int MaxScent=1200, MaxSound=255;
+  
+  #region EntityCollection
+  public class EntityCollection : ArrayList
+  { public EntityCollection(Map map) { this.map = map; }
 
     public new Entity this[int index] { get { return (Entity)base[index]; } }
 
@@ -61,18 +66,18 @@ public sealed class Map
       map.Added(c);
       return i;
     }
-    public new void AddRange(ICollection creatures)
-    { base.AddRange(creatures);
-      foreach(Entity c in creatures) map.Added(c);
+    public new void AddRange(ICollection entities)
+    { base.AddRange(entities);
+      foreach(Entity c in entities) map.Added(c);
     }
     public new void Insert(int index, object o) { Insert(index, (Entity)o); }
     public void Insert(int index, Entity c)
     { base.Insert(index, c);
       map.Added(c);
     }
-    public void InsertRange(ICollection creatures, int index)
-    { base.InsertRange(index, creatures);
-      foreach(Entity c in creatures) map.Added(c);
+    public void InsertRange(ICollection entities, int index)
+    { base.InsertRange(index, entities);
+      foreach(Entity c in entities) map.Added(c);
     }
     public new void Remove(object o) { Remove((Entity)o); }
     public void Remove(Entity c)
@@ -99,7 +104,7 @@ public sealed class Map
   { this.width  = width;
     this.height = height;
     map = new Tile[height, width];
-    creatures = new CreatureCollection(this);
+    entities = new EntityCollection(this);
   }
 
   public Link[] Links { get { return links; } }
@@ -128,15 +133,15 @@ public sealed class Map
     links = narr;
   }
 
-  public void AddScent(int x, int y) { map[y,x].Scent = (ushort)Math.Min(map[y,x].Scent+800, 1200); }
+  public void AddScent(int x, int y) { map[y,x].Scent = (ushort)Math.Min(map[y,x].Scent+800, MaxScent); }
 
   public bool Contains(int x, int y) { return y>=0 && y<height && x>=0 && x<width; }
 
-  public Entity GetCreature(Point pt)
-  { for(int i=0; i<creatures.Count; i++) if(creatures[i].Position==pt) return creatures[i];
+  public Entity GetEntity(Point pt)
+  { for(int i=0; i<entities.Count; i++) if(entities[i].Position==pt) return entities[i];
     return null;
   }
-  public Entity GetCreature(int x, int y) { return GetCreature(new Point(x, y)); }
+  public Entity GetEntity(int x, int y) { return GetEntity(new Point(x, y)); }
 
   public bool GetFlag(Point pt, Tile.Flag flag) { return this[pt.X,pt.Y].GetFlag(flag); }
   public bool GetFlag(int x, int y, Tile.Flag flag) { return this[x,y].GetFlag(flag); }
@@ -174,7 +179,7 @@ public sealed class Map
   public bool IsPassable(int x, int y)
   { Tile tile = this[x,y];
     if(!IsPassable(tile.Type)) return false;
-    for(int i=0; i<creatures.Count; i++) if(creatures[i].X==x && creatures[i].Y==y) return false;
+    for(int i=0; i<entities.Count; i++) if(entities[i].X==x && entities[i].Y==y) return false;
     return true;
   }
   public bool IsWall(Point pt) { return IsWall(this[pt.X,pt.Y].Type); }
@@ -184,27 +189,70 @@ public sealed class Map
 
   public Point FreeSpace() { return FreeSpace(true, false); }
   public Point FreeSpace(bool allowItems) { return FreeSpace(allowItems, false); }
-  public Point FreeSpace(bool allowItems, bool allowCreatures)
+  public Point FreeSpace(bool allowItems, bool allowEntities)
   { int tries = width*height;
     while(tries-->0)
     { Point pt = new Point(Global.Rand(width), Global.Rand(height));
-      if(!IsFreeSpace(pt, allowItems, allowCreatures)) continue;
+      if(!IsFreeSpace(pt, allowItems, allowEntities)) continue;
       return pt;
     }
     for(int y=0; y<height; y++)
       for(int x=0; x<width; x++)
-        if(IsFreeSpace(x, y, allowItems, allowCreatures)) return new Point(x, y);
+        if(IsFreeSpace(x, y, allowItems, allowEntities)) return new Point(x, y);
     throw new ArgumentException("No free space found on this map!");
   }
 
-  public bool IsFreeSpace(Point pt, bool allowItems, bool allowCreatures)
-  { return IsFreeSpace(pt.X, pt.Y, allowItems, allowCreatures);
+  public bool IsFreeSpace(Point pt, bool allowItems, bool allowEntities)
+  { return IsFreeSpace(pt.X, pt.Y, allowItems, allowEntities);
   }
-  public bool IsFreeSpace(int x, int y, bool allowItems, bool allowCreatures)
+  public bool IsFreeSpace(int x, int y, bool allowItems, bool allowEntities)
   { Tile tile = this[x, y];
     if(!IsPassable(tile.Type) || !allowItems && tile.Items!=null && tile.Items.Count>0) return false;
-    if(!allowCreatures) for(int i=0; i<creatures.Count; i++) if(creatures[i].X==x && creatures[i].Y==y) return false;
+    if(!allowEntities) for(int i=0; i<entities.Count; i++) if(entities[i].X==x && entities[i].Y==y) return false;
     return true;
+  }
+
+  public void MakeNoise(Point pt, Entity source, Noise type, byte volume)
+  { for(int y=0; y<height; y++) for(int x=0; x<width; x++) map[y,x].Sound=0;
+    if(soundStack==null) soundStack=new Point[256];
+    int slen, nslen=1;
+    bool changed;
+
+    map[pt.Y, pt.X].Sound = volume;
+    
+    if(volume>10)
+    { soundStack[0] = pt;
+      do
+      { slen=nslen; changed=false;
+        for(int i=0; i<slen; i++)
+        { Point cp=soundStack[i];
+          int val = map[cp.Y,cp.X].Sound - 10; // yeah, yeah, a poor decay method...
+
+          for(int d=0; d<8; d++)
+          { Point np = Global.Move(cp, d);
+            Tile   t = this[np];
+            if(IsPassable(t.Type) && val>t.Sound)
+            { if(t.Sound==0)
+              { if(nslen==soundStack.Length)
+                { Point[] narr = new Point[nslen+128];
+                  Array.Copy(soundStack, narr, nslen);
+                  soundStack = narr;
+                }
+                soundStack[nslen++] = np;
+              }
+              map[np.Y,np.X].Sound = (byte)val;
+              changed = true;
+            }
+          }
+        }
+      } while(changed);
+    }
+    if(!IsPassable(map[pt.Y,pt.X].Type)) map[pt.Y,pt.X].Sound=0;
+    
+    foreach(Entity e in entities)
+    { int vol = map[e.Position.Y, e.Position.X].Sound;
+      if(vol>0) e.OnNoise(source, type, vol);
+    }
   }
 
   public Point RandomTile(TileType type)
@@ -232,7 +280,7 @@ public sealed class Map
   public static bool IsWall(TileType type) { return (tileFlag[(int)type]&TileFlag.Wall) != TileFlag.None; }
   public static bool IsDoor(TileType type) { return (tileFlag[(int)type]&TileFlag.Door) != TileFlag.None; }
 
-  public CreatureCollection Creatures { get { return creatures; } }
+  public EntityCollection Entities { get { return entities; } }
 
   public void Simulate() { Simulate(null); }
   public void Simulate(Player player)
@@ -241,8 +289,8 @@ public sealed class Map
     while(thinkQueue.Count==0)
     { while(thinkQueue.Count==0)
       { timer += 10;
-        for(int i=0; i<creatures.Count; i++)
-        { Entity c = creatures[i];
+        for(int i=0; i<entities.Count; i++)
+        { Entity c = entities[i];
           c.Timer += 10;
           if(c.Timer>=c.Speed)
           { if(c==player) addedPlayer=true;
@@ -251,14 +299,14 @@ public sealed class Map
         }
         if(timer>=100)
         { timer -= 100;
-          for(int i=0; i<creatures.Count; i++) creatures[i].ItemThink();
+          for(int i=0; i<entities.Count; i++) entities[i].ItemThink();
           for(int y=0; y<height; y++)
             for(int x=0; x<width; x++)
             { ItemPile items = map[y,x].Items;
               if(items!=null) for(int i=0; i<items.Count; i++) items[i].Think(null);
             }
         }
-        if(creatures.Count==0) return;
+        if(entities.Count==0) return;
       }
       if(addedPlayer) break;
       Simulate(null);
@@ -267,11 +315,11 @@ public sealed class Map
     thinking++;
     while(thinkQueue.Count!=0)
     { Entity c = (Entity)thinkQueue.Dequeue();
-      if(removedCreatures.Contains(c)) continue;
+      if(removedEntities.Contains(c)) continue;
       if(c==player) { thinking--; return; }
       c.Think();
     }
-    if(--thinking==0) removedCreatures.Clear();
+    if(--thinking==0) removedEntities.Clear();
   }
   
   public void SpreadScent()
@@ -291,7 +339,7 @@ public sealed class Map
     for(int y=0,i=0; y<height; y++) for(int x=0; x<width; x++) map[y,x].Scent=scentbuf[i++];
   }
 
-  class CreatureComparer : IComparer
+  class EntityComparer : IComparer
   { public int Compare(object x, object y) { return ((Entity)x).Timer - ((Entity)y).Timer; }
   }
 
@@ -302,18 +350,19 @@ public sealed class Map
   void Removed(Entity c)
   { c.Map=null;
     c.OnMapChanged();
-    if(thinking>0) removedCreatures[c]=true;
+    if(thinking>0) removedEntities[c]=true;
   }
 
   Tile[,] map;
   Link[]  links = new Link[0];
   Map     memory;
-  CreatureCollection creatures;
-  PriorityQueue thinkQueue = new PriorityQueue(new CreatureComparer());
-  Hashtable removedCreatures = new Hashtable();
+  EntityCollection entities;
+  PriorityQueue thinkQueue = new PriorityQueue(new EntityComparer());
+  Hashtable removedEntities = new Hashtable();
   int width, height, thinking, timer;
 
   static ushort[] scentbuf;
+  static Point[] soundStack;
 
   [Flags]
   enum TileFlag : byte { None=0, Passable=1, Wall=2, Door=4, Dangerous=8 }

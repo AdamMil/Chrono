@@ -18,7 +18,13 @@ public enum Direction
 public sealed class Global
 { private Global() { }
 
-  public static bool Coinflip() { return Random.Next(2)==0; }
+  public static string AorAn(string s)
+  { char fc = char.ToLower(s[0]);
+    if(fc=='a' || fc=='e' || fc=='i' || fc=='o' || fc=='u') return "an";
+    else return "a";
+  }
+
+  public static bool Coinflip() { return Random.Next(100)<50; }
   public static Point Move(Point pt, Direction d) { return Move(pt, (int)d); }
   public static Point Move(Point pt, int d)
   { if(d<0) d = d%8+8;

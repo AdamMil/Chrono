@@ -5,7 +5,7 @@ namespace Chrono
 
 public enum ItemClass
 { Invalid=-1, Any=-1,
-  Amulet, Weapon, Armor, Ammo, Food, Corpse, Scroll, Ring, Potion, Wand, Tool, Spellbook, Container, Treasure,
+  Amulet, Weapon, Shield, Armor, Ammo, Food, Corpse, Scroll, Ring, Potion, Wand, Tool, Spellbook, Container, Treasure,
   NumClasses
 }
 
@@ -43,11 +43,15 @@ public abstract class Item : ICloneable
 
   public virtual bool CanStackWith(Item item)
   { if(item.Title!=null || Title!=null || item.GetType() != GetType()) return false;
-    if(Class==ItemClass.Food || Class==ItemClass.Potion || Class==ItemClass.Treasure) return true;
+    if(Class==ItemClass.Food || Class==ItemClass.Potion || Class==ItemClass.Scroll || Class==ItemClass.Treasure)
+      return true;
     return false;
   }
 
-  public virtual void Invoke(Entity user) { if(user==App.Player) App.IO.Print("Nothing seems to happen."); }
+  public virtual bool Invoke(Entity user)
+  { if(user==App.Player) App.IO.Print("Nothing seems to happen.");
+    return false;
+  }
 
   public virtual void OnPickup(Entity holder) { }
   public virtual void OnDrop  (Entity holder) { }
@@ -77,14 +81,15 @@ public abstract class Item : ICloneable
 public abstract class Modifying : Item
 { public override bool CanStackWith(Item item) { return false; }
 
-  public int AC { get { return Mods[(int)Attr.AC]; } set { SetAttr(Attr.AC, value); } }
-  public int Dex { get { return Mods[(int)Attr.Dex]; } set { SetAttr(Attr.Dex, value); } }
-  public int EV { get { return Mods[(int)Attr.EV]; } set { SetAttr(Attr.EV, value); } }
-  public int Int { get { return Mods[(int)Attr.Int]; } set { SetAttr(Attr.Int, value); } }
-  public int MaxHP { get { return Mods[(int)Attr.MaxHP]; } set { SetAttr(Attr.MaxHP, value); } }
-  public int MaxMP { get { return Mods[(int)Attr.MaxMP]; } set { SetAttr(Attr.MaxMP, value); } }
-  public int Speed { get { return Mods[(int)Attr.Speed]; } set { SetAttr(Attr.Speed, value); } }
-  public int Str { get { return Mods[(int)Attr.Str]; } set { SetAttr(Attr.Str, value); } }
+  public int AC { get { return Mods[(int)Attr.AC]; } set { Mods[(int)Attr.AC]=value; } }
+  public int Dex { get { return Mods[(int)Attr.Dex]; } set { Mods[(int)Attr.Dex]=value; } }
+  public int EV { get { return Mods[(int)Attr.EV]; } set { Mods[(int)Attr.EV]=value; } }
+  public int Int { get { return Mods[(int)Attr.Int]; } set { Mods[(int)Attr.Int]=value; } }
+  public int MaxHP { get { return Mods[(int)Attr.MaxHP]; } set { Mods[(int)Attr.MaxHP]=value; } }
+  public int MaxMP { get { return Mods[(int)Attr.MaxMP]; } set { Mods[(int)Attr.MaxMP]=value; } }
+  public int Speed { get { return Mods[(int)Attr.Speed]; } set { Mods[(int)Attr.Speed]=value; } }
+  public int Stealth { get { return Mods[(int)Attr.Stealth]; } set { Mods[(int)Attr.Stealth]=value; } }
+  public int Str { get { return Mods[(int)Attr.Str]; } set { Mods[(int)Attr.Str]=value; } }
 
   public int GetAttr(Attr attribute) { return Mods[(int)attribute]; }
   public int SetAttr(Attr attribute, int val) { return Mods[(int)attribute]=val; }

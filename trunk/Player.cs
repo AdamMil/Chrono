@@ -7,19 +7,14 @@ namespace Chrono
 public class Player : Entity
 { public Player() { Color=Color.White; Timer=50; /*we get a headstart*/ }
 
-  public override void Die(string cause)
-  { App.IO.Print("You die.");
-    App.IO.Print("Goodbye {0} the {1}... you were killed by: {2}", Name, Title, cause);
-    if(!App.IO.YesNo("Die?", false))
-    { App.IO.Print("Okay, you're alive again.");
-      HP = MaxHP;
-    }
-    else App.Quit = true;
-  }
+  public override void Die(Entity killer, Item impl) { Die(killer.aName); }
+  public override void Die(Death cause) { Die(cause.ToString().ToLower()); }
 
-  public override void Generate(int level, CreatureClass myClass)
+  public override void Generate(int level, EntityClass myClass)
   { base.Generate(level, myClass);
-    LevelUp(); ExpLevel--; // players get an advantage
+    LevelUp(); ExpLevel--; // players start with slightly higher stats
+    ExpPool = (level+1)*25;
+    
   }
 
   public override void Think()
@@ -48,8 +43,13 @@ public class Player : Entity
           Tile tile = Map[newpos];
           if(tile.Type==TileType.ClosedDoor) App.IO.Print("That door is already closed.");
           else if(tile.Type!=TileType.OpenDoor) App.IO.Print("There is no door there.");
-          else if(Map.HasItems(newpos) || Map.GetCreature(newpos)!=null) App.IO.Print("The door is blocked.");
-          else { Map.SetType(newpos, TileType.ClosedDoor); break;  }
+          else if(Map.HasItems(newpos) || Map.GetEntity(newpos)!=null) App.IO.Print("The door is blocked.");
+          else
+          { Map.SetType(newpos, TileType.ClosedDoor);
+            int noise = (10-Stealth) * 5;
+            if(noise>0) Map.MakeNoise(newpos, this, Noise.Bang, (byte)noise);
+            break;
+          }
         }
         goto next;
       }
@@ -72,18 +72,19 @@ public class Player : Entity
         if(!GroundPackUse(typeof(Food), "Eat", out item, out inv, ItemClass.Food)) goto next;
 
         Food toEat = (Food)item;
-        bool split=false, consumed=false;
+        bool split=false, consumed=false, stopped=false;
         if(toEat.Count>1) { toEat = (Food)toEat.Split(1); split=true; }
         if(toEat.FoodLeft>Food.MaxFoodPerTurn) App.IO.Print("You begin to eat {0}.", toEat);
         while(true)
         { if(toEat.Eat(this)) { consumed=true; break; }
           if(Hunger<Food.MaxFoodPerTurn) break;
-          if(ThinkUpdate(ref vis)) { App.IO.Print("You stop eating."); goto next; }
+          if(ThinkUpdate(ref vis)) { App.IO.Print("You stop eating."); stopped=true; break; }
         }
         if(consumed && !split) inv.Remove(toEat);
         else if(split && !consumed) inv.Add(toEat);
         if(consumed) App.IO.Print("You finish eating.");
         if(Hunger<Food.MaxFoodPerTurn) App.IO.Print("You feel full.");
+        if(stopped) goto next;
         break;
       }
 
@@ -98,8 +99,8 @@ public class Player : Entity
       { if(Map[Position].Type!=TileType.DownStairs) { App.IO.Print("You can't go down here!"); goto next; }
         Map.SaveMemory(Memory);
         Link link = Map.GetLink(Position);
-        Map.Creatures.Remove(this);
-        App.Dungeon[App.CurrentLevel=link.ToLevel].Creatures.Add(this);
+        Map.Entities.Remove(this);
+        App.Dungeon[App.CurrentLevel=link.ToLevel].Entities.Add(this);
         Position = link.To;
         break;
       }
@@ -112,8 +113,8 @@ public class Player : Entity
         else
         { Map.SaveMemory(Memory);
           Link link = Map.GetLink(Position);
-          Map.Creatures.Remove(this);
-          App.Dungeon[App.CurrentLevel=link.ToLevel].Creatures.Add(this);
+          Map.Entities.Remove(this);
+          App.Dungeon[App.CurrentLevel=link.ToLevel].Entities.Add(this);
           Position = link.To;
         }
         break;
@@ -130,12 +131,16 @@ public class Player : Entity
         break;
       }
 
+      case Action.ManageSkills: App.IO.ManageSkills(this); goto next;
+
       case Action.Move:
       { Point np = Global.Move(Position, inp.Direction);
-        Entity c = Map.GetCreature(np);
+        Entity c = Map.GetEntity(np);
         if(c!=null) Attack(c);
         else if(Map.IsPassable(np))
         { Position = np;
+          int noise = (10-Stealth)*12; // stealth = 0 to 10
+          if(noise>0) Map.MakeNoise(np, this, Noise.Walking, (byte)noise);
           if(count<=1 && Map.HasItems(np)) App.IO.DisplayTileItems(Map[np].Items);
           inp.Count = count;
         }
@@ -144,9 +149,11 @@ public class Player : Entity
       }
 
       case Action.MoveToInteresting: // this needs to be improved
-      { Point np = Global.Move(Position, inp.Direction);
+      { Point  np = Global.Move(Position, inp.Direction);
+        int noise = (10-Stealth)*12; // stealth = 0 to 10
         if(!Map.IsPassable(np)) goto next;
         Position = np;
+        if(noise>0) Map.MakeNoise(np, this, Noise.Walking, (byte)noise);
 
         int options=0;
         Direction dir = inp.Direction;
@@ -169,7 +176,10 @@ public class Player : Entity
           if(newopts!=options) goto next;
 
           np = Global.Move(Position, inp.Direction);
-          if(Map.IsPassable(np) && !Map.IsDangerous(np)) Position = np;
+          if(Map.IsPassable(np) && !Map.IsDangerous(np))
+          { Position = np;
+            if(noise>0) Map.MakeNoise(np, this, Noise.Walking, (byte)noise);
+          }
           else goto next;
         }
       }
@@ -184,7 +194,11 @@ public class Player : Entity
           if(tile.Type==TileType.OpenDoor) App.IO.Print("That door is already open.");
           else if(tile.Type!=TileType.ClosedDoor) App.IO.Print("There is no door there.");
           else if(tile.GetFlag(Tile.Flag.Locked)) App.IO.Print("That door is locked.");
-          else { Map.SetType(newpos, TileType.OpenDoor); break; }
+          else
+          { int noise = (10-Stealth) * 2;
+            if(noise>0) Map.MakeNoise(newpos, this, Noise.Bang, (byte)noise);
+            Map.SetType(newpos, TileType.OpenDoor); break;
+          }
         }
         goto next;
       }
@@ -317,7 +331,7 @@ public class Player : Entity
       }
 
       case Action.Wield:
-      { MenuItem[] items = App.IO.ChooseItem("Wield what?", Inv, MenuFlag.AllowNothing, ItemClass.Weapon);
+      { MenuItem[] items = App.IO.ChooseItem("Wield what?", Inv, MenuFlag.AllowNothing, ItemClass.Weapon, ItemClass.Shield);
         if(items.Length==0) goto nevermind;
         if(items[0].Item==null) TryEquip(null);
         else
@@ -333,7 +347,7 @@ public class Player : Entity
     OnAge();
   }
 
-  public static Player Generate(CreatureClass myClass, Race race)
+  public static Player Generate(EntityClass myClass, Race race)
   { if(race==Race.RandomRace) { race = (Race)Global.Rand((int)Race.NumRaces); }
     Player p = new Player();
     p.Race = race;
@@ -343,7 +357,7 @@ public class Player : Entity
 
   public override void LevelUp()
   { base.LevelUp();
-    if(Age>0) App.IO.Print(Color.Green, "You are now a level {0} {1}!", ExpLevel+1, Class);
+    if(Age>0) App.IO.Print(Color.Green, "You are now a level {0} {1}!", ExpLevel, Class);
   }
 
   protected bool GroundPackUse(Type type, string verb, out Item item, out IInventory inv, params ItemClass[] classes)
@@ -383,6 +397,21 @@ public class Player : Entity
     Map.SpreadScent();
   }
 
+  public override void OnAttrChange(Attr attribute, int amount, bool fromExercise)
+  { string feel=null;
+    switch(attribute)
+    { case Attr.AC:      feel = amount>0 ? "tough"   : "frail"; break;
+      case Attr.Dex:     feel = amount>0 ? "agile"   : "clumsy"; break;
+      case Attr.EV:      feel = amount>0 ? "elusive" : "sluggish"; break;
+      case Attr.Int:     feel = amount>0 ? "smart"   : "stupid"; break;
+      case Attr.Light:   feel = amount>0 ? "aware"   : "unobservant"; break;
+      case Attr.Speed:   feel = amount>0 ? "quick"   : "slow"; break;
+      case Attr.Stealth: feel = amount>0 ? "cunning" : "exposed"; break;
+      case Attr.Str:     feel = amount>0 ? "strong"  : "weak"; break;
+    }
+    if(feel==null) return;
+    App.IO.Print(Color.Green, "You feel {0}!", feel);
+  }
   public override void OnDrink(Potion potion) { App.IO.Print("You drink {0}.", potion); }
   public override void OnDrop(Item item) { App.IO.Print("You drop {0}.", item); }
   public override void OnEquip(Wieldable item) { App.IO.Print("You equip {0}.", item); }
@@ -397,8 +426,14 @@ public class Player : Entity
   public override void OnKill(Entity killed) { App.IO.Print("You kill {0}!", killed.TheName); }
   public override void OnMiss(Entity hit, Weapon w) { App.IO.Print("You miss {0}.", hit.theName); }
   public override void OnMissBy(Entity hit, Weapon w) { App.IO.Print("{0} misses you.", hit.TheName); }
+  public override void OnNoise(Entity source, Noise type, int volume)
+  { if(type==Noise.Alert) { App.IO.Print("You hear a shout!"); Interrupt(); }
+  }
   public override void OnReadScroll(Scroll item) { App.IO.Print("You read {0}.", item); }
   public override void OnRemove(Wearable item) { App.IO.Print("You remove {0}.", item); }
+  public override void OnSkillUp(Skill skill)
+  { App.IO.Print(Color.Green, "Your {0} skill went up!", skill.ToString().ToLower());
+  }
   public override void OnUnequip(Wieldable item) { App.IO.Print("You unequip {0}.", item); }
   public override void OnWear(Wearable item)
   { if(item.EquipText!=null) App.IO.Print(item.EquipText);
@@ -414,6 +449,16 @@ public class Player : Entity
     }
   }
 
+  protected virtual void Die(string cause)
+  { App.IO.Print("You die.");
+    App.IO.Print("Goodbye {0} the {1}... you were killed by: {2}", Name, Title, cause);
+    if(!App.IO.YesNo("Die?", false))
+    { App.IO.Print("Okay, you're alive again.");
+      HP = MaxHP;
+    }
+    else App.Quit = true;
+  }
+
   protected bool ThinkUpdate(ref Point[] vis)
   { Map.Simulate(this);
     base.Think();
@@ -424,7 +469,7 @@ public class Player : Entity
     if(interrupt) { interrupt=false; return true; }
     return false;
   }
-
+  
   protected static readonly ItemClass[] wearableClasses =  new ItemClass[]
   { ItemClass.Amulet, ItemClass.Armor, ItemClass.Ring
   };

@@ -22,7 +22,7 @@ public class HealPotion : Potion
   
   public override void Drink(Entity user)
   { user.OnDrink(this);
-    int heal=Math.Min(Global.NdN(4, 4), user.MaxHP-user.HP);
+    int heal=Math.Min(Global.NdN(4, 6), user.MaxHP-user.HP);
     if(heal>0)
     { user.HP += heal;
       if(user==App.Player) App.IO.Print("You feel better.");

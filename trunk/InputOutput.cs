@@ -37,8 +37,7 @@ public struct MenuItem
 }
 
 public abstract class InputOutput
-{ public abstract bool RedrawStats { get; set; }
-  public abstract int ScrollBack { get; set; }
+{ public abstract int ScrollBack { get; set; }
   
   public void Alert(string message) { Alert(Color.Warning, message); }
   public abstract void Alert(Color color, string message);

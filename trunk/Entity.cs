@@ -317,7 +317,11 @@ public abstract class Entity : UniqueObject
       }
       else item = item.Split(1);
       if(Global.Rand(100)<staychance) // put the item on the ground
-        Map.AddItem(c!=null || Map.IsPassable(Map[res.Point].Type) ? res.Point : res.Previous, item);
+      { Point putAt = c!=null || Map.IsPassable(Map[res.Point].Type) ? res.Point : res.Previous;
+        Map.AddItem(putAt, item);
+        if(Map.GetShop(putAt)!=item.Shop) Use(item, true);
+      }
+      else Use(item, true);
     }
   }
 
@@ -492,6 +496,8 @@ public abstract class Entity : UniqueObject
     return val;
   }
 
+  public Gold GetGold(int amount, bool acceptLess) { return GetGold(amount, acceptLess, Inv); }
+
   // generates an entity, gives it default stats
   public virtual void Generate(int level, EntityClass myClass)
   { if(myClass==EntityClass.RandomClass)
@@ -617,6 +623,7 @@ public abstract class Entity : UniqueObject
   }
 
   // event handlers (for output, etc)
+  public virtual void OnAttackedBy(Entity attacker) { }
   public virtual void OnAttrChange(Attr attribute, int amount, bool fromExercise) { }
   public virtual void OnDrink(Potion potion) { }
   public virtual void OnDrop(Item item) { }
@@ -629,6 +636,16 @@ public abstract class Entity : UniqueObject
   public virtual void OnMapChanged() { } // called when the creature is added to or removed from a map
   public virtual void OnMiss(Entity hit, object item) { }
   public virtual void OnMissBy(Entity attacker, object item) { }
+  public void OnMove(Link link) { OnMove(link.ToPoint, link.ToDungeon[link.ToLevel]); }
+  public void OnMove(Point newPos) { OnMove(newPos, null); }
+  public virtual void OnMove(Point newPos, Map newMap)
+  { if(newMap!=null)
+    { if(Memory!=null) Map.SaveMemory(Memory);
+      Map.Entities.Remove(this);
+      newMap.Entities.Add(this);
+    }
+    Position=newPos;
+  }
   public virtual void OnNoise(Entity source, Noise type, int volume) { }
   public virtual void OnPickup(Item item, IInventory from) { }
   public virtual void OnReadScroll(Scroll scroll) { }
@@ -680,11 +697,15 @@ public abstract class Entity : UniqueObject
     CheckFlags();
   }
 
-  public void Say(string text)
-  { if(App.Player.CanSee(this)) App.IO.Print("{0} says \"{1}\".", TheName, text);
-    else if(DistanceTo(App.Player)<30) App.IO.Print("You hear something say \"{0}\".", text);
+  public bool Say(string text)
+  { if(App.Player.CanSee(this)) App.IO.Print("{0} says \"{1}\"", TheName, text);
+    else if(DistanceTo(App.Player)<25) App.IO.Print("You hear something say \"{0}\"", text);
+    else return false;
+
+    Interrupt();
+    return true;
   }
-  public void Say(string text, params object[] args) { Say(string.Format(text, args)); }
+  public bool Say(string text, params object[] args) { return Say(string.Format(text, args)); }
 
   public Ammo SelectAmmo(Weapon w)
   { FiringWeapon fw = w as FiringWeapon;
@@ -809,16 +830,11 @@ public abstract class Entity : UniqueObject
     return true;
   }
 
-  // try to move in a direction. will not move if the destination is impassable or dangerous. return true on success
-  public bool TryMove(Direction dir) { return TryMove((int)dir); }
-  public bool TryMove(int dir)
-  { Point np = Global.Move(Position, dir);
-    if(Map.IsPassable(np) && !Map.IsDangerous(np)) { Position = np; return true; }
-    return false;
-  }
-  // moves to a position, assuming that position is passable and not dangerous. returns true on success
+  // moves to a position, if that position is passable and not dangerous. returns true on success
+  public bool TryMove(Direction dir) { return TryMove(Global.Move(Position, dir)); }
+  public bool TryMove(int dir) { return TryMove(Global.Move(Position, dir)); }
   public bool TryMove(Point pt)
-  { if(Map.IsPassable(pt) && !Map.IsDangerous(pt)) { Position = pt; return true; }
+  { if(Map.IsPassable(pt) && !Map.IsDangerous(pt)) { OnMove(pt); return true; }
     return false;
   }
 
@@ -885,6 +901,7 @@ public abstract class Entity : UniqueObject
         e.OnHitBy(this, spell, damage);
         e.DoDamage(this, Death.Combat, damage);
       }
+      e.OnAttackedBy(this);
       return true;
     }
     else return TryDamageTile(point, damage);
@@ -901,6 +918,12 @@ public abstract class Entity : UniqueObject
     OnUnequip(i);
     i.OnUnequip(this);
     CheckFlags();
+  }
+
+  public void Use(Item item) { Use(item, false); }
+  public void Use(Item item, bool standardMessage)
+  { if(this==App.Player && item.Shop!=null && item.Shop.Shopkeeper!=null)
+      item.Shop.Shopkeeper.PlayerUsed(item, standardMessage);
   }
 
   // returns a list of creatures visible from this position
@@ -1057,6 +1080,7 @@ public abstract class Entity : UniqueObject
       Exercise(Skill.Fighting);
       Timer -= Speed*w.Delay/100;
     }
+    c.OnAttackedBy(this);
 
     return destroyed;
   }
@@ -1087,9 +1111,10 @@ public abstract class Entity : UniqueObject
   protected void UpdateMemory(Point[] vis)
   { if(Memory==null) return;
     foreach(Point pt in vis)
-    { Tile tile = Map[pt];
-      tile.Items = tile.Items==null || tile.Items.Count==0 ? null : tile.Items.Clone();
-      tile.Node  = Memory[pt].Node;
+    { Tile tile   = Map[pt];
+      tile.Items  = tile.Items==null || tile.Items.Count==0 ? null : tile.Items.Clone();
+      tile.Node   = Memory[pt].Node;
+      tile.Entity = null;
       Memory[pt] = tile;
     }
     Entity[] creats = VisibleCreatures(vis);
@@ -1113,6 +1138,46 @@ public abstract class Entity : UniqueObject
   { public ClassLevel(int level, string title) { Level=level; Title=title; }
     public int Level;
     public string Title;
+  }
+
+  Gold GetGold(int amount, bool acceptLess, IInventory inv)
+  { Gold ret=null;
+    ArrayList remove = new ArrayList();
+
+    foreach(Item i in inv)
+    { if(i.Class==ItemClass.Gold)
+      { if(i.Count>amount)
+        { if(ret==null) ret = (Gold)i.Split(amount);
+          else { ret.Count+=amount; i.Count-=amount; }
+          return ret;
+        }
+        else
+        { if(remove==null) remove=new ArrayList();
+          remove.Add(i);
+          if(ret==null) ret=(Gold)i;
+          else ret.Count += i.Count;
+          amount -= i.Count;
+        }
+      }
+    }
+    foreach(Item i in remove) inv.Remove(i);
+
+    if(amount>0)
+      foreach(Item i in inv)
+      { IInventory ni = i as IInventory;
+        if(ni!=null)
+        { Gold gold = GetGold(amount, acceptLess, ni);
+          if(gold!=null)
+          { if(ret!=null) ret=gold;
+            else ret.Count += gold.Count;
+            amount -= gold.Count;
+            if(amount==0) break;
+          }
+        }
+      }
+    
+    if(!acceptLess && amount>0 && inv==Inv) { inv.Add(ret); ret=null; }
+    return ret;
   }
 
   string GetTitle()
@@ -1160,6 +1225,9 @@ public abstract class Entity : UniqueObject
         if(hdam>pdam) { msg="The door burns!"; noise=80; }
         else { msg="Crash! You break down the door."; noise=200; }
         effect = true;
+        
+        Shop shop = Map.GetShop(pt);
+        if(shop.Shopkeeper!=null) shop.Shopkeeper.PlayerDamagedShop(this);
       }
     }
     if(!effect) return false;

@@ -29,10 +29,59 @@ public enum Trap : byte { Dart, PoisonDart, Magic, MpDrain, Teleport, Pit }
 
 [Serializable]
 public class Shop
-{ public Shop(Rectangle area, Shopkeeper shopkeeper, ShopType type) { Area=area; Shopkeeper=shopkeeper; Type=type; }
-  public Rectangle Area;
+{ public Shop(Rectangle area, Shopkeeper shopkeeper, ShopType type)
+  { OuterArea=area; Shopkeeper=shopkeeper; Type=type;
+  }
+
+  public Rectangle InnerArea { get { Rectangle r = OuterArea; r.Inflate(-1, -1); return r; } }
+  public Rectangle ItemArea
+  { get
+    { Rectangle ret = InnerArea;
+      switch(DoorSide)
+      { case Direction.Up:    ret.Y++; ret.Height--; break;
+        case Direction.Down:  ret.Height--; break;
+        case Direction.Left:  ret.X++; ret.Width--; break;
+        case Direction.Right: ret.Width--; break;
+      }
+      return ret;
+    }
+  }
+
+  public Point FrontOfDoor
+  { get
+    { Point ret = Door;
+      switch(DoorSide)
+      { case Direction.Up:    ret.Y++; break;
+        case Direction.Down:  ret.Y--; break;
+        case Direction.Left:  ret.X++; break;
+        case Direction.Right: ret.X--; break;
+      }
+      return ret;
+    }
+  }
+
+  public bool Accepts(Item item) { return Accepts(item.Class); }
+  public bool Accepts(ItemClass ic)
+  { switch(Type)
+    { case ShopType.Accessories: return ic==ItemClass.Amulet || ic==ItemClass.Ring;
+      case ShopType.Armor: return ic==ItemClass.Armor;
+      case ShopType.ArmorWeapons: return ic==ItemClass.Ammo || ic==ItemClass.Armor || ic==ItemClass.Weapon;
+      case ShopType.Books: return ic==ItemClass.Scroll || ic==ItemClass.Spellbook;
+      case ShopType.Food: return ic==ItemClass.Food;
+      case ShopType.General: return ic!=ItemClass.Gold;
+      case ShopType.Magic:
+        return ic==ItemClass.Amulet || ic==ItemClass.Ring || ic==ItemClass.Scroll || ic==ItemClass.Spellbook ||
+               ic==ItemClass.Wand || ic==ItemClass.Potion;
+      case ShopType.Weapons: return ic==ItemClass.Ammo || ic==ItemClass.Weapon;
+      default: throw new NotImplementedException("Unhandled shop type: "+Type.ToString());
+    }
+  }
+
+  public Rectangle  OuterArea;
+  public Point      Door;
+  public Direction  DoorSide;
   public Shopkeeper Shopkeeper;
-  public ShopType Type;
+  public ShopType   Type;
 }
 
 [Serializable]
@@ -140,11 +189,13 @@ public sealed class PathFinder // FIXME: having this latch onto the .Node bits o
 
   int MoveCost(PathNode node)
   { TileType type = map[node.Point].Type;
-    return Map.IsDangerous(type) ? 2000 : // dangerous tiles
-           Map.IsPassable(type) ? 1 :     // freely passable tiles
-           Map.IsDoor(type) && !map.GetFlag(node.Point, Tile.Flag.Locked) ? 2 : // doors
-           map.GetFlag(node.Point, Tile.Flag.Seen) ? 10000 : // known unpassable areas
-           10; // unknown areas
+    int cost = Map.IsDangerous(type) ? 2000 : // dangerous tiles
+               Map.IsPassable(type)  ? 1    : // freely passable tiles
+               Map.IsDoor(type) && !map.GetFlag(node.Point, Tile.Flag.Locked) ? 2 : // closed, unlocked doors
+               map.GetFlag(node.Point, Tile.Flag.Seen) ? 10000 : // known unpassable areas
+               10; // unknown areas
+    if(Map.IsPassable(type) && map.GetEntity(node.Point)!=null) cost += 10; // entity in the way
+    return cost;
   }
 
   class NodeComparer : IComparer
@@ -249,7 +300,7 @@ public class Map : UniqueObject
         SpawnInfo si = new SpawnInfo(t);
 
         Item i = (Item)t.GetConstructor(Type.EmptyTypes).Invoke(null);
-        lists[(int)ShopType.General].Add(si);
+        if(i.Class!=ItemClass.Gold) lists[(int)ShopType.General].Add(si);
 
         switch(i.Class)
         { case ItemClass.Amulet: case ItemClass.Ring:
@@ -291,12 +342,13 @@ public class Map : UniqueObject
     set { map[pt.Y, pt.X] = value; }
   }
 
-  public void AddItem(Point pt, Item item) { AddItem(pt.X, pt.Y, item); }
-  public void AddItem(int x, int y, Item item)
+  public Item AddItem(Point pt, Item item) { return AddItem(pt.X, pt.Y, item); }
+  public Item AddItem(int x, int y, Item item)
   { ItemPile inv = map[y,x].Items;
     if(inv==null) map[y,x].Items = inv = new ItemPile();
-    inv.Add(item);
+    Item ret = inv.Add(item);
     item.OnMap();
+    return ret;
   }
   
   public void AddLink(Link link)
@@ -311,30 +363,46 @@ public class Map : UniqueObject
   { AddShop(rect, type, (Shopkeeper)Entity.Generate(typeof(Shopkeeper), Global.Rand(3), EntityClass.Fighter), stock);
   }
   public void AddShop(Rectangle rect, ShopType type, Shopkeeper shopkeeper, bool stock)
-  { Shop[] narr = new Shop[shops==null ? 1 : shops.Length+1];
+  { Shop[] narr = new Shop[shops.Length+1];
     if(narr.Length!=1) Array.Copy(shops, narr, narr.Length-1);
     shops = narr;
 
     Shop shop = narr[narr.Length-1] = new Shop(rect, shopkeeper, type);
+    for(int y=shop.OuterArea.Y; y<shop.OuterArea.Bottom; y++)
+      for(int x=shop.OuterArea.X; x<shop.OuterArea.Right; x++)
+        if(IsDoor(x, y))
+        { shop.Door = new Point(x, y);
+          if(x==shop.OuterArea.X) shop.DoorSide=Direction.Left;
+          else if(y==shop.OuterArea.Y) shop.DoorSide=Direction.Up;
+          else if(x==shop.OuterArea.Right-1) shop.DoorSide=Direction.Right;
+          else if(y==shop.OuterArea.Bottom-1) shop.DoorSide=Direction.Down;
+          else throw new ArgumentException("This shop has an oddly-placed door!");
+          goto foundDoor;
+        }
+    throw new ArgumentException("This shop has no door!");
+
+    foundDoor:
     Entities.Add(shop.Shopkeeper);
-    shop.Shopkeeper.Position = new Point(shop.Area.X+shop.Area.Width/2, shop.Area.Y+shop.Area.Height/2); // FIXME: wrong
+    shop.Shopkeeper.Position    = shop.FrontOfDoor;
     shop.Shopkeeper.SocialGroup = GroupID;
     if(stock) while(RestockShop(shop));
   }
-
-  public void ClearLinks() { links = new Link[0]; }
-
+  
   public void AddScent(int x, int y, int amount)
   { if(Index==(int)Overworld.Place.Overworld && Dungeon is Overworld) return;
     scentmap[y,x] = (ushort)Math.Min(scentmap[y,x]+Math.Min(amount, MaxScentAdd), MaxScent);
   }
+
+  public void ClearLinks() { links = new Link[0]; }
 
   public bool Contains(int x, int y) { return y>=0 && y<height && x>=0 && x<width; }
 
   public void Fill(TileType type) { for(int y=0; y<height; y++) for(int x=0; x<width; x++) map[y,x].Type=type; }
 
   public Entity GetEntity(Point pt)
-  { for(int i=0; i<entities.Count; i++) if(entities[i].Position==pt) return entities[i];
+  { Tile t = this[pt];
+    if(t.Entity!=null) return t.Entity;
+    for(int i=0; i<entities.Count; i++) if(entities[i].Position==pt) return entities[i];
     return null;
   }
   public Entity GetEntity(int x, int y) { return GetEntity(new Point(x, y)); }
@@ -373,7 +441,7 @@ public class Map : UniqueObject
   public Shop GetShop(int x, int y) { return GetShop(new Point(x, y)); }
   public Shop GetShop(Point pt)
   { if(shops==null) return null;
-    for(int i=0; i<shops.Length; i++) if(shops[i].Area.Contains(pt)) return shops[i];
+    for(int i=0; i<shops.Length; i++) if(shops[i].OuterArea.Contains(pt)) return shops[i];
     return null;
   }
 
@@ -492,14 +560,12 @@ public class Map : UniqueObject
   }
   
   public bool RestockShop(Shop shop)
-  { if(shop.Shopkeeper==null) return false;
-    if(shop.Shopkeeper.HP<=0) { shop.Shopkeeper=null; return false; }
-
-    for(int y=shop.Area.Y; y<shop.Area.Bottom; y++)
-      for(int x=shop.Area.X; x<shop.Area.Right; x++)
+  { Rectangle area = shop.ItemArea;
+    for(int y=area.Y; y<area.Bottom; y++)
+      for(int x=area.X; x<area.Right; x++)
         if(!HasItems(x, y))
         { SpawnInfo[] arr = objSpawns[(int)shop.Type];
-          AddItem(x, y, Global.SpawnItem(arr[Global.Rand(arr.Length)]));
+          AddItem(x, y, Global.SpawnItem(arr[Global.Rand(arr.Length)])).Shop=shop;
           return true;
         }
     return false;
@@ -757,7 +823,7 @@ public class Map : UniqueObject
 
   Tile[,] map;
   Link[]  links = new Link[0];
-  Shop[]  shops;
+  Shop[]  shops = new Shop[0];
   ushort[,] scentmap;
   EntityCollection entities;
   PriorityQueue thinkQueue = new PriorityQueue(new EntityComparer());

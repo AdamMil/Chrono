@@ -241,6 +241,8 @@ public class TownGenerator : MapGenerator
   { this.map = map;
     if(map.GroupID==-1) map.GroupID = Global.NewSocialGroup(false, true);
 
+Rand = new Random(2);
+
     map.Fill(TileType.Grass);
     int size = map.Width*map.Height;
     for(int ntrees=size/50; ntrees>0; ntrees--) map.SetType(map.FreeSpace(), TileType.Tree);
@@ -271,7 +273,7 @@ public class TownGenerator : MapGenerator
       if(rect.Right>map.Width-2 || rect.Bottom>map.Height-2) continue; // size/location
       if(rect.Height*3<=rect.Width || rect.Width*3<=rect.Height) continue; // aspect ratio
       bounds = rect; bounds.Inflate(3, 2);
-      for(r=0; r<rooms.Count; r++) if(bounds.IntersectsWith((Rectangle)rooms[r])) break;
+      for(r=0; r<rooms.Count; r++) if(bounds.IntersectsWith((Rectangle)rooms[r])) break; // spacing
       if(r==rooms.Count) break;
     }
     if(tri==50) return -1;
@@ -300,12 +302,13 @@ public class TownGenerator : MapGenerator
         if(map[bounds.Right-xo-1, y].Type==TileType.Grass) map.SetType(bounds.Right-xo-1, y, TileType.DirtSand);
       }
 
-    Point pt = Global.TraceLine(new Point(map.Width/2, map.Height/2),
-                                new Point(rect.X+rect.Width/2, rect.Y+rect.Height/2), -1, true,
-                                new LinePoint(DoorTrace), bounds).Point;
-    if(pt.Y==rect.Y || pt.Y==rect.Bottom-1)
-    { if(pt.X==rect.X) pt.X++;
-      else if(pt.X==rect.Right-1) pt.X--;
+    Point start = new Point(map.Width/2, map.Height/2);
+    if(rect.Contains(start)) start = new Point();
+    Point pt = Global.TraceLine(start, new Point(rect.X+rect.Width/2, rect.Y+rect.Height/2), -1, true,
+                                new LinePoint(DoorTrace), rect).Point;
+    if(pt.X==rect.X || pt.X==rect.Right-1)
+    { if(pt.Y==rect.Y) pt.Y++;
+      else if(pt.Y==rect.Bottom-1) pt.Y--;
     }
     map.SetType(pt, Rand.Next(100)<50 ? TileType.ClosedDoor : TileType.OpenDoor);
 
@@ -332,11 +335,7 @@ public class TownGenerator : MapGenerator
   { return ((Rectangle)context).Contains(pt) && map[pt].Type==TileType.Wall ? TraceAction.Stop : TraceAction.Go;
   }
 
-  void MakeShop(int i, ShopType type)
-  { Rectangle rect = (Rectangle)rooms[i];
-    rect.Inflate(-1, -1); // exclude the wall
-    map.AddShop(rect, type);
-  }
+  void MakeShop(int i, ShopType type) { map.AddShop((Rectangle)rooms[i], type); }
 
   ArrayList rooms = new ArrayList();
   Map map;

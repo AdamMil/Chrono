@@ -40,6 +40,7 @@ public sealed class App
         Player.SetSkill(Skill.Bow, 1);
         Player.SetSkill(Skill.ShortBlade, 1);
         Player.Pickup(new ShortSword());
+        Player.SetBaseAttr(Attr.Str, 1000);
       }
       else
       { Player.SetSkill(Skill.Casting, 1);
@@ -61,6 +62,13 @@ public sealed class App
         { Link link = map.GetLink(map.Links[i].FromPoint);
           link.ToDungeon[link.ToLevel].Entities.Add(Player);
           break;
+        }
+
+      for(int y=0; y<Player.Map.Height; y++)
+        for(int x=0; x<Player.Map.Width; x++)
+        { Tile tile  = Player.Map[x, y];
+          tile.Items = tile.Items==null || tile.Items.Count==0 ? null : tile.Items.Clone();
+          Player.Memory[x, y] = tile;
         }
     }
 

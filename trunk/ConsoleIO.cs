@@ -378,7 +378,7 @@ public sealed class ConsoleIO : InputOutput
 
   public override void DisplayTileItems(Entity entity, IInventory items) { DisplayTileItems(entity, items, true); }
   public void DisplayTileItems(Entity entity, IInventory items, bool visible)
-  { if(items.Count==0) return;
+  { if(items==null || items.Count==0) return;
     if(items.Count==1) AddLine((visible ? "You see here: " : "You saw here: ")+items[0].GetAName(entity));
     else
     { int nitems=items.Count+1, space=LineSpace-uncleared-2;

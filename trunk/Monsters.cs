@@ -159,14 +159,24 @@ public class Shopkeeper : AI
   { Race     = Race.Human; // TODO: not always human...
     baseName = "shopkeeper";
     alwaysHostile = false;
+    canOpenDoors  = true;
   }
   public Shopkeeper(SerializationInfo info, StreamingContext context) : base(info, context) { }
-  
+
+  public int Credit { get { return credit; } }
+
   public Shop Shop
   { get
     { foreach(Shop s in Map.Shops) if(s.Shopkeeper==this) return s;
       return null;
     }
+  }
+
+  public int BuyCost(Item item)
+  { if(item.Class==ItemClass.Gold) return item.Count;
+    if(!Shop.Accepts(item)) return 0;
+    int baseCost = (int)item.GetType().GetField("ShopValue", BindingFlags.Static|BindingFlags.Public).GetValue(item);
+    return (int)Math.Round(baseCost*item.Count / (priceMod*2));
   }
 
   public override void Generate(int level, EntityClass myClass)
@@ -217,6 +227,20 @@ public class Shopkeeper : AI
         // TODO: give a mace
         break;
     }
+    
+    AddItem(new Gold()).Count += Global.Rand(1500, 4000);
+  }
+
+  public void GiveCredit(int amount) { credit += amount; }
+
+  public void GreetPlayer(Entity player)
+  { if(state!=AIState.Attacking)
+    { if(HostileTowards(player))
+      { Say("How dare you show your face around here again?");
+        Attack(player);
+      }
+      else if(state==AIState.Working) Say("Hello! Welcome to my shop.");
+    }
   }
 
   public override void OnHitBy(Entity attacker, object item, Damage damage)
@@ -229,22 +253,60 @@ public class Shopkeeper : AI
     base.OnHitBy(attacker, item, damage);
   }
 
-  // TODO: take store type into account (eg, shopkeeper in food store won't buy sword)
-  public int BuyCost(Item item)
-  { if(item.Class==ItemClass.Gold) return item.Count;
-    int baseCost = (int)item.GetType().GetField("ShopValue", BindingFlags.Static|BindingFlags.Public).GetValue(item);
-    return (int)Math.Round(baseCost*item.Count / (priceMod*2));
+  public override void OnAttackedBy(Entity attacker)
+  { if(state!=AIState.Attacking && attacker==App.Player)
+    { Say("What the hell do you think you're doing?");
+      Attack(attacker);
+    }
+    base.OnAttackedBy(attacker);
   }
 
-  public bool IsOnTab(Item item) { return tab.Contains(item); }
+  public void PlayerDamagedShop(Entity player)
+  { if(!alwaysHostile)
+    { Say("How dare you defile my shop!");
+      alwaysHostile = true;
+      Attack(player);
+    }
+  }
 
-  public void PlayerReturned(Item item) { tab.Remove(item); }
+  public void PlayerLeft(Entity player)
+  { int bill = GetPlayerBill(player);
+    if(bill>0)
+    { if(credit>=bill)
+      { Say("I'm deducting {0} from your credit for unpaid items.", bill);
+        ClearUnpaidItems(Shop, player.Inv);
+        credit -= bill;
+      }
+      else if(!alwaysHostile)
+      { App.IO.Print("You stole from the shop! You'd better not let the shopkeeper catch you!");
+        priceMod += 0.10;
+        alwaysHostile = true;
+      }
+    }
+  }
+
+  public int GetPlayerBill(Entity player) { return (credit<0 ? -credit : 0) + ContainsMyItems(Shop, player.Inv); }
 
   public void PlayerTook(Item item)
   { if(item.Class!=ItemClass.Gold)
-      Say("{0} {1} cost{2} {3} gold.", item.Count>1 ? "Those" : "That", item.GetFullName(App.Player),
+      Say("{0} cost{1} {2} gold.", Global.Cap1(item.GetThatName(App.Player)),
           item.Count>1 ? "" : "s",  SellCost(item));
-    tab.Add(item);
+  }
+
+  public void PlayerUsed(Item item, bool standardMessage)
+  { int cost = SellCost(item);
+    item.Shop = null;
+
+    if(credit>=cost) { Say("I'm deducting {0} gold from your credit.", cost); return; }
+    if(credit>0) { cost-=credit; credit=0; }
+
+    string yell = "Hey";
+    if(!standardMessage)
+    { if(item.Class==ItemClass.Food) yell = "You bit it, you bought it";
+    }
+
+    Say("{0}! You owe me {1} gold for {2}!", yell, cost, item.GetThatName(App.Player));
+    credit -= cost;
   }
 
   public int SellCost(Item item)
@@ -253,9 +315,29 @@ public class Shopkeeper : AI
     return (int)Math.Round(baseCost*item.Count * priceMod);
   }
 
+  protected int ContainsMyItems(Shop shop, IInventory inv)
+  { int total=0;
+    foreach(Item i in inv)
+    { if(i.Shop==shop) total += SellCost(i);
+      IInventory ni = i as IInventory;
+      if(ni!=null) total += ContainsMyItems(shop, ni);
+    }
+    return total;
+  }
+
   protected override void Die()
-  { Shop.Shopkeeper = null;
-    tab.Clear();
+  { Shop shop = Shop;
+    ClearUnpaidItems(shop, App.Player.Inv);
+
+    Rectangle area = shop.OuterArea;
+    for(int y=area.Y; y<area.Bottom; y++)
+      for(int x=area.X; x<area.Right; x++)
+      { Tile t = Map[x, y];
+        if(t.Items!=null)
+          foreach(Item i in t.Items) if(i.Shop==shop) i.Shop=null;
+      }
+
+    shop.Shopkeeper = null;
     base.Die();
   }
 
@@ -264,44 +346,46 @@ public class Shopkeeper : AI
     if(state==AIState.Attacking && target==App.Player) priceMod += 0.03;
 
     if(state==AIState.Working)
-    { if(tab.Count>0 && !alwaysHostile && (App.Player.Map!=Map || !Shop.Area.Contains(App.Player.Position)))
-      { App.IO.Print("You stole from the shop! You'd better not let the shopkeeper find you!");
-        priceMod += 0.10;
-        alwaysHostile = true;
-      }
-
-      if(App.Player.Map==Map) // move around to get out of the player's way
+    { if(App.Player.Map==Map) // move around to get out of the player's way
       { int dist = DistanceTo(App.Player.Position);
         Direction d;
-        if(dist==1) d = App.Player.LookAt(Position);
-        else if(dist>2)
-        { Rectangle rect = Shop.Area;
-          d = LookAt(new Point(rect.X+rect.Width/2, rect.Y+rect.Height/2));
-        }
-        else return DoIdleStuff();
+        if(dist<=1) d = App.Player.LookAt(Position);
+        else d = LookAt(Shop.FrontOfDoor);
 
         if(d!=Direction.Self)
+        { Rectangle area = Shop.InnerArea;
           for(int i=0; i<4; i++)
           { Point pt = Global.Move(Position, (int)d+i);
-            if(Shop.Area.Contains(pt) && TryMove(pt)) return true;
+            if(area.Contains(pt) && TryMove(pt)) return true;
             if(i!=0)
             { pt = Global.Move(Position, (int)d-i);
-              if(Shop.Area.Contains(pt) && TryMove(pt)) return true;
+              if(area.Contains(pt) && TryMove(pt)) return true;
             }
           }
+        }
       }
       return DoIdleStuff();
     }
     else if(state==defaultState)
-    { if(!Shop.Area.Contains(Position)) TeleportSpell.Default.Cast(this, Map.FreeSpace(Shop.Area));
+    { if(!Shop.InnerArea.Contains(Position))
+      { if(!TryMove(Shop.FrontOfDoor)) TeleportSpell.Default.Cast(this, Map.FreeSpace(Shop.InnerArea));
+      }
       GotoState(AIState.Working);
       return true;
     }
     else return base.HandleState(state);
   }
 
-  protected ItemPile tab = new ItemPile();
+  protected int credit;
   protected double priceMod;
+
+  protected static void ClearUnpaidItems(Shop shop, IInventory inv)
+  { foreach(Item i in inv)
+    { if(i.Shop==shop) i.Shop=null;
+      IInventory ni = i as IInventory;
+      if(ni!=null) ClearUnpaidItems(shop, ni);
+    }
+  }
 }
 #endregion
 

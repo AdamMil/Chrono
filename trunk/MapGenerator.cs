@@ -27,7 +27,7 @@ public class RoomyMapGenerator : MapGenerator
   }
   public Map Generate(int width, int height, int minrooms, int maxrooms)
   { map = new Map(width, height);
-    maxRoomSize = new Size(width/3, height/3);
+    maxRoomSize = new Size(20, 20);
     rooms.Clear();
     while(rooms.Count<minrooms) if(!AddRoom()) throw new UnableToGenerateException("Couldn't add enough rooms.");
     while(rooms.Count<maxrooms) if(!AddRoom()) break;

@@ -23,7 +23,7 @@ public class Dungeon
     maps[mi] = map = lg.Generate();
     map.Index = mi;
 
-    int min = map.Width*map.Height/500, max = map.Width*map.Height/250;
+    int max = map.Width*map.Height/250, min = map.Width*map.Height/500;
 
     for(int i=0,num=Global.Rand(max-min)+min+2; i<num; i++) map.SpawnItem();
     for(int i=0,num=Global.Rand(max-min)+min; i<num; i++) map.SpawnMonster();

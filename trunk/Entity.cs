@@ -8,7 +8,7 @@ namespace Chrono
 
 public enum Attr
 { Str, Dex, Int, NumBasics,
-  MaxHP=NumBasics, MaxMP, Speed, AC, EV, Stealth, Light, NumModifiable,
+  MaxHP=NumBasics, MaxMP, Speed, AC, EV, Stealth, Light, HeatRes, ColdRes, ElectricityRes, PoisonRes, NumModifiable,
   NumAttributes=NumModifiable,
   
   // not really attributes (only used for Effect)
@@ -353,10 +353,16 @@ public abstract class Entity : UniqueObject
     }
   }
   public void DoDamage(object killer, Death cause, Damage dam)
-  { int ac=AC, n, phys=dam.Physical;
+  { int oldHP = HP;
 
-    if(phys>0)
-    { Shield shield = Shield;
+    HP -= dam.Direct; // at high (>100) resistance levels, these actually increase our hitpoints
+    if(dam.Heat>0) HP -= dam.Heat - (int)Math.Round(dam.Heat*GetAttr(Attr.HeatRes)/100.0);
+    if(dam.Cold>0) HP -= dam.Cold - (int)Math.Round(dam.Cold*GetAttr(Attr.ColdRes)/100.0);
+    if(dam.Electricity>0) HP -= dam.Electricity - (int)Math.Round(dam.Electricity*GetAttr(Attr.ElectricityRes)/100.0);
+
+    if(dam.Physical>0)
+    { int ac=AC, n, phys=dam.Physical;
+      Shield shield = Shield;
       int blockchance;
       if(shield!=null)
       { blockchance = shield.BlockChance + (shield.BlockChance*GetSkill(Skill.Shields)*10+50)/100; // +10% PSL rounded
@@ -369,18 +375,18 @@ public abstract class Entity : UniqueObject
         if(n<blockchance) phys /= 2;        // shield blocks 50% damage the other half of the time
         if(ac>5) Exercise(Skill.Armor);     // if wearing substantial armor, exercise it
         n = ac>7 ? Global.NdN(4, ac/2)-2 : ac>1 ? Global.NdN(2, AC)-1 : ac;
-        phys -= n + n*GetSkill(Skill.Armor)*10/100; // armor absorbs phys (+10% per skill level)
+        phys -= n + (n*GetSkill(Skill.Armor)*10+50)/100; // armor absorbs phys (+10% per skill level, rounded)
         if(phys<0) phys = 0;                // normalize damage
-        App.IO.Print(Color.DarkGrey, "DAMAGE: {0} -> {1}, HP: {2} -> {3}", odam, phys, HP, HP-phys);
+        App.IO.Print(Color.DarkGrey, "PHYS: {0} -> {1}, HP: {2} -> {3}", odam, phys, oldHP, HP-phys);
         HP -= phys;
       }
       else App.IO.Print(Color.DarkGrey, "BLOCKED");
     }
 
-    HP -= dam.Direct + dam.Heat + dam.Cold + dam.Electricity; // FIXME: no resistance to these yet...
+    if(dam.Poison>0 && Global.Rand(100)>GetAttr(Attr.PoisonRes)) AddEffect(killer, Attr.Poison, dam.Poison, -1);
 
-    if(dam.Poison>0) AddEffect(killer, Attr.Poison, dam.Poison, -1);
     if(HP<=0) Die(killer, cause);
+    else HP = Math.Min(HP, MaxHP);
   }
 
   public Item Drop(char c) // drops an item (assumes it's droppable), returns item dropped
@@ -443,7 +449,7 @@ public abstract class Entity : UniqueObject
     }
   }
   public void Exercise(Skill skill) // exercises a skill (not guaranteed)
-  { if(!Training(skill)) return;
+  { if(!Training(skill) || GetSkill(skill)==10) return; // the maximum skill level is 10
     int points = Math.Min(Global.Rand(11), ExpPool);
     if(points==0) return;
     if(Global.Rand(100)<33) // 33% chance of exercise
@@ -457,7 +463,7 @@ public abstract class Entity : UniqueObject
       }
     }
   }
-  
+
   public int GetAttr(Attr attribute) // returns an attribute, applying any bonuses from items, etc
   { int idx=(int)attribute, val = attr[idx];
     if(attribute>=Attr.NumModifiable) return val;
@@ -658,6 +664,10 @@ public abstract class Entity : UniqueObject
   public Ammo SelectAmmo(Weapon w)
   { FiringWeapon fw = w as FiringWeapon;
     if(fw==null) return null;
+    if(this==App.Player) // players can assign the character 'q' to their preferred ammunition
+    { Ammo a = Inv['q'] as Ammo;
+      if(a!=null && fw.CompatibleWith(a)!=Compatibility.None) return a;
+    }
     Compatibility cmp = Compatibility.None;
     Ammo ammo = null;
     foreach(Item i in Inv)
@@ -820,17 +830,36 @@ public abstract class Entity : UniqueObject
   }
   public bool TryRemove(Slot slot) { return Wearing(slot) ? TryRemove(Slots[(int)slot]) : true; }
 
+  public bool TryResist(Entity caster, Spell spell)
+  { int toHit = caster.Int/2*caster.GetSkill(spell.Skill)+1; // product of intelligence/2 and spell skill, plus 1
+    int toEvade = Int/2*GetSkill(Skill.MagicResistance)+1;   // product of intelligence/2 and magicresist, plus 1
+
+    toHit   -= (toHit  *((int)caster.HungerLevel*10)+99)/100;  // effects of hunger -10% per hunger level (rounded up)
+    toEvade -= (toEvade*((int)HungerLevel*10)+99)/100;
+
+    int n = Global.Rand(toHit+toEvade);
+    App.IO.Print(Color.DarkGrey, "SpRES: (toHit: {0}, EV: {1}, roll: {2} = {3})", toHit, toEvade, n, n>=toHit ? "succ" : "fail");
+    Exercise(Skill.MagicResistance);
+    Exercise(Attr.Int);
+    return n>=toHit;
+  }
+
   public bool TrySpellDamage(Spell spell, Point point, Damage damage) // 'damage' is base damage (no modifiers)
   { int skill = GetSkill(spell.Skill);
     if(skill==0) damage.Modify(0.5);
-    else damage.Modify(SkillCombatMul(skill));
+    else damage.Modify(SkillModifier(skill));
 
     Entity e = Map.GetEntity(point);
     if(e!=null)
-    { OnHit(e, spell, damage);
-      e.OnHitBy(this, spell, damage);
-      e.DoDamage(this, Death.Combat, damage);
-      e.Exercise(Skill.MagicResistance);
+    { if(e.TryResist(this, spell))
+      { if(e==App.Player) App.IO.Print("You resist.");
+        else if(this==App.Player && CanSee(e)) App.IO.Print("{0} resists!", e.TheName);
+      }
+      else
+      { OnHit(e, spell, damage);
+        e.OnHitBy(this, spell, damage);
+        e.DoDamage(this, Death.Combat, damage);
+      }
       return true;
     }
     else return TryDamageTile(point, damage);
@@ -950,6 +979,16 @@ public abstract class Entity : UniqueObject
     return c;
   }
 
+  // for skills 1-10, returns a multiplier >= 1
+  public static double SkillModifier(double skill)
+  { return (1-1/Math.Pow(1.3, skill-1)) * 1.1041178682161386195553037077594 + 1;
+  }
+
+  public static readonly string[] RaceDescs = new string[(int)Race.NumRaces]
+  { "Humans are cute.",
+    "Orcs are ugly."
+  };
+
   // a table of skill experience requirements for level up for races
   public static readonly int[][] RaceSkills = new int[(int)Race.NumRaces][]
   { new int[(int)Skill.NumSkills] // human
@@ -1018,11 +1057,6 @@ public abstract class Entity : UniqueObject
   // called when the creature is added to or removed from a map
   protected internal virtual void OnMapChanged() { }
 
-  // for skills 1-10, returns a multiplier >= 1
-  protected double SkillCombatMul(double skill)
-  { return (1-1/Math.Pow(1.3, skill-1)) * 1.1041178682161386195553037077594 + 1;
-  }
-
   protected void UpdateMemory() // updates Memory using the visible area
   { if(Memory==null) return;
     UpdateMemory(VisibleTiles());
@@ -1078,9 +1112,9 @@ public abstract class Entity : UniqueObject
     if(item==null || w!=null) dam=(w==null ? CalculateDamage(c) : w.CalculateDamage(this, ammo, c)); // real weapon (possibly our fists)
     else dam = new Damage((item.Weight+4)/5); // regular item, one damage per pound (rounded up)
 
-    if(wepskill==0) dam.Physical /= 2;
-    else if(wepskill==1) dam.Physical -= (ushort)(dam.Physical/4);
-    else dam.Physical = (ushort)Math.Round(dam.Physical * SkillCombatMul(wepskill/2.0));
+    if(wepskill==0) dam.Physical = (ushort)((dam.Physical+1)/2);
+    else if(wepskill==1) dam.Physical -= (ushort)((dam.Physical+2)/4);
+    else dam.Physical = (ushort)Math.Round(dam.Physical * SkillModifier(wepskill/2.0));
 
     c.OnHitBy(this, item, dam);
     OnHit(c, item, dam);
@@ -1121,11 +1155,11 @@ public abstract class Entity : UniqueObject
     int wepskill = GetSkill(Skill.Fighting) +
                    (w==null ? GetSkill(item==null ? Skill.UnarmedCombat : Skill.Throwing) : GetSkill((Skill)w.wClass));
 
-    if(wepskill==0) toHit/=2;
-    else if(wepskill==1) toHit -= toHit/4;
-    else toHit = (int)Math.Round(toHit*SkillCombatMul(wepskill/2.0));
+    if(wepskill==0) toHit = (toHit+1)/2;
+    else if(wepskill==1) toHit -= (toHit+2)/4;
+    else toHit = (int)Math.Round(toHit*SkillModifier(wepskill/2.0));
 
-    toEvade += toEvade*c.GetSkill(Skill.Dodge)*10/100;   // toEvade +10% per dodge level
+    toEvade += (toEvade*c.GetSkill(Skill.Dodge)*10+50)/100;   // toEvade +10% per dodge level, rounded
 
     toHit   -= (toHit  *((int)  HungerLevel*10)+99)/100; // effects of hunger -10% per hunger level (rounded up)
     toEvade -= (toEvade*((int)c.HungerLevel*10)+99)/100;
@@ -1200,6 +1234,7 @@ public abstract class Entity : UniqueObject
     new AttrMods(7, 3, -1, 15, 2, 40, 0, 1),   // Fighter - 9, 15/2=17, 40, 0/1, 0
     new AttrMods(-1, 3, 7, 9, 8, 45, 0, 0, 1), // Wizard  - 9, 9/8=17,  45, 0/0, 1
   };
+
   // titles per exp level per class
   static readonly ClassLevel[][] classTitles = new ClassLevel[(int)EntityClass.NumClasses][]
   { new ClassLevel[]

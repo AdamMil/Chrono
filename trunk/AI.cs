@@ -178,7 +178,7 @@ public abstract class AI : Entity
 
     if(wakeup>0) // if we have a wakeup delay, don't attack yet
     { wakeup--;
-      if(dist>=4) // but we can prepare for combat
+      if(dist>=3) // but we can prepare for combat
       { if(combat!=Combat.Ranged && PrepareRanged(true)) return true;
       }
       else if(combat!=Combat.Melee && PrepareMelee(true)) return true;
@@ -187,7 +187,7 @@ public abstract class AI : Entity
 
     if(targetPoint.X!=-1 && CanSee(targetPoint)) // we have a line of sight to the enemy
     { timeout=5; // we know where the enemy is! our vigor is renewed!
-      if(dist>=4 || bestWand!=null) // we know exactly where the target is and we want to use a ranged attack
+      if(dist>=3 || bestWand!=null) // we know exactly where the target is and we want to use a ranged attack
       { if(bestWand!=null && bestWand.Spell.Range>=dist) // use a wand if possible
         { bool discard = bestWand.Charges==0;
           App.IO.Print("{0} zaps {1}!", TheName, bestWand.GetAName(App.Player));

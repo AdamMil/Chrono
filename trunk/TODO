@@ -14,27 +14,21 @@ update target selection interface so you can filter by creature type (hostile/fr
 make character hesitant to eat raw flesh
 allow attacking ground/ceiling
 implement cloaks
-add the ability to select the default ammo
 add dipping (into potions, water...)
 add the ability to break wands
 handing choosing an above/below directional target
 don't walk through invisible monsters while moving
 make path tracing part of the Map class (?)
-confirm on lifting heavy items
-improve spell description (add MP usage, etc)
-rework skill system so top level is 10
-add critical hits
-make higher skill levels harder to obtain
+add critical hits?
 add ability to view other levels in DisplayMap
-add magic resistance
-add a line giving a monster's general health to DescribeTile
 save when moving between levels, load levels on demand, unload unused levels
 redo formula for MaxHP/MaxMP gain (make based somewhat on race)
 make the AI affected by carry weight (unable to move, etc)
-improve spell targeting (make it affected by skills, dex, etc)
 fix bug where if an orc is on the up stairs, you'll be placed over it (prevent enemies from being spawned on stairs?)
 improve AI's Wander()
 in places where SPACE means page down, make it mean page down or close the menu/etc if we're already on the last page
 make pressing characters representing an item class toggle all items of that class in menus (ie '!' toggles potions)
 speed up item cloning!
 clone entities into memory as well as items
+add ways to raise natural resistances
+improve AI's RunAway() so it will go through doors more often

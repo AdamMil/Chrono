@@ -298,6 +298,7 @@ public class Player : Entity
           else
           { ammo = SelectAmmo(w);
             if(ammo==null) { App.IO.Print("You have no suitable ammunition!"); goto next; }
+            App.IO.Print("Using {0} - {1}.", ammo.Char, ammo.GetAName(this));
           }
           RangeTarget rt = App.IO.ChooseTarget(this, true);
           if(rt.Dir!=Direction.Invalid) Attack(w, ammo, rt.Dir);
@@ -366,6 +367,7 @@ public class Player : Entity
           Ammo   a = SelectAmmo(w);
           if(w!=null && a==null && w.Ranged && w.wClass!=WeaponClass.Thrown)
             App.IO.Print(Color.Warning, "You're out of "+((FiringWeapon)w).AmmoName+'!');
+          else if(a!=null) App.IO.Print("Using {0} - {1}.", a.Char, a.GetAName(this));
           Attack(w, a, np);
         }
         else if(Map.IsPassable(np))
@@ -449,16 +451,32 @@ public class Player : Entity
         if(!Map.HasItems(Position)) { App.IO.Print("There are no items here."); goto next; }
         if(Inv.IsFull) { App.IO.Print("Your pack is full."); goto next; }
         ItemPile inv = Map[Position].Items;
-        CarryStress stress = CarryStress, newstress;
+
+        CarryStress stress=CarryStress, newstress;
+        int weight=CarryWeight, max=CarryMax, next;
+        if(weight<BurdenedAt*max/100) next = BurdenedAt*max/100;
+        else if(weight<StressedAt*max/100) next = StressedAt*max/100;
+        else next = OvertaxedAt*max/100;
+
+        // TODO: maybe this shouldn't use a turn if we don't pick anything up (due to answering no to all the
+        // confirmations)?
         if(inv.Count==1)
-        { Item item = inv[0], newItem = Pickup(inv, 0);
-          string s = string.Format("{0} - {1}", newItem.Char, item.GetAName(this));
-          if(item.Count!=newItem.Count) s += string.Format(" (now {0})", newItem.Count);
-          App.IO.Print(s);
+        { if(inv[0].FullWeight+weight<next ||
+             App.IO.YesNo("You're having trouble lifting "+inv[0].GetAName(this)+". Continue?", false))
+          { Item item = inv[0], newitem = Pickup(inv, 0);
+            string s = string.Format("{0} - {1}", newitem.Char, item.GetAName(this));
+            if(newitem.Count!=item.Count) s += string.Format(" (now {0})", newitem.Count);
+            App.IO.Print(s);
+          }
         }
         else
           foreach(MenuItem item in App.IO.Menu(this, inv, MenuFlag.AllowNum|MenuFlag.Multi|MenuFlag.Reletter))
-          { Item newItem = item.Count==item.Item.Count ? Pickup(inv, item.Item) : Pickup(item.Item.Split(item.Count));
+          { if(weight+item.Item.Weight*item.Count >= next)
+            { if(App.IO.YesNo("You're having trouble lifting "+inv[0].GetAName(this)+". Continue?", false))
+                next = int.MaxValue;
+              else continue;
+            }
+            Item newItem = item.Count==item.Item.Count ? Pickup(inv, item.Item) : Pickup(item.Item.Split(item.Count));
             string s = string.Format("{0} - {1}", newItem.Char, item.Item.GetAName(this));
             if(item.Count!=newItem.Count) s += string.Format(" (now {0})", newItem.Count);
             App.IO.Print(s);
@@ -651,7 +669,7 @@ public class Player : Entity
         { char c = w.Char=='a' ? 'b' : 'a';
           Item i = Inv[c];
           if(!(i is Wieldable) || !TryEquip((Wieldable)i))
-          { App.IO.Print("No suitable item found to equip."); goto next;
+          { App.IO.Print(Color.Warning, "No suitable item found to equip."); goto next;
           }
         }
         done: break;

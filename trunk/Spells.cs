@@ -12,16 +12,19 @@ public enum SpellClass // remember to add these to the Skill enum as well
 }
 
 public abstract class Spell
-{ public void Cast(Entity user) { Cast(user, user.Position, Direction.Self); }
-  public void Cast(Entity user, RangeTarget rt)
+{ public void Cast(Entity user) { Cast(user, ItemStatus.None, user.Position, Direction.Self); }
+  public void Cast(Entity user, RangeTarget rt) { Cast(user, ItemStatus.None, rt); }
+  public void Cast(Entity user, ItemStatus buc, RangeTarget rt)
   { if(rt.Dir!=Direction.Invalid)
     { Point np = rt.Dir>=Direction.Above ? user.Position : Global.Move(user.Position, rt.Dir);
-      Cast(user, np, rt.Dir);
+      Cast(user, buc, np, rt.Dir);
     }
-    else if(rt.Point.X!=-1) Cast(user, rt.Point, rt.Dir);
+    else if(rt.Point.X!=-1) Cast(user, buc, rt.Point, rt.Dir);
   }
-  public virtual void Cast(Entity user, Item item) { }
-  public virtual void Cast(Entity user, Point tile, Direction dir) { }
+  public void Cast(Entity user, Item target) { Cast(user, ItemStatus.None, target); }
+  public virtual void Cast(Entity user, ItemStatus buc, Item target) { }
+  public void Cast(Entity user, Point tile, Direction dir) { Cast(user, ItemStatus.None, tile, dir); }
+  public virtual void Cast(Entity user, ItemStatus buc, Point tile, Direction dir) { }
 
   public Skill Exercises { get { return (Skill)((int)Class+(int)Skill.WeaponSkills); } }
   public int Level { get { return (Difficulty+1)/2; } }
@@ -59,8 +62,9 @@ public abstract class Spell
 public abstract class BeamSpell : Spell
 { protected BeamSpell() { Target=SpellTarget.Tile; }
   
-  public override void Cast(Entity user, Point tile, Direction dir)
-  { if((dir==Direction.Above || dir==Direction.Below) && !Affect(user, dir)) return;
+  public override void Cast(Entity user, ItemStatus buc, Point tile, Direction dir)
+  { FromStatus = buc;
+    if((dir==Direction.Above || dir==Direction.Below) && !Affect(user, dir)) return;
     else if(user.Position==tile) Affect(user, user);
     else
     { bounces=0; oldPt=user.Position;
@@ -91,7 +95,6 @@ public abstract class BeamSpell : Spell
       ret = TraceAction.Bounce;
       if(!Map.IsPassable(user.Map[oldPt.X, pt.Y].Type)) ret &= ~TraceAction.HBounce;
       if(!Map.IsPassable(user.Map[pt.X, oldPt.Y].Type)) ret &= ~TraceAction.VBounce;
-      if(ret==0) ret=TraceAction.Bounce;
     }
     else ret = TraceAction.Go;
     oldPt=pt;
@@ -115,6 +118,7 @@ public abstract class BeamSpell : Spell
     return ret;
   }
   
+  protected ItemStatus FromStatus;
   Point oldPt;
   int bounces;
 }
@@ -132,16 +136,15 @@ public class ForceBolt : BeamSpell
     { if(user==App.Player) App.IO.Print("Bits of stone rain down on you as the spell slams into the ceiling.");
       return false;
     }
-    else if(dir==Direction.Below)
-    { if(user==App.Player) App.IO.Print("The bugs on the ground are crushed!");
-    }
+    else if(dir==Direction.Below && user==App.Player) App.IO.Print("The bugs on the ground are crushed!");
     return false;
   }
 
   protected override void Affect(Entity user, object obj)
   { Entity e = obj as Entity;
     if(e!=null)
-    { Damage damage = new Damage(Global.NdN(1, 6));
+    { e.Exercise(Skill.MagicResistance);
+      Damage damage = new Damage(Global.NdN(1, 6));
       damage.Direct = 2;
       e.OnHitBy(user, this, damage);
       user.OnHit(e, this, damage);
@@ -191,7 +194,8 @@ public class FireSpell : BeamSpell
   { Entity e = obj as Entity;
     bool print;
     if(e!=null)
-    { Damage damage = new Damage();
+    { e.Exercise(Skill.MagicResistance);
+      Damage damage = new Damage();
       damage.Heat = (ushort)Global.NdN(4, 10);
       e.OnHitBy(user, this, damage);
       user.OnHit(e, this, damage);
@@ -229,7 +233,7 @@ public class TeleportSpell : Spell
     Description = "This spell will teleport the caster to a random location.";
   }
 
-  public override void Cast(Entity user, Point tile, Direction dir)
+  public override void Cast(Entity user, ItemStatus buc, Point tile, Direction dir)
   { user.Position = user.Map.FreeSpace();
     if(user!=App.Player) App.IO.Print("{0} disappears.", user.TheName);
   }
@@ -243,27 +247,56 @@ public class AmnesiaSpell : Spell
     Description = "This spell scrambles the caster's memory.";
   }
   
-  public override void Cast(Entity user, Point tile, Direction dir)
+  public override void Cast(Entity user, ItemStatus buc, Point tile, Direction dir)
   { if(user.Memory!=null)
-    { Map old = user.Memory;
-      user.Memory = new Map(user.Map.Width, user.Map.Height, TileType.Border, false); // wipe the memory
-      int count = user.Map.Width*user.Map.Height/20;
-      for(int i=0; i<count; i++) // put some of the old tiles in there
-      { int x = Global.Rand(user.Map.Width), y = Global.Rand(user.Map.Height);
-        if(old[x, y].Type!=TileType.Border)
-        { user.Memory.SetType(x, y, user.Map[x, y].Type);
-          user.Memory.SetFlag(x, y, Tile.Flag.Seen, true);
-        }
+    { user.Memory = Wipe(user.Memory, buc);
+      if((buc&ItemStatus.Cursed)!=0)
+      { int index = user.Map.Index;
+        if(index>0 && App.Dungeon[index-1].Memory!=null)
+          App.Dungeon[index-1].Memory = Wipe(App.Dungeon[index-1].Memory, buc);
+        if(index<App.Dungeon.Count-1 && App.Dungeon[index+1].Memory!=null)
+          App.Dungeon[index+1].Memory = Wipe(App.Dungeon[index+1].Memory, buc);
       }
-      for(int i=0; i<count; i++) // put some random tiles in there
-      { int x = Global.Rand(user.Map.Width), y = Global.Rand(user.Map.Height);
-        user.Memory.SetType(x, y, (TileType)Global.Rand((int)TileType.NumTypes));
-      }
+
       if(user==App.Player) App.IO.Print("You feel your mind being twisted!");
     }
   }
   
   public static AmnesiaSpell Default = new AmnesiaSpell();
+  
+  Map Wipe(Map good, ItemStatus buc)
+  { Map bad = new Map(good.Width, good.Height, TileType.Border, false);
+    int count = good.Width*good.Height/20;
+    if((buc&ItemStatus.Blessed)!=0) count *= 2;
+    for(int i=0; i<count; i++) // put some of the old tiles in there
+    { int x = Global.Rand(good.Width), y = Global.Rand(good.Height);
+      if(good[x, y].Type!=TileType.Border)
+      { bad.SetType(x, y, good[x, y].Type);
+        bad.SetFlag(x, y, Tile.Flag.Seen, true);
+      }
+    }
+    for(int i=0; i<count; i++) // put some random tiles in there
+    { int x = Global.Rand(good.Width), y = Global.Rand(good.Height);
+      bad.SetType(x, y, (TileType)Global.Rand((int)TileType.NumTypes));
+    }
+    return bad;
+  }
+}
+
+public class IdentifySpell : Spell
+{ public IdentifySpell()
+  { Name="identify"; Class=SpellClass.Divination; Difficulty=5; Power=3; Target=SpellTarget.Item;
+    Description = "This spell provides the caster full knowledge of an item.";
+  }
+  
+  public override void Cast(Entity user, ItemStatus buc, Item target)
+  { if(user==App.Player)
+    { user.AddKnowledge(target, true);
+      App.IO.Print("{0} - {1}", target.Char, target.GetFullName(user));
+    }
+  }
+
+  public static IdentifySpell Default = new IdentifySpell();
 }
 
 } // namespace Chrono

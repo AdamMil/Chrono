@@ -11,12 +11,14 @@ public enum ItemClass
 }
 [Flags] public enum ItemUse : byte { NoUse=0, Self=1, UseTarget=2, UseDirection=4, UseBoth=UseTarget|UseDirection };
 
-[Flags] public enum ItemStatus : byte { Identified=1, Burnt=2, Rotted=4, Rusted=8, Cursed=16, Blessed=32 };
+[Flags] public enum ItemStatus : byte
+{ None=0, Identified=1, KnowCB=2, Burnt=4, Rotted=8, Rusted=16, Cursed=32, Blessed=64
+};
 
 #region Item
 public abstract class Item : ICloneable
 { public Item()
-  { Prefix="a "; PluralPrefix=string.Empty; PluralSuffix="s"; Count=1; Color=Color.White; Durability=-1;
+  { Prefix=PluralPrefix=string.Empty; PluralSuffix="s"; Count=1; Color=Color.White; Durability=-1;
   }
   protected Item(Item item)
   { name=item.name; Title=item.Title; Class=item.Class;
@@ -25,33 +27,74 @@ public abstract class Item : ICloneable
     Usability=item.Usability; Durability=item.Durability; Status=item.Status;
   }
 
-  public virtual bool Think(Entity holder) { Age++; return false; }
-
   public string AreIs { get { return Count>1 ? "are" : "is"; } }
+  
+  public bool Blessed { get { return (Status&(ItemStatus.Cursed|ItemStatus.Blessed)) == ItemStatus.Blessed; } }
+  public bool CBUnknown { get { return (Status&ItemStatus.KnowCB) == 0; } }
+  public bool Cursed { get { return (Status&(ItemStatus.Cursed|ItemStatus.Blessed)) == ItemStatus.Cursed; } }
+  public bool Uncursed { get { return (Status&(ItemStatus.Cursed|ItemStatus.Blessed)) == 0; } }
+  public bool KnownBlessed
+  { get
+    { return (Status&(ItemStatus.KnowCB|ItemStatus.Cursed|ItemStatus.Blessed))==(ItemStatus.KnowCB|ItemStatus.Blessed);
+    }
+  }
+  public bool KnownCursed
+  { get
+    { return (Status&(ItemStatus.KnowCB|ItemStatus.Cursed|ItemStatus.Blessed))==(ItemStatus.KnowCB|ItemStatus.Cursed);
+    }
+  }
+  public bool KnownUncursed
+  { get { return (Status&(ItemStatus.KnowCB|ItemStatus.Cursed|ItemStatus.Blessed))==ItemStatus.KnowCB; }
+  }
 
   public virtual string FullName
   { get
-    { string ret = Count>1 ? Count+" "+PluralPrefix+Name+PluralSuffix : Prefix+Name;
+    { string status = StatusString;
+      if(status!="") status += ' ';
+      string ret = Count>1 ? Count.ToString()+' '+status+PluralPrefix+Name+PluralSuffix : status+Prefix+Name;
       if(Title!=null) ret += " named "+Title;
-      return ret;
+      return Count>1 ? ret : Global.AorAn(ret) + ' ' + ret;
     }
   }
+
+  public bool Identified { get { return (Status&ItemStatus.Identified)!=0; } }
+
   public virtual string Name { get { return name; } }
 
   public string ItOne { get { return Count>1 ? "one" : "it"; } }
   public string ItThem { get { return Count>1 ? "them" : "it"; } }
+  
+  public string StatusString
+  { get
+    { string ret="";
+      if(!CBUnknown)
+      { if(KnownUncursed) ret = "uncursed";
+        else if(KnownBlessed) ret = "blessed";
+        else if(KnownCursed) ret = "cursed";
+      }
+
+      if((Status&ItemStatus.Burnt)!=0) ret += (ret!="" ? ", " : "") + "burnt";
+      if((Status&ItemStatus.Rotted)!=0) ret += (ret!="" ? ", " : "") + "rotted";
+      if((Status&ItemStatus.Rusted)!=0) ret += (ret!="" ? ", " : "") + "rusted";
+      return ret;
+    }
+  }
 
   #region ICloneable Members
   public virtual object Clone() { return GetType().GetConstructor(copyCons).Invoke(new object[] { this }); }
   #endregion
 
   public virtual bool CanStackWith(Item item)
-  { if(item.Title!=null || Title!=null || item.GetType() != GetType()) return false;
+  { if(Status!=item.Status || item.Title!=null || Title!=null || item.GetType() != GetType()) return false;
     if(Class==ItemClass.Food || Class==ItemClass.Potion || Class==ItemClass.Scroll || Class==ItemClass.Ammo ||
        Class==ItemClass.Weapon && Class==ItemClass.Treasure)
       return true;
     return false;
   }
+  
+  public void Bless() { Status = Status&~ItemStatus.Cursed|ItemStatus.Blessed; }
+  public void Curse() { Status = Status&~ItemStatus.Blessed|ItemStatus.Cursed; }
+  public void Uncurse() { Status &= ~(ItemStatus.Blessed|ItemStatus.Cursed); }
 
   public virtual string GetFullName(Entity e) { return FullName; }
   public virtual string GetInvName(Entity e) { return GetFullName(e); }
@@ -64,6 +107,8 @@ public abstract class Item : ICloneable
   { if(user==App.Player) App.IO.Print("Nothing seems to happen.");
     return false;
   }
+
+  public virtual bool Think(Entity holder) { Age++; return false; }
 
   public virtual bool Use(Entity user, Direction dir) // returns true if item should be consumed
   { if((Usability&ItemUse.UseDirection)==0 && (int)dir<8) return Use(user, Global.Move(user.Position, dir));

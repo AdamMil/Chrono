@@ -19,22 +19,25 @@ public abstract class Weapon : Wieldable
 
   public override string FullName
   { get
-    { string ret = (Count>1 ? Count.ToString() : "a") + ' ' + 
+    { if(!Identified) return base.FullName;
+      string status = StatusString;
+      if(status!="") status += ' ';
+      string ret = (Count>1 ? Count.ToString()+' ' : "") + status +
                    (damageBonus<baseDamage ? "" : "+") + (damageBonus-baseDamage) + ',' +
                    (ToHitBonus<baseToHit ? "" : "+") + (ToHitBonus-baseToHit) + ' ' + Name;
       if(Count>1) ret += PluralSuffix;
       if(Title!=null) ret += " named "+Title;
-      return ret;
+      return Count>1 ? ret : Global.AorAn(ret) + ' ' + ret;
     }
   }
 
   public abstract Damage CalculateDamage(Entity user, Ammo ammo, Entity target); // ammo and target can be null
 
   public override bool CanStackWith(Item item)
-  { return wClass==WeaponClass.Thrown && item.Title==null && Title==null && item.GetType()==GetType() &&
-           ((Weapon)item).wClass==wClass;
+  { return Status==item.Status && wClass==WeaponClass.Thrown && item.Title==null && Title==null &&
+           item.GetType()==GetType() && ((Weapon)item).wClass==wClass;
   }
-  
+
   public virtual Compatibility CompatibleWith(Entity user) { return Compatibility.Okay; }
 
   public WeaponClass wClass;

@@ -8,9 +8,12 @@ public abstract class Shield : Wieldable
 
   public override string FullName
   { get
-    { string ret = "a " + (AC<0 ? "" : "+") + AC + ' ' + Name;
+    { if(!Identified) return base.FullName;
+      string status = StatusString;
+      if(status!="") status += ' ';
+      string ret = status + (AC<0 ? "" : "+") + AC + ' ' + Name;
       if(Title!=null) ret += " named "+Title;
-      return ret;
+      return Global.AorAn(ret) + ' ' + ret;
     }
   }
 

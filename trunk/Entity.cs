@@ -235,9 +235,11 @@ public abstract class Entity
     else effects[numEffects++] = effect;
   }
   
-  public void AddKnowledge(Item item)
-  { if(knowledge==null) knowledge = new Hashtable();
-    knowledge[item.GetType().ToString()] = null;
+  public void AddKnowledge(Item item) { AddKnowledge(item, false); }
+  public void AddKnowledge(Item item, bool identify)
+  { if(Knowledge==null) Knowledge = new Hashtable();
+    Knowledge[item.GetType().ToString()] = null;
+    if(identify) item.Status |= ItemStatus.Identified|ItemStatus.KnowCB;
   }
 
   // attack in a direction, can be used for attacking locked doors, etc
@@ -362,8 +364,7 @@ public abstract class Entity
       { int odam=phys;
         if(n<blockchance) phys /= 2;        // shield blocks 50% damage the other half of the time
         if(ac>5) Exercise(Skill.Armor);     // if wearing substantial armor, exercise it
-        if(ac>1) n = Global.NdN(4, ac/2);
-        else n=ac;
+        n = ac>7 ? Global.NdN(4, ac/2)-2 : ac>1 ? Global.NdN(2, AC)-1 : ac;
         phys -= n + n*GetSkill(Skill.Armor)*10/100; // armor absorbs phys (+10% per skill level)
         if(phys<0) phys = 0;                // normalize damage
         App.IO.Print(Color.DarkGrey, "DAMAGE: {0} -> {1}, HP: {2} -> {3}", odam, phys, HP, HP-phys);
@@ -529,7 +530,7 @@ public abstract class Entity
   { for(int i=0; i<Inv.Count; i++) if(Inv[i].Think(this)) Inv.RemoveAt(i--);
   }
 
-  public bool KnowsAbout(Item item) { return knowledge!=null && knowledge.Contains(item.GetType().ToString()); }
+  public bool KnowsAbout(Item item) { return Knowledge!=null && Knowledge.Contains(item.GetType().ToString()); }
 
   public virtual void LevelDown() { ExpLevel--; } // TODO: make this subtract from stats
   public virtual void LevelUp()
@@ -704,7 +705,7 @@ public abstract class Entity
       else if(--effects[i].Timeout<=0) CancelEffect(i--);
     }
     
-    if(healthup) App.IO.Print(Color.LightGreen, "You feel your health improve.");
+    if(healthup && this==App.Player) App.IO.Print(Color.LightGreen, "You feel your health improve.");
   }
   
   public void ThrowItem(Item item, Direction dir)
@@ -863,7 +864,7 @@ public abstract class Entity
   public int[] Skills = new int[(int)Skill.NumSkills], SkillExp = new int[(int)Skill.NumSkills]; // our skills
   public Wieldable[] Hands = new Wieldable[2]; // our hands (currently just 2, but maybe more in the future)
   public ArrayList Spells;    // spells we've learned (don't modify this collection manually)
-  public Hashtable knowledge; // hash table of known item classes
+  public Hashtable Knowledge; // hash table of known item classes
   public string Name, Title;  // Name can be null (our race [eg "orc"] is displayed). Title can be null (no title)
   public Map    Map, Memory;  // the map and our memory of it
   public Point  Position;     // our position within the map

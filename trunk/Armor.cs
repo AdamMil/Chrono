@@ -8,9 +8,12 @@ public class Armor : Wearable
 
   public override string FullName
   { get
-    { string ret = "a " + (AC<baseAC ? '-' : '+') + (AC-baseAC) + ' ' + Name;
+    { if(!Identified) return base.FullName;
+      string status = StatusString;
+      if(status!="") status += ' ';
+      string ret = status + (AC<baseAC ? '-' : '+') + (AC-baseAC) + ' ' + Name;
       if(Title!=null) ret += " named "+Title;
-      return ret;
+      return Global.AorAn(ret) + ' ' + ret;
     }
   }
 

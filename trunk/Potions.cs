@@ -6,7 +6,7 @@ namespace Chrono
 
 public abstract class Potion : Item
 { public Potion()
-  { Class=ItemClass.Potion; Prefix="a potion of "; PluralPrefix="potions of "; PluralSuffix=""; Weight=5;
+  { Class=ItemClass.Potion; Prefix="potion of "; PluralPrefix="potions of "; PluralSuffix=""; Weight=5;
   }
   protected Potion(Item item) : base(item) { }
   static Potion() { Global.RandomizeNames(names); }
@@ -20,15 +20,12 @@ public abstract class Potion : Item
   public override string GetFullName(Entity e)
   { if(e==null || e.KnowsAbout(this)) return FullName;
     string tn = GetType().ToString(), rn = (string)namemap[tn];
-    if(rn==null)
-    { namemap[tn] = rn = Global.AorAn(names[namei]) + ' ' + names[namei];
-      namei++;
-    }
-    rn += " potion";
-    if(Title!=null) rn += " (called "+Title+')';
+    if(rn==null) namemap[tn] = rn = names[namei++];
+    rn = Count>1 ? Count.ToString() + ' ' + rn + " potions" : Global.AorAn(rn) + ' ' + rn + " potion";
+    if(Title!=null) rn += " named "+Title;
     return rn;
   }
-  
+
   static System.Collections.Hashtable namemap = new System.Collections.Hashtable();
   static string[] names = new string[] { "green", "purple", "bubbly", "fizzy" };
   static int namei;

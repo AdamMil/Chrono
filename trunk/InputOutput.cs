@@ -5,7 +5,8 @@ namespace Chrono
 {
 
 public enum Action
-{ None, Quit, Rest, Move, MoveToInteresting, MoveToDanger, MoveAFAP, OpenDoor, CloseDoor, Pickup, Drop,
+{ None, Quit, Rest, Move, MoveToInteresting, MoveToDanger, MoveAFAP, OpenDoor, CloseDoor, Pickup, Drop, DropType,
+  GoUp, GoDown,
 }
 
 public struct Input
@@ -53,10 +54,10 @@ public abstract class InputOutput
   public abstract string Ask(Color color, string prompt, bool allowEmpty, string rebuke);
 
   public char CharChoice(string prompt, string chars)
-  { return CharChoice(Color.Normal, prompt, chars, '\n', false, null);
+  { return CharChoice(Color.Normal, prompt, chars, '\0', false, null);
   }
   public char CharChoice(Color color, string prompt, string chars)
-  { return CharChoice(color, prompt, chars, '\n', false, null);
+  { return CharChoice(color, prompt, chars, '\0', false, null);
   }
   public char CharChoice(string prompt, string chars, char defaultChar)
   { return CharChoice(Color.Normal, prompt, chars, defaultChar, false, null);

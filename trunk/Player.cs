@@ -18,28 +18,31 @@ public class Player : Creature
 
     Point[] vis = VisibleTiles();
     next:
-    if(inp.Count==0)
+    int count = inp.Count;
+    if(count==0)
     { UpdateMemory(vis);
       App.IO.Render(this);
       inp = App.IO.GetNextInput();
     }
-    else inp.Count--;
+    else
+    { count--;
+      inp.Count = 0;
+    }
     switch(inp.Action)
     { case Action.Rest:
-        if(IsMonsterVisible(vis)) { inp.Count=0; goto next; }
+        if(IsMonsterVisible(vis)) goto next;
+        inp.Count = count;
         break;
 
       case Action.Move:
       { Point newpos = Global.Move(Position, inp.Direction);
-        if(Map.IsPassable(newpos)) Position = newpos;
-        else { inp.Count=0; goto next; }
+        if(Map.IsPassable(newpos)) { inp.Count = count; Position = newpos; }
+        else goto next;
         break;
       }
 
       case Action.MoveToInteresting: // this needs to be improved, and made continuable
-      { inp.Count = 0;
-
-        Point np = Global.Move(Position, inp.Direction);
+      { Point np = Global.Move(Position, inp.Direction);
         if(!Map.IsPassable(np)) goto next;
         Position = np;
 
@@ -70,8 +73,7 @@ public class Player : Creature
       }
 
       case Action.Pickup:
-      { inp.Count = 0;
-        if(!Map.HasItems(Position)) { App.IO.Print("There are no items here."); goto next; }
+      { if(!Map.HasItems(Position)) { App.IO.Print("There are no items here."); goto next; }
         Inventory inv = Map[Position].Items;
         if(inv.Count==1)
         { Item item = Pickup(inv, 0);
@@ -84,10 +86,17 @@ public class Player : Creature
           }
         break;
       }
+      
+      case Action.Drop:
+      { if(Inv==null || Inv.Count==0) { App.IO.Print("You're not carrying anything."); goto next; }
+        char c = App.IO.CharChoice("Drop which item?", Inv.CharString()+"?");
+        if(c==0) { App.IO.Print("Never mind."); goto next; }
+        Drop(c);
+        break;
+      }
 
       case Action.OpenDoor:
       { Direction dir = App.IO.ChooseDirection(false, false);
-        inp.Count = 0;
         if(dir!=Direction.Invalid)
         { Point newpos = Global.Move(Position, dir);
           Tile tile = Map[newpos];
@@ -101,7 +110,6 @@ public class Player : Creature
 
       case Action.CloseDoor:
       { Direction dir = App.IO.ChooseDirection(false, false);
-        inp.Count = 0;
         if(dir!=Direction.Invalid)
         { Point newpos = Global.Move(Position, dir);
           Tile tile = Map[newpos];
@@ -113,7 +121,6 @@ public class Player : Creature
       }
 
       case Action.Quit: 
-        inp.Count = 0;
         if(App.IO.YesNo(Color.Warning, "Do you really want to quit?", false)) App.Quit=true;
         break;
     }

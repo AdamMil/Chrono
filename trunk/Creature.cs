@@ -60,6 +60,10 @@ public abstract class Creature
   }
   public Point Position { get { return new Point(X, Y); } set { X=value.X; Y=value.Y; } }
 
+  public void Drop(char c)
+  { 
+  }
+
   public int GetAttr(Attr attribute) { return attr[(int)attribute]; }
   public int SetAttr(Attr attribute, int val)
   { if(val != attr[(int)attribute])

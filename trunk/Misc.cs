@@ -18,14 +18,16 @@ public enum Direction
 public sealed class Global
 { private Global() { }
 
+  public static bool Coinflip() { return Random.Next(1)==0; }
   public static Point Move(Point pt, Direction d) { pt.Offset(DirMap[(int)d].X, DirMap[(int)d].Y); return pt; }
+  public static int Rand(int max) { return Random.Next(max); }
 
   public static readonly Point[] DirMap = new Point[8]
   { new Point(0, -1), new Point(1, -1), new Point(1, 0),  new Point(1, 1),
     new Point(0, 1),  new Point(-1, 1), new Point(-1, 0), new Point(-1, -1)
   };
   
-  public static readonly Random Rand = new Random();
+  static readonly Random Random = new Random();
 }
 
 } // namespace Chrono

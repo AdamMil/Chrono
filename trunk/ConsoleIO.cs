@@ -127,8 +127,7 @@ public sealed class ConsoleIO : InputOutput
           default: buf[i] = new NTConsole.CharInfo(' ', NTConsole.Attribute.Black); break;
         }
     foreach(Creature c in map.Creatures)
-      if(rect.Contains(c.Position))
-        buf[(c.Y-rect.Y)*rect.Width + c.X-rect.X] = new NTConsole.CharInfo('@', NTConsole.Attribute.White);
+      if(rect.Contains(c.Position)) buf[(c.Y-rect.Y)*rect.Width + c.X-rect.X] = CreatureToChar(c);
     console.PutBlock(new Rectangle(0, 0, rect.Width, rect.Height), buf);
     if(redrawStats)
     { RenderStats(viewer);
@@ -213,11 +212,10 @@ public sealed class ConsoleIO : InputOutput
     PutString(x, 6, "Str:  {0}", player.Str);
     PutString(x, 7, "Int:  {0}", player.Int);
     PutString(x, 8, "Dex:  {0}", player.Dex);
-    PutString(x, 9, "Per:  {0}", player.Per);
-    PutString(x,10, "Gold: {0}", 0);
-    PutString(x,11, "Exp:  {0}/{0}", player.Exp, player.NextExp);
-    PutString(x,12, "Turn: {0}", player.Age);
-    PutString(x,13, "Dungeon map {0}", App.CurrentLevel+1);
+    PutString(x, 9, "Gold: {0}", 0);
+    PutString(x,10, "Exp:  {0}/{0}", player.Exp, player.NextExp);
+    PutString(x,11, "Turn: {0}", player.Age);
+    PutString(x,12, "Dungeon level {0}", App.CurrentLevel+1);
   }
 
   NTConsole.CharInfo[] buf;
@@ -243,6 +241,11 @@ public sealed class ConsoleIO : InputOutput
     }
   }
 
+  static NTConsole.CharInfo CreatureToChar(Creature c)
+  { return new NTConsole.CharInfo(raceMap[(int)c.Race],
+                                  c is Player ? NTConsole.Attribute.White : NTConsole.Attribute.Yellow);
+  }
+  
   static NTConsole.Attribute ColorToAttr(Color color)
   { NTConsole.Attribute attr = NTConsole.Attribute.Black;
     if((color & Color.Red)    != Color.Black) attr |= NTConsole.Attribute.Red;
@@ -251,6 +254,10 @@ public sealed class ConsoleIO : InputOutput
     if((color & Color.Bright) != Color.Black) attr |= NTConsole.Attribute.Bright;
     return attr;
   }
+  
+  static char[] raceMap = new char[(int)Race.NumRaces]
+  { '@', 'o'
+  };
 }
 
 } // namespace Chrono.Application

@@ -7,7 +7,7 @@ namespace Chrono
 public enum Action
 { None, Quit, Rest, Move, MoveToInteresting, MoveToDanger, MoveAFAP, OpenDoor, CloseDoor, Pickup, Drop, DropType,
   GoUp, GoDown, Eat, Wear, Remove, Wield, Inventory, ShowMap, Fire, Quaff, Read, ViewItem, Invoke, SwapAB, Reassign,
-  ManageSkills, UseItem, Carve, ExamineTile, Throw, ZapWand, CastSpell, ShowKnowledge
+  ManageSkills, UseItem, Carve, ExamineTile, Throw, ZapWand, CastSpell, ShowKnowledge, Save
 }
 
 public struct Input
@@ -18,7 +18,7 @@ public struct Input
 }
 
 [Flags]
-public enum Color
+public enum Color : byte
 { Black=0, Red=1, Green=2, Blue=4, Bright=8,
   Cyan=Green|Blue, Purple=Red|Blue, Brown=Red|Green, Grey=Red|Green|Blue,
   DarkGrey=Black|Bright, LightRed=Red|Bright, LightGreen=Green|Bright, LightBlue=Blue|Bright,

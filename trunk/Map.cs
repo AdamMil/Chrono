@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Drawing;
+using System.Runtime.Serialization;
 using GameLib.Collections;
 
 namespace Chrono
@@ -20,18 +21,18 @@ public enum TileType : byte
 public enum Trap : byte { Dart, PoisonDart, Magic, MpDrain, Teleport, Pit }
 public enum God : byte { God1, God2, God3 }
 
-public enum Noise { Walking, Bang, Combat, Alert, NeedHelp }
+public enum Noise { Walking, Bang, Combat, Alert, NeedHelp, Item, Zap }
 
+[Serializable]
 public struct Tile
-{ [Flags()]
-  public enum Flag : byte { None=0, Hidden=1, Locked=2, Seen=4 };
+{ [Flags] public enum Flag : byte { None=0, Hidden=1, Locked=2, Seen=4 };
 
   public bool GetFlag(Flag f) { return (Flags&(byte)f)!=0; }
   public void SetFlag(Flag flag, bool on) { if(on) Flags|=(byte)flag; else Flags&=(byte)~flag; }
 
   public ItemPile  Items;
   public Entity    Entity;   // for memory (creature on tile), or owner of trap
-  public PathNode  Node;     // for pathfinding
+  [NonSerialized] public PathNode Node; // for pathfinding
   public ushort    Scent;    // strength of player smell
   public TileType  Type;
   public byte      Subtype;  // subtype of tile (ie, type of trap/altar/etc)
@@ -41,6 +42,7 @@ public struct Tile
   public static Tile Border { get { return new Tile(); } }
 }
 
+[Serializable]
 public struct Link
 { public Link(Point from, bool down) { From=from; To=new Point(-1, -1); ToLevel=-1; Down=down; }
   public Point From, To;
@@ -141,12 +143,13 @@ public sealed class PathFinder // FIXME: having this latch onto the .Node bits o
   Map map;
 }
 
-public sealed class Map
-{ 
-  // maximum scent on a tile, maximum scent add on a single call (maximum entity smelliness), maximum sound on a tile
+[Serializable]
+public sealed class Map : UniqueObject
+{ // maximum scent on a tile, maximum scent add on a single call (maximum entity smelliness), maximum sound on a tile
   public const int MaxScent=1200, MaxScentAdd=800, MaxSound=255;
   
   #region EntityCollection
+  [Serializable]
   public class EntityCollection : ArrayList
   { public EntityCollection(Map map) { this.map = map; }
 
@@ -202,6 +205,7 @@ public sealed class Map
       for(int y=0; y<height; y++) for(int x=0; x<width; x++) map[y,x].Type=fill;
     if(seen) for(int y=0; y<height; y++) for(int x=0; x<width; x++) map[y,x].Flags=(byte)Tile.Flag.Seen;
   }
+  public Map(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public EntityCollection Entities { get { return entities; } }
   public Link[] Links { get { return links; } }
@@ -417,7 +421,7 @@ public sealed class Map
     }
 
     thinking++;
-    while(thinkQueue.Count!=0)
+    while(!App.Quit && thinkQueue.Count!=0)
     { Entity c = (Entity)thinkQueue.Dequeue();
       if(removedEntities.Contains(c)) continue;
       if(c==player) { thinking--; return; }
@@ -456,6 +460,7 @@ public sealed class Map
   public Map Memory;
   public int Index;
 
+  [Serializable]
   class EntityComparer : IComparer
   { public int Compare(object x, object y) { return ((Entity)x).Timer - ((Entity)y).Timer; }
   }

@@ -1,11 +1,15 @@
 using System;
 using System.Drawing;
+using System.Runtime.Serialization;
 
 namespace Chrono
 {
 
 public abstract class Fighter : AI
-{ public override void Generate(int level, EntityClass myClass)
+{ public Fighter() { }
+  protected Fighter(SerializationInfo info, StreamingContext context) : base(info, context) { }
+
+  public override void Generate(int level, EntityClass myClass)
   { if(myClass==EntityClass.RandomClass) // choose random fighting class
     { myClass = EntityClass.Fighter;
     }
@@ -26,8 +30,9 @@ public abstract class Fighter : AI
   { if(!HasEars) return;
     if(!Alerted) switch(type)
     { case Noise.Alert: case Noise.NeedHelp: if(volume>Map.MaxSound*8/100)  Alerted=true; break;
-      case Noise.Bang:  case Noise.Combat:   if(volume>Map.MaxSound*10/100) Alerted=true; break;
+      case Noise.Bang:  case Noise.Combat: case Noise.Zap: if(volume>Map.MaxSound*10/100) Alerted=true; break;
       case Noise.Walking: if(volume>Map.MaxSound*15/100) Alerted=true; break;
+      case Noise.Item:    if(volume>Map.MaxSound*12/100) Alerted=true; break;
     }
     if(Alerted)
     { for(int i=0; i<8; i++)
@@ -100,8 +105,10 @@ public abstract class Fighter : AI
   bool shouted;
 }
 
+[Serializable]
 public class Orc : Fighter
 { public Orc() { Race=Race.Orc; Color=Color.Yellow; baseKillExp=10; }
+  public Orc(SerializationInfo info, StreamingContext context) : base(info, context) { }
 }
 
 } // namespace Chrono

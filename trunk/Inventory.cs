@@ -29,11 +29,13 @@ public interface IKeyedInventory : IInventory
 }
 
 #region ItemPile
+[Serializable]
 public sealed class ItemPile : IInventory
 {
   public ItemPile Clone() // will only be called if there are items
   { ItemPile ret = new ItemPile();
-    ret.items = (ArrayList)items.Clone();
+    ret.items = new ArrayList(items.Count);
+    foreach(Item i in items) ret.items.Add(i.Clone());
     return ret;
   }
 
@@ -89,6 +91,7 @@ public sealed class ItemPile : IInventory
 #endregion
 
 #region Inventory
+[Serializable]
 public sealed class Inventory : IKeyedInventory
 { public Inventory() : this(52) { }
   public Inventory(int maxItems)

@@ -1,14 +1,17 @@
 using System;
+using System.Collections;
 using System.Drawing;
+using System.Runtime.Serialization;
 
 namespace Chrono
 {
 
+#region Potion
 public abstract class Potion : Item
 { public Potion()
   { Class=ItemClass.Potion; Prefix="potion of "; PluralPrefix="potions of "; PluralSuffix=""; Weight=5;
   }
-  protected Potion(Item item) : base(item) { }
+  protected Potion(SerializationInfo info, StreamingContext context) : base(info, context) { }
   static Potion() { Global.RandomizeNames(names); }
 
   public override bool CanStackWith(Item item)
@@ -26,14 +29,27 @@ public abstract class Potion : Item
     return rn;
   }
 
-  static System.Collections.Hashtable namemap = new System.Collections.Hashtable();
+  public static void Deserialize(System.IO.Stream stream, IFormatter formatter)
+  { namemap = (Hashtable)formatter.Deserialize(stream);
+    names   = (string[])formatter.Deserialize(stream);
+    namei   = (int)formatter.Deserialize(stream);
+  }
+  public static void Serialize(System.IO.Stream stream, IFormatter formatter)
+  { formatter.Serialize(stream, namemap);
+    formatter.Serialize(stream, names);
+    formatter.Serialize(stream, namei);
+  }
+
+  static Hashtable namemap = new Hashtable();
   static string[] names = new string[] { "green", "purple", "bubbly", "fizzy" };
   static int namei;
 }
+#endregion
 
+[Serializable]
 public class HealPotion : Potion
 { public HealPotion() { name="healing"; Color=Color.LightGreen; }
-  public HealPotion(Item item) : base(item) { }
+  public HealPotion(SerializationInfo info, StreamingContext context) : base(info, context) { }
   
   public override void Drink(Entity user)
   { user.OnDrink(this);

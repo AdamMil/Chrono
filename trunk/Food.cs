@@ -10,7 +10,7 @@ public class Food : Item
     Flags=food.Flags; DecayTime=food.DecayTime;
   }
 
-  public const int FoodPerWeight=50, MaxFoodPerTurn=100;
+  public const int FoodPerWeight=75, MaxFoodPerTurn=150;
 
   public sealed class Flag
   { private Flag() { }

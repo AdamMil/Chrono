@@ -189,40 +189,44 @@ public class RoomyMapGenerator : MapGenerator
 #endregion
 
 public class MetaCaveGenerator : MapGenerator
-{
-  public override Map Generate(int width, int height) { return Generate(width, height, 50); }
+{ public override Map Generate(int width, int height) { return Generate(width, height, 50); }
   public Map Generate(int width, int height, int ncircles)
   { Point[] centers = new Point[ncircles];
-    for(int i=0; i<ncircles; i++) centers[i] = new Point(Global.Rand(width-8)+4, Global.Rand(height-8)+4);
+    PathFinder path = new PathFinder();
 
-    Map map = new Map(width, height);
-    for(int y=0; y<height; y++)
-      for(int x=0; x<width; x++)
-      { double sum=0;
-        for(int i=0; i<ncircles; i++)
-        { int xd=x-centers[i].X, yd=y-centers[i].Y;
-          sum += 1.0/(xd*xd+yd*yd);
+    while(true)
+    { for(int i=0; i<ncircles; i++) centers[i] = new Point(Global.Rand(width-8)+4, Global.Rand(height-8)+4);
+
+      Map map = new Map(width, height);
+      for(int y=0; y<height; y++)
+        for(int x=0; x<width; x++)
+        { double sum=0;
+          for(int i=0; i<ncircles; i++)
+          { int xd=x-centers[i].X, yd=y-centers[i].Y;
+            sum += 1.0/(xd*xd+yd*yd);
+          }
+          map.SetType(x, y, sum>0.2 ? TileType.RoomFloor : TileType.Wall);
         }
-        map.SetType(x, y, sum>0.2 ? TileType.RoomFloor : TileType.Wall); // 0.178571
+      for(int x=0; x<width; x++)
+      { map.SetType(x, 0, TileType.Wall);
+        map.SetType(x, height-1, TileType.Wall);
       }
-    for(int x=0; x<width; x++)
-    { map.SetType(x, 0, TileType.Wall);
-      map.SetType(x, height-1, TileType.Wall);
+      for(int y=0; y<height; y++)
+      { map.SetType(0, y, TileType.Wall);
+        map.SetType(width-1, y, TileType.Wall);
+      }
+        
+      Point up=AddStairs(map, false), down=AddStairs(map, true);
+      if(!path.Plan(map, up, down) || path.GetPathFrom(up).Cost>=1000) map.ClearLinks();
+      else return map;
     }
-    for(int y=0; y<height; y++)
-    { map.SetType(0, y, TileType.Wall);
-      map.SetType(width-1, y, TileType.Wall);
-    }
-      
-    AddStairs(map, false);
-    AddStairs(map, true);
-    return map;
   }
 
-  void AddStairs(Map map, bool down)
+  Point AddStairs(Map map, bool down)
   { Point point = map.RandomTile(TileType.RoomFloor);
     map.SetType(point, down ? TileType.DownStairs : TileType.UpStairs);
     map.AddLink(new Link(point, down));
+    return point;
   }
 }
 

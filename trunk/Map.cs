@@ -50,23 +50,17 @@ public struct Link
 
 public class PathNode
 { public PathNode(int x, int y) { Point=new Point(x, y); }
-  public enum State { New, Open, Closed };
+  public enum State : byte { New, Open, Closed };
 
   public Point    Point;
   public PathNode Parent;
-  public int      MinCost, PathCost;
+  public int      Base, Cost;
   public State    Type;
+  public byte     Length;
 }
 
-public sealed class PathFinder : IDisposable // FIXME: having this latch onto the .Node bits of a map is not clean
+public sealed class PathFinder // FIXME: having this latch onto the .Node bits of a map is not clean
 { public PathFinder() { queue = new BinaryTree(NodeComparer.Default); }
-
-  public Point Goal { get { return goal; } }
-
-  public void Changed(PathNode node) { if(node.Type==PathNode.State.Closed) Insert(node, node.PathCost); }
-
-  public void Dispose() { Finish(); Clear(map); }
-  public void Finish() { queue.Clear(); }
 
   public PathNode GetPathFrom(Point pt) { return map[pt].Node; }
 
@@ -74,127 +68,77 @@ public sealed class PathFinder : IDisposable // FIXME: having this latch onto th
   { queue.Clear();
     if(this.map!=map) Clear(this.map);
 
+    PathNode n;
+    byte maxlen = (byte)Math.Min(Math.Max(map.Width, map.Height)*3/2, 255);
     for(int y=0; y<map.Height; y++)
       for(int x=0; x<map.Width; x++)
-      { PathNode n = map[x, y].Node;
+      { n = map[x, y].Node;
         if(n==null) map.SetNode(x, y, new PathNode(x, y));
-        else { n.Parent=null; n.Type=PathNode.State.New; }
+        else n.Type=PathNode.State.New;
       }
 
-    this.map  = map;
-    this.goal = goal;
+    this.map = map;
     if(map[start].Node==null || map[goal].Node==null) return false;
-    Insert(map[goal].Node, 0);
+    n = map[goal].Node;
+    n.Base = n.Cost = n.Length = 0;
+    Insert(n); // work backwards
 
-    PathNode startnode = map[start].Node;
-    int kmin;
-    do kmin=ProcessState(); while(startnode.Type!=PathNode.State.Closed && kmin!=-1);
-    if(kmin==-1) { queue.Clear(); return false; }
-    return true;
-  }
-
-  public bool Replan(PathNode from)
-  { int kmin=-1;
-    do kmin=ProcessState(); while(kmin<from.PathCost && kmin!=-1);
-    if(kmin!=-1) return true;
+    while(queue.Count>0)
+    { n = (PathNode)queue.RemoveMinimum();
+      if(n.Point==start) { queue.Clear(); return true; } // work backwards
+      if(n.Length==maxlen) break;
+      n.Type = PathNode.State.Closed;
+      for(int yi=-1; yi<=1; yi++)
+        for(int xi=-1; xi<=1; xi++)
+        { if(xi==0 && yi==0) continue;
+          PathNode nei = map[n.Point.X+xi, n.Point.Y+yi].Node;
+          if(nei==null) continue;
+          int move=MoveCost(nei), bcost=n.Base+move, heur=Math.Max(Math.Abs(nei.Point.X-goal.X), Math.Abs(nei.Point.Y-goal.Y))/8,
+              cost=bcost + (move>2 ? heur : heur/4);
+          if(nei.Type!=PathNode.State.New && cost>=nei.Cost) continue;
+          nei.Parent = n;
+          nei.Base   = bcost;
+          nei.Cost   = cost;
+          nei.Length = (byte)(n.Length+1);
+          Insert(nei);
+        }
+    }
     queue.Clear();
     return false;
   }
 
   void Clear(Map map)
   { if(map==null) return;
-    for(int y=0; y<map.Height; y++) for(int x=0; x<map.Height; x++) map.SetNode(x, y, null);
+    for(int y=0; y<map.Height; y++) for(int x=0; x<map.Width; x++) map.SetNode(x, y, null);
   }
+  
+  void Insert(PathNode node) { queue.Add(node); node.Type=PathNode.State.Open; }
 
-  void Insert(PathNode node, int cost)
-  { switch(node.Type)
-    { case PathNode.State.New: node.MinCost=cost; break;
-      case PathNode.State.Open:
-int count = queue.Count;
-      queue.Remove(node); 
-if(count==queue.Count) throw new Exception();
-      if(cost<node.MinCost) node.MinCost=cost; break;
-      case PathNode.State.Closed: node.MinCost = Math.Min(cost, node.PathCost); break;
-    }
-    node.PathCost = cost;
-    node.Type=PathNode.State.Open;
-    queue.Add(node);
-  }
-
-  int TileCost(Point pt)
-  { TileType type = map[pt].Type;
+  int MoveCost(PathNode node)
+  { TileType type = map[node.Point].Type;
     return Map.IsDangerous(type) ? 2000 : // dangerous tiles
            Map.IsPassable(type) ? 1 :     // freely passable tiles
-           Map.IsDoor(type) && !map.GetFlag(pt, Tile.Flag.Locked) ? 2 : // doors
-           map.GetFlag(pt, Tile.Flag.Seen) ? 10000 : // known unpassable areas
+           Map.IsDoor(type) && !map.GetFlag(node.Point, Tile.Flag.Locked) ? 2 : // doors
+           map.GetFlag(node.Point, Tile.Flag.Seen) ? 10000 : // known unpassable areas
            10; // unknown areas
-  }
-
-  int MoveCost(PathNode from, PathNode to) { return Math.Max(TileCost(to.Point), TileCost(from.Point)); }
-
-  int ProcessState()
-  { if(queue.Count==0) return -1;
-    PathNode x = (PathNode)queue.RemoveMinimum();
-    int kold = x.MinCost, knew;
-    x.Type = PathNode.State.Closed;
-    if(kold<x.PathCost)
-      for(int yi=-1; yi<=1; yi++)
-        for(int xi=-1; xi<=1; xi++)
-        { if(yi==0 && xi==0) continue;
-          PathNode y = map[x.Point.X+xi, x.Point.Y+yi].Node;
-          if(y==null) continue;
-          if(y.PathCost<=kold)
-          { knew=y.PathCost+MoveCost(y, x);
-            if(x.PathCost>knew) { x.Parent=y; x.PathCost=knew; }
-          }
-        }
-
-    if(kold==x.PathCost) 
-      for(int yi=-1; yi<=1; yi++)
-        for(int xi=-1; xi<=1; xi++)
-        { if(yi==0 && xi==0) continue;
-          PathNode y = map[x.Point.X+xi, x.Point.Y+yi].Node;
-          if(y==null) continue;
-          knew = x.PathCost+MoveCost(x, y);
-          if(y.Type==PathNode.State.New || y.Parent==x && y.PathCost!=knew || y.Parent!=x && y.PathCost>knew)
-          { y.Parent = x;
-            Insert(y, knew);
-          }
-        }
-    else
-      for(int yi=-1; yi<=1; yi++)
-        for(int xi=-1; xi<=1; xi++)
-        { if(yi==0 && xi==0) continue;
-          PathNode y = map[x.Point.X+xi, x.Point.Y+yi].Node;
-          if(y==null) continue;
-          knew=x.PathCost+MoveCost(x, y);
-          if(y.Type==PathNode.State.New || y.Parent==x && y.PathCost!=knew) { y.Parent=x; Insert(y, knew); }
-          else if(y.Parent!=x)
-          { if(y.PathCost>knew && x.Type==PathNode.State.Closed) Insert(x, x.PathCost);
-            else if(y.Type==PathNode.State.Closed && y.PathCost>kold && x.PathCost>y.PathCost+MoveCost(y, x))
-              Insert(y, y.PathCost);
-          }
-        }
-    return queue.Count==0 ? -1 : ((PathNode)queue.GetMinimum()).MinCost;
   }
 
   class NodeComparer : IComparer
   { public int Compare(object x, object y)
     { PathNode a=(PathNode)x, b=(PathNode)y;
-      int n = a.MinCost-b.MinCost;
+      int n = a.Cost - b.Cost;
       if(n==0)
       { n = a.Point.X-b.Point.X;
         if(n==0) n = a.Point.Y-b.Point.Y;
       }
       return n;
     }
-    
+
     public static NodeComparer Default = new NodeComparer();
   }
 
   BinaryTree queue;
   Map map;
-  Point goal;
 }
 
 public sealed class Map

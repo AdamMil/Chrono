@@ -18,10 +18,11 @@ public class Dungeon
 
   void Generate(int mi)
   { Map map;
-    maps[mi] = map = new RoomyMapGenerator().Generate();
+    MapGenerator lg = (mi/5&1)==0 ? (MapGenerator)new RoomyMapGenerator() : (MapGenerator)new MetaCaveGenerator();
+    maps[mi] = map = lg.Generate();
     map.Index = mi;
 
-    //for(int i=0; i<10; i++) map.SpawnMonster();
+    for(int i=0; i<10; i++) map.SpawnMonster();
     for(int i=0; i<2; i++) map.AddItem(map.FreeSpace(true, true), new Hamburger());
     for(int i=0; i<5; i++)
     { Item item = new Gold();

@@ -26,7 +26,6 @@ public sealed class App
       for(int x=0; x<map.Width; x++)
         if(map[x, y].Type==TileType.UpStairs) { Player.X = x; Player.Y = y; break; }
     Player.SetRawAttr(Attr.AC, 7);
-    Player.SetRawAttr(Attr.Stealth, 0);
     Player.SetRawAttr(Attr.EV, 6);
     Player.Pickup(new CueStick());
     Player.Pickup(new Buckler());

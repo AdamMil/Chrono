@@ -305,6 +305,9 @@ public sealed class Map
             { ItemPile items = map[y,x].Items;
               if(items!=null) for(int i=0; i<items.Count; i++) items[i].Think(null);
             }
+          age++;
+          if(entities.Count<50 && (Index==App.CurrentLevel && age%75==0 || Index!=App.CurrentLevel && age%150==0))
+            SpawnMonster();
         }
         if(entities.Count==0) return;
       }
@@ -322,6 +325,11 @@ public sealed class Map
     if(--thinking==0) removedEntities.Clear();
   }
   
+  public void SpawnMonster()
+  { int idx = entities.Add(Entity.Generate(typeof(Orc), Index+1, EntityClass.Fighter));
+    entities[idx].Position = FreeSpace();
+  }
+
   public void SpreadScent()
   { if(scentbuf==null || scentbuf.Length<width*height) scentbuf=new ushort[width*height];
     for(int y=0,i=0; y<height; y++)
@@ -359,7 +367,7 @@ public sealed class Map
   EntityCollection entities;
   PriorityQueue thinkQueue = new PriorityQueue(new EntityComparer());
   Hashtable removedEntities = new Hashtable();
-  int width, height, thinking, timer;
+  int width, height, thinking, timer, age;
 
   static ushort[] scentbuf;
   static Point[] soundStack;

@@ -24,7 +24,7 @@ public sealed class App
     { FileStream f = File.Open("c:/chrono.sav", FileMode.Open);
       Load(f);
       f.Close();
-      File.Delete("c:/chrono.sav");
+      //File.Delete("c:/chrono.sav");
       App.IO.Print("Welcome back to Chrono, {0}!", Player.Name);
     }
     else
@@ -59,6 +59,11 @@ public sealed class App
       Player.Pickup(new Deodorant());
       Player.Pickup(new WandOfFire());
       Player.Pickup(new FoolsBook());
+
+      Player.Inv[0].Curse();
+      Player.Inv[3].Curse();
+      Player.Inv[4].Curse();
+
       map.Entities.Add(Player);
     }
 

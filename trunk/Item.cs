@@ -17,6 +17,8 @@ public enum ItemClass : sbyte
 [Flags] public enum ItemStatus : byte
 { None=0, Identified=1, KnowCB=2, Burnt=4, Rotted=8, Rusted=16, Cursed=32, Blessed=64
 };
+
+public enum Material : byte { Paper, Leather, HardMaterials, Wood=HardMaterials, Metal, Glass }
 #endregion
 
 #region Item
@@ -52,7 +54,7 @@ public abstract class Item : UniqueObject, ICloneable
       if(status!="") status += ' ';
       string ret = Count>1 ? Count.ToString()+' '+status+PluralPrefix+Name+PluralSuffix : status+Prefix+Name;
       if(Title!=null) ret += " named "+Title;
-      return Count>1 ? ret : Global.AorAn(ret) + ' ' + ret;
+      return ret;
     }
   }
 
@@ -99,8 +101,9 @@ public abstract class Item : UniqueObject, ICloneable
   public void Curse() { Status = Status&~ItemStatus.Blessed|ItemStatus.Cursed; }
   public void Uncurse() { Status &= ~(ItemStatus.Blessed|ItemStatus.Cursed); }
 
+  public string GetAName(Entity e) { return Global.WithAorAn(GetFullName(e)); }
   public virtual string GetFullName(Entity e) { return FullName; }
-  public virtual string GetInvName(Entity e) { return GetFullName(e); }
+  public virtual string GetInvName(Entity e) { return Global.WithAorAn(GetFullName(e)); }
   public byte GetNoise(Entity e) { return (byte)Math.Max(Math.Min(Noise*15-e.Stealth*8, 255), 0); }
 
   // item is thrown at or bashed on an entity. returns true if item should be destroyed
@@ -188,7 +191,7 @@ public abstract class Wearable : Modifying
   protected Wearable(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override string GetInvName(Entity e)
-  { string ret = GetFullName(e);
+  { string ret = GetAName(e);
     if(worn) ret += " (worn)";
     return ret;
   }
@@ -197,6 +200,7 @@ public abstract class Wearable : Modifying
   public virtual void OnWear  (Entity equipper) { worn=true; }
 
   public Slot Slot;
+  public Material Material;
   bool worn;
 }
 
@@ -205,7 +209,7 @@ public abstract class Wieldable : Modifying
   protected Wieldable(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override string GetInvName(Entity e)
-  { string ret = GetFullName(e);
+  { string ret = GetAName(e);
     if(equipped) ret += " (equipped)";
     return ret;
   }

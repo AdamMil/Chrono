@@ -23,7 +23,7 @@ public abstract class Wand : Chargeable
 
     rn = status + rn + " wand" + suffix;
     if(Title!=null) rn += " named "+Title;
-    return Global.AorAn(rn) + ' ' + rn;
+    return rn;
   }
 
   public bool Zap(Entity user, Point target) { return Zap(user, target, Direction.Invalid); }
@@ -45,7 +45,10 @@ public abstract class Wand : Chargeable
   public Spell Spell;
 
   protected virtual void Cast(Entity user, Point target, Direction dir)
-  { if(Spell.AutoIdentify && user==App.Player) user.AddKnowledge(this);
+  { if(Spell.AutoIdentify && !App.Player.KnowsAbout(this))
+    { if(user==App.Player || App.Player.CanSee(Position)) user.AddKnowledge(this);
+      if(user==App.Player) App.IO.Print("This is {0}.", GetAName(user));
+    }
     Spell.Cast(user, Status, target, dir);
   }
   

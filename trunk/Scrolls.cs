@@ -24,14 +24,16 @@ public abstract class Scroll : Readable
   { if(e==null || e.KnowsAbout(this)) return FullName;
     string tn = GetType().ToString(), rn = (string)namemap[tn];
     if(rn==null) namemap[tn] = rn = names[namei++];
-    rn = (Count>1 ? Count+" scrolls" : "a scroll") + " labeled "+rn;
+    rn = (Count>1 ? Count+" scrolls" : "scroll") + " labeled "+rn;
     if(Title!=null) rn += " named "+Title;
     return rn;
   }
 
   public virtual void Read(Entity user) // only called interactively
-  { if(FirstUseMsg!=null && !user.KnowsAbout(this)) App.IO.Print(FirstUseMsg);
-    if(Spell.AutoIdentify) user.AddKnowledge(this);
+  { if(Spell.AutoIdentify && user==App.Player && !user.KnowsAbout(this))
+    { user.AddKnowledge(this);
+      App.IO.Print("This is {0}.", GetAName(user));
+    }
     if(!Cast(user)) App.IO.Print("The scroll crumbles into dust.");
   }
 
@@ -55,7 +57,7 @@ public abstract class Scroll : Readable
     return true;
   }
 
-  protected string FirstUseMsg, Prompt;
+  protected string Prompt;
 
   public static void Deserialize(System.IO.Stream stream, IFormatter formatter)
   { namemap = (Hashtable)formatter.Deserialize(stream);
@@ -83,16 +85,17 @@ public class TeleportScroll : Scroll
 [Serializable]
 public class IdentifyScroll : Scroll
 { public IdentifyScroll()
-  { name="identify"; Color=Color.White; Spell=IdentifySpell.Default;
-    FirstUseMsg="This is a scroll of identification."; Prompt="Identify which item?";
+  { name="identify"; Color=Color.White; Spell=IdentifySpell.Default; Prompt="Identify which item?";
   }
   public IdentifyScroll(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override void Read(Entity user)
   { if(Cursed && Global.Coinflip()) App.IO.Print("Nothing seems to happen.");
     else
-    { if(FirstUseMsg!=null && !user.KnowsAbout(this)) App.IO.Print(FirstUseMsg);
-      if(Spell.AutoIdentify) user.AddKnowledge(this);
+    { if(Spell.AutoIdentify && user==App.Player && !user.KnowsAbout(this))
+      { user.AddKnowledge(this);
+        App.IO.Print("This is {0}.", GetAName(user));
+      }
       if(!Blessed || Global.Rand(100)<80)
       { int n = Blessed ? Global.Rand(3) + 2 : 1;
         while(n-->0) Cast(user);

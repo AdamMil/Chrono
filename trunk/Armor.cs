@@ -15,7 +15,7 @@ public class Armor : Wearable
       if(status!="") status += ' ';
       string ret = status + (AC<baseAC ? '-' : '+') + (AC-baseAC) + ' ' + Name;
       if(Title!=null) ret += " named "+Title;
-      return Global.AorAn(ret) + ' ' + ret;
+      return ret;
     }
   }
 
@@ -25,7 +25,7 @@ public class Armor : Wearable
 [Serializable]
 public class PaperBag : Armor
 { public PaperBag()
-  { Slot=Slot.Head; name="paper bag"; Color=Color.Brown; Weight=2;
+  { Slot=Slot.Head; name="paper bag"; Color=Color.Brown; Weight=2; Material=Material.Paper;
     SetAttr(Attr.AC, baseAC=3); SetAttr(Attr.EV, -2);
   }
   public PaperBag(SerializationInfo info, StreamingContext context) : base(info, context) { }

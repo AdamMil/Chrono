@@ -17,10 +17,7 @@ public abstract class Ring : Wearable
   public override string GetFullName(Entity e)
   { if(e==null || e.KnowsAbout(this)) return FullName;
     string tn = GetType().ToString(), rn = (string)namemap[tn];
-    if(rn==null)
-    { namemap[tn] = rn = Global.AorAn(names[namei]) + ' ' + names[namei];
-      namei++;
-    }
+    if(rn==null) namemap[tn] = rn = names[namei++];
     rn += " ring";
     if(Title!=null) rn += " named "+Title;
     return rn;

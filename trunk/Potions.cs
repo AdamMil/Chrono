@@ -24,7 +24,7 @@ public abstract class Potion : Item
   { if(e==null || e.KnowsAbout(this)) return FullName;
     string tn = GetType().ToString(), rn = (string)namemap[tn];
     if(rn==null) namemap[tn] = rn = names[namei++];
-    rn = Count>1 ? Count.ToString() + ' ' + rn + " potions" : Global.AorAn(rn) + ' ' + rn + " potion";
+    rn = Count>1 ? Count.ToString() + ' ' + rn + " potions" : rn + " potion";
     if(Title!=null) rn += " named "+Title;
     return rn;
   }

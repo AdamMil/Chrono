@@ -20,11 +20,19 @@ public enum CarryStress { Normal, Burdened, Stressed, Overtaxed } // states rela
 public struct Damage
 { public Damage(int damage) { Physical=(ushort)damage; Direct=Heat=Cold=Electricity=Poison=0; }
   public int Total { get { return Direct+Physical+Heat+Cold+Electricity; } } // doesn't count poison
+  public void Modify(int percent)
+  { Direct += (ushort)(Direct*percent/100);
+    Physical += (ushort)(Physical*percent/100);
+    Heat += (ushort)(Heat*percent/100);
+    Cold += (ushort)(Cold*percent/100);
+    Electricity += (ushort)(Electricity*percent/100);
+  }
   public ushort Direct, Physical, Heat, Cold, Electricity, Poison;
 }
 
 public enum Death { Combat, Falling, Poison, Quit, Starvation, Sickness, Trap } // causes of death
 
+[Serializable]
 public struct Effect
 { public Effect(object source, Attr attr, int value, int timeout)
   { Source=source; Attr=attr; Value=value; Timeout=timeout;
@@ -270,26 +278,16 @@ public abstract class Entity : UniqueObject
     bool destroy = false;
     if(c!=null) destroy = Attack(c, item, ammo, ranged, thrown); // if ranged, TryHit has already been called
     else if(w!=null || item==null)
-    { Tile t = Map[res.Point];
-      string msg=null;
-      byte noise=0;
-      if(t.Type==TileType.ClosedDoor)
-      { int damage = (w==null ? CalculateDamage(null) : w.CalculateDamage(this, ammo, null)).Total;
-        // FIXME: take skill into account?
-        if(damage>=10)
-        { msg = "Crash! You break down the door.";
-          Map.SetType(res.Point, TileType.RoomFloor);
-          noise = 200;
-          if(w==null) Exercise(Global.Coinflip() ? Attr.Dex : Attr.Str);
-          else Exercise((Skill)w.wClass);
-        }
-        else { msg = "Thunk!"; noise = 80; }
+    { if(Map.IsPassable(Map[res.Point].Type))
+      { if(this==App.Player && !thrown && ammo==null) App.IO.Print("You swing at thin air.");
       }
-      else if(!Map.IsPassable(t.Type)) { msg = "Thunk!"; noise = 80; }
-      else if(!thrown && ammo==null) msg = "You swing at thin air.";
-      if(this==App.Player)
-      { if(msg!=null) App.IO.Print(msg);
-        if(noise>0) Map.MakeNoise(res.Point, this, Noise.Bang, noise);
+      else
+      { Damage damage = w==null ? CalculateDamage(null) : w.CalculateDamage(this, ammo, null);
+        if(!TryDamageTile(res.Point, damage) && this==App.Player)
+        { App.IO.Print("Thunk!"); Map.MakeNoise(res.Point, this, Noise.Bang, 80);
+        }
+        if(w==null) Exercise(Global.Coinflip() ? Attr.Dex : Attr.Str);
+        else Exercise((Skill)w.wClass);
       }
     }
     else if(item!=null) destroy = item.Hit(this, res.Point);
@@ -325,15 +323,15 @@ public abstract class Entity : UniqueObject
   }
 
   // true if item can be removed (not cursed, etc) or slot is empty
-  public bool CanRemove(Slot slot) { return true; }
-  public bool CanRemove(Wearable item) { return true; }
+  public bool CanRemove(Slot slot) { return Slots[(int)slot]==null || !Slots[(int)slot].Cursed; }
+  public bool CanRemove(Wearable item) { return !item.Cursed; }
   // true if there's a line of sight to the given creature/tile
   // FIXME: there's a disparity here. if creature==this, LookAt() says we can't see it, but CanSee says we can
   public bool CanSee(Entity creature) { return this==creature || LookAt(creature) != Direction.Invalid; }
   public bool CanSee(Point point) { return Position==point || LookAt(point) != Direction.Invalid; }
   // true if item can be unequipped (not cursed, etc) or hand is empty
-  public bool CanUnequip(int hand) { return true; }
-  public bool CanUnequip(Wieldable item) { return true; }
+  public bool CanUnequip(int hand) { return Hands[hand]==null || !Hands[hand].Cursed; }
+  public bool CanUnequip(Wieldable item) { return !item.Cursed; }
 
   public void Die(Death cause) { Die(null, cause); }
   public abstract void Die(object killer, Death cause);
@@ -345,7 +343,8 @@ public abstract class Entity : UniqueObject
   }
   public void DoDamage(Death cause, Damage dam) { DoDamage(null, cause, dam); }
   public void DoDamage(Entity entity, Death cause, Damage dam)
-  { DoDamage((object)entity, cause, dam);
+  { //if(HP<=0) return; // TODO: uncomment this later
+    DoDamage((object)entity, cause, dam);
     if(HP<=0)
     { entity.OnKill(this);
       entity.GiveKillExp(this);
@@ -768,22 +767,49 @@ public abstract class Entity : UniqueObject
 
   // unequips an item if possible. returns true if item could be unequipped, or it was not equipped in the first place
   public bool TryUnequip(Item item)
-  { if(Equipped(item)) Unequip(item);
+  { if(Equipped(item))
+    { if(item.Cursed)
+      { if(this==App.Player)
+        { App.IO.Print("The {0} is stuck to your {1}!", item.Name, item.Class==ItemClass.Shield ? "arm" : "hand");
+          item.Status |= ItemStatus.KnowCB;
+        }
+        return false;
+      }
+      Unequip(item);
+    }
     return true;
   }
-  public bool TryUnequip(int hand)
-  { if(Equipped(hand)) Unequip(hand);
-    return true;
-  }
+  public bool TryUnequip(int hand) { return Equipped(hand) ? TryUnequip(Hands[(int)hand]) : true; }
 
   // removes a worn item if possible. returns true if item could be removed, or if it was not being worn
   public bool TryRemove(Item item)
-  { if(Wearing(item)) Remove(item);
+  { if(Wearing(item))
+    { if(item.Cursed)
+      { if(this==App.Player)
+        { App.IO.Print("The {0} won't come off!", item.Name);
+          item.Status |= ItemStatus.KnowCB;
+        }
+        return false;
+      }
+      Remove(item);
+    }
     return true;
   }
-  public bool TryRemove(Slot slot)
-  { if(Wearing(slot)) Remove(slot);
-    return true;
+  public bool TryRemove(Slot slot) { return Wearing(slot) ? TryRemove(Slots[(int)slot]) : true; }
+
+  public bool TrySpellDamage(Spell spell, Point point, Damage damage) // 'damage' is base damage (no modifiers)
+  { int skill = spell.GetSpellSkill(this);
+    damage.Modify(skill*10); // damage up 10% per skill level
+
+    Entity e = Map.GetEntity(point);
+    if(e!=null)
+    { OnHit(e, spell, damage);
+      e.OnHitBy(this, spell, damage);
+      e.DoDamage(this, Death.Combat, damage);
+      e.Exercise(Skill.MagicResistance);
+      return true;
+    }
+    else return TryDamageTile(point, damage);
   }
 
   // unequips an item. it's assumed that the item is currently equipped
@@ -1029,6 +1055,28 @@ public abstract class Entity : UniqueObject
 
     return destroyed;
   }
+  
+  bool TryDamageTile(Point pt, Damage damage)
+  { Tile t=Map[pt];
+    string msg=null;
+    byte noise=0;
+
+    if(t.Type==TileType.ClosedDoor)
+    { int pdam = damage.Direct+damage.Physical, hdam = damage.Heat;
+      if(pdam+hdam>=10)
+      { Map.SetType(pt, TileType.RoomFloor);
+        if(hdam>pdam) { msg="The door burns!"; noise=80; }
+        else { msg="Crash! You break down the door."; noise=200; }
+      }
+    }
+    else return false;
+
+    if(this==App.Player)
+    { if(msg!=null) App.IO.Print(msg);
+      if(noise>0) Map.MakeNoise(pt, this, Noise.Bang, noise);
+    }
+    return true;
+  }
 
   bool TryHit(Entity c, Item item)
   { Weapon w = item as Weapon;
@@ -1105,8 +1153,9 @@ public abstract class Entity : UniqueObject
     new AttrMods(9, 4, 3)  // Orc   - 16
   };
   static readonly AttrMods[] classAttrs = new AttrMods[(int)EntityClass.NumClasses] // stat modifiers per class
-  { new AttrMods(7, 3, -1, 15, 2, 40, 0, 1), // Fighter - 9, 15/2=17, 40, 0/1
-    new AttrMods(-1, 3, 7, 9, 8, 45),        // Wizard  - 9, 9/8=17,  45, 0/0
+  {                                            // CLASS   - Str+Dex+Int, HP/MP, Speed, AC/EV, Stealth
+    new AttrMods(7, 3, -1, 15, 2, 40, 0, 1),   // Fighter - 9, 15/2=17, 40, 0/1, 0
+    new AttrMods(-1, 3, 7, 9, 8, 45, 0, 0, 1), // Wizard  - 9, 9/8=17,  45, 0/0, 1
   };
   // titles per exp level per class
   static readonly ClassLevel[][] classTitles = new ClassLevel[(int)EntityClass.NumClasses][]

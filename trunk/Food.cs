@@ -46,7 +46,7 @@ public abstract class Food : Item
   { base.Think(holder);
     if(DecayTime>0)
     { if(Age>=DecayTime*2)
-      { if(holder==App.Player) App.IO.Print("Your {0} rots away.", name);
+      { if(holder==App.Player) App.IO.Print("Your {0} rot{1} away.", GetFullName(holder), Count>1 ? "" : "s");
         return true;
       }
       else if(Age>=DecayTime && (Flags&Flag.Rotten)==0) Rot(holder);
@@ -89,7 +89,7 @@ public class Hamburger : Food
 [Serializable]
 public class Flesh : Food
 { public Flesh(Corpse from)
-  { Color=from.Color; Weight=2; Prefix="a chunk of "; PluralPrefix="chunks of "; PluralSuffix="";
+  { Color=from.Color; Weight=2; Prefix="chunk of "; PluralPrefix="chunks of "; PluralSuffix="";
     name=from.CorpseOf.Race.ToString().ToLower()+" flesh"; FromCorpse=from; DecayTime=60;
     Age=from.Age/2; // meat from older corpses decays quicker
     if((from.Flags&Corpse.Flag.Rotting)!=0) { Rot(null); Age=DecayTime; }

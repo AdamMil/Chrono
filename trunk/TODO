@@ -18,22 +18,19 @@ implement cloaks
 add the ability to select the default ammo
 add dipping (into potions, water...)
 add the ability to break wands
-make some spells hit doors, etc (generalize the code to damage tiles)
 handing choosing an above/below directional target
-make dying stop the simulation immediately
 don't walk through invisible monsters while moving
 make path tracing part of the Map class (?)
 confirm on lifting heavy items
 better item spawning
-develop a better, more centralized spell damage system
 improve spell description (add MP usage, etc)
 improve spell target prompting (add custom messages, etc)
 rework skill system so top level is 10
 add critical hits
-require a sharp weapon for carving (and equip it during carving?)
 make higher skill levels harder to obtain
-have user identify wand whenever he can see it cast and the effect?
 add ability to view other levels in DisplayMap
 add magic resistance
 add a line giving a monster's general health to DescribeTile
 save when moving between levels, load levels on demand, unload unused levels
+redo formula for MaxHP/MaxMP gain (make based somewhat on race)
+fix annoying disappearing stats bar

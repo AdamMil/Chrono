@@ -181,9 +181,10 @@ public sealed class ConsoleIO : InputOutput
     }
   }
 
-  public override void DisplayMap(Creature viewer)
-  { ClearScreen();
+  public override void DisplayMap(Entity viewer)
+  { Size old = new Size(mapW, mapH);
     mapW = console.Width-1; mapH = console.Height-1;
+    console.Fill(0, 0, mapW, mapH);
     SetCursorToPlayer();
     Point[] vpts = viewer.VisibleTiles();
     Point pos = viewer.Position;
@@ -207,6 +208,8 @@ public sealed class ConsoleIO : InputOutput
       }
     }
     done:
+    console.Fill(0, 0, mapW, mapH);
+    mapW=old.Width; mapH=old.Height;
     RestoreScreen();
     renderStats=true;
   }
@@ -326,7 +329,8 @@ public sealed class ConsoleIO : InputOutput
         {
         }
       else if(rec.Key.HasMod(NTConsole.Modifier.Ctrl)) switch(c+64)
-      { case 'Q': inp.Action = Action.Quit; break;
+      { case 'P': DisplayMessages(); break;
+        case 'Q': inp.Action = Action.Quit; break;
       }
       else switch(c)
       { case 'b': case 'h': case 'j': case 'k': case 'l': case 'n': case 'u': case 'y':
@@ -343,20 +347,27 @@ public sealed class ConsoleIO : InputOutput
         case 'd': inp.Action = Action.Drop; break;
         case 'D': inp.Action = Action.DropType; break;
         case 'e': inp.Action = Action.Eat; break;
+        case 'f': inp.Action = Action.Fire; break;
         case 'i': inp.Action = Action.Inventory; break;
+        case 'I': inp.Action = Action.Invoke; break;
         case 'o': inp.Action = Action.OpenDoor; break;
+        case 'q': inp.Action = Action.Quaff; break;
+        case 'r': inp.Action = Action.Read; break;
         case 'R': inp.Action = Action.Remove; break;
+        case 'v': inp.Action = Action.ViewItem; break;
         case 'w': inp.Action = Action.Wield; break;
         case 'W': inp.Action = Action.Wear; break;
         case 'X': inp.Action = Action.ShowMap; break;
         case '<': inp.Action = Action.GoUp; break;
         case '>': inp.Action = Action.GoDown; break;
+        case '=': inp.Action = Action.Reassign; break;
+        case '\'':inp.Action = Action.SwapAB; break;
         case '/':
           inp.Direction = CharToDirection(ReadChar());
           if(inp.Direction==Direction.Self) { count=100; inp.Action=Action.Rest; }
           else if(inp.Direction!=Direction.Invalid) inp.Action = Action.MoveToInteresting;
           break;
-        case '?': ShowHelp(); break;
+        case '?': DisplayHelp(); break;
       }
       if(inp.Action != Action.None)
       { inp.Count = count;
@@ -365,7 +376,7 @@ public sealed class ConsoleIO : InputOutput
     }
   }
 
-  public override void Render(Creature viewer)
+  public override void Render(Entity viewer)
   { mapW = Math.Min(console.Width, MapWidth); mapH = Math.Min(console.Height, MapHeight);
     RenderMap(viewer, viewer.Position, viewer.VisibleTiles());
     RenderStats(viewer);
@@ -374,6 +385,47 @@ public sealed class ConsoleIO : InputOutput
   }
 
   public override void SetTitle(string title) { console.Title = title; }
+
+  public override void ViewItem(Item item)
+  { ClearScreen();
+    console.SetCursorPosition(0, 0);
+    console.WriteLine("{0} - {1}", item.Char, item.InvName);
+    console.WriteLine();
+    if(item.ShortDesc!=null)
+    { WriteWrapped(item.ShortDesc, MapWidth);
+      console.WriteLine();
+    }
+    if(item is Modifying)
+    { Modifying mod = (Modifying)item;
+      if(mod.AC!=0) console.WriteLine("Armor {0}: {1}", mod.AC<0 ? "penalty" : "bonus", mod.AC);
+      if(mod.Dex!=0) console.WriteLine("Dexterity modifier: {0}", mod.Dex);
+      if(mod.EV!=0) console.WriteLine("Evasion modifier: {0}", mod.EV);
+      if(mod.Int!=0) console.WriteLine("Intelligence modifier: {0}", mod.Int);
+      if(mod.Speed!=0) console.WriteLine("Speed modifier: {0}", mod.Speed);
+      if(mod.Str!=0) console.WriteLine("Strength modifier: {0}", mod.Str);
+    }
+    if(item is Weapon)
+    { Weapon w = (Weapon)item;
+      if(w.Delay!=0) console.WriteLine("Attack delay: {0}%", w.Delay);
+      if(w.ToHitBonus!=0) console.WriteLine("To hit {0}: {1}", w.ToHitBonus<0 ? "penalty" : "bonus", w.ToHitBonus);
+      console.WriteLine("It falls into the '{0}' category.", w.wClass.ToString().ToLower());
+    }
+    if(item is Wieldable)
+    { Wieldable w = (Wieldable)item;
+      console.WriteLine("It is a {0}-handed item.", w.AllHandWield ? "two" : "one");
+      console.WriteLine("This item is better for the {0}.",
+                        w.Exercises==Attr.Str ? "strong" : w.Exercises==Attr.Dex ? "dexterous" : "intelligent");
+    }
+    if(item.Count>1)
+      console.WriteLine("They weigh about {0} mt. each ({1} total).", item.Weight, item.Weight*item.Count);
+    else console.WriteLine("It weighs about {0} mt.", item.Weight);
+    if(item.LongDesc!=null)
+    { console.WriteLine();
+      WriteWrapped(item.LongDesc, MapWidth);
+    }
+    ReadChar();
+    RestoreScreen();
+  }
 
   public override bool YesNo(Color color, string prompt, bool defaultYes)
   { char c = CharChoice(color, prompt, defaultYes ? "Yn" : "yN", defaultYes ? 'y' : 'n', true, null);
@@ -473,18 +525,91 @@ public sealed class ConsoleIO : InputOutput
     console.Fill(0, mheight, console.Width, height-mheight); // clear message area
   }
 
-  bool Diff(Creature player, Attr attr) { return renderStats || player.GetAttr(attr)!=stats[(int)attr]; }
-  bool Diff(Creature player, Attr attr1, Attr attr2) { return Diff(player, attr1) || Diff(player, attr2); }
+  bool Diff(Entity player, Attr attr) { return renderStats || player.GetAttr(attr)!=stats[(int)attr]; }
+  bool Diff(Entity player, Attr attr1, Attr attr2) { return Diff(player, attr1) || Diff(player, attr2); }
+
+  void DisplayHelp()
+  { ClearScreen();
+    string helptext =
+@"                   Chrono Help
+a - use special ability     A - list abilities
+c - close door
+d - drop item(s)
+e - eat food
+f - fire weapon/attack
+i - inventory listing       I - invoke item power
+o - open door
+p - pray
+q - quaff a potion
+r - read scroll or book     R - remove a worn item
+s - search adjacent tiles   S - manage skills
+t - throw an item
+u - use item
+v - view item description   V - version info
+w - wield an item           W - wear an item
+x - examine surroundings    X - examine level map
+z - zap a wand              Z - cast a spell
+! - shout or command allies ' - wield item a/b
+, - pick up item(s)         . - rest one turn
+: - examine occupied tile   \ - check knowledge
+< - ascend staircase        > - descend staircase
+= - reassign item letters   ^ - describe religion
+/ . - rest 100 turns        / DIR - long walk
+Ctrl-A - toggle autopickup  Ctrl-Q - quit
+Ctrl-P - see old messages   Ctrl-X - quit + save";
+
+    console.SetCursorPosition(0, 0);
+    NTConsole.OutputModes mode = console.OutputMode;
+    console.OutputMode = NTConsole.OutputModes.Processed;
+    console.Write(helptext);
+    console.ReadChar();
+    console.OutputMode = mode;
+    RestoreScreen();
+  }
+
+  void DisplayMessages()
+  { int maxlines = console.Height-1, width=MapWidth, li, height;
+    Line[] arr = new Line[maxlines];
+    LinkedList.Node baseNode = lines.Tail, node;
+
+    ClearScreen();
+    while(true)
+    { li=maxlines-1;
+      node = baseNode;
+
+      while(li>=0 && node!=null)
+      { Line line = (Line)node.Data;
+        height = WordWrap(line.Text, width);
+        while(height-->0 && li>=0) arr[li--] = new Line(line.Color, wrapped[height]);
+        node=node.PrevNode;
+      }
+      for(int y=0,i=li+1; i<arr.Length; y++,i++) PutStringP(arr[i].Color, width, 0, y, arr[i].Text);
+      
+      nextChar: ReadChar();
+      if(rec.Key.VirtualKey==NTConsole.Key.Escape) goto done;
+      if(rec.Key.VirtualKey==NTConsole.Key.Prior)
+        for(int i=0; i<maxlines/2 && li<0 && baseNode!=lines.Head; i++) baseNode=baseNode.PrevNode;
+      else if(rec.Key.VirtualKey==NTConsole.Key.Next)
+        for(int i=0; i<maxlines/2 && baseNode!=lines.Tail; i++) baseNode=baseNode.NextNode;
+      else switch(char.ToLower(NormalizeDirChar()))
+      { case 'j': if(baseNode==lines.Tail) goto nextChar; baseNode=baseNode.NextNode; break;
+        case 'k': if(li>=0 || baseNode==lines.Head) goto nextChar; baseNode=baseNode.PrevNode; break;
+        case ' ': case '\r': case '\n': goto done;
+        default: goto nextChar;
+      }
+    }
+    
+    done: RestoreScreen();
+  }
 
   void DrawLines()
-  { Line[] arr;
+  { int maxlines=LineSpace, li=maxlines-1;
+    Line[] arr = new Line[maxlines];;
     { LinkedList.Node node = lines.Tail;
-      int nlines = Math.Min(lines.Count, LineSpace), i=nlines-1, height;
-      arr = new Line[nlines];
-      while(i>=0)
+      while(li>=0 && node!=null)
       { Line line = (Line)node.Data;
-        height = WordWrap(line.Text);
-        while(height-->0 && i>=0) arr[i--] = new Line(line.Color, wrapped[height]);
+        int height = WordWrap(line.Text);
+        while(height-->0 && li>=0) arr[li--] = new Line(line.Color, wrapped[height]);
         node=node.PrevNode;
       }
     }
@@ -493,10 +618,10 @@ public sealed class ConsoleIO : InputOutput
     console.Fill(0, MapHeight, console.Width, console.Height-MapHeight);
     console.SetCursorPosition(0, blY+1); // MapHeight
 
-    for(int i=0; i<arr.Length; i++)
-    { console.Attributes = ColorToAttr(arr[i].Color);
-      console.WriteLine(arr[i].Text);
-      blX = arr[i].Text.Length; blY++;
+    for(li++; li<arr.Length; li++)
+    { console.Attributes = ColorToAttr(arr[li].Color);
+      console.WriteLine(arr[li].Text);
+      blX = arr[li].Text.Length; blY++;
     }
     SetCursorToPlayer();
   }
@@ -570,48 +695,46 @@ public sealed class ConsoleIO : InputOutput
     return rec.Key.Char;
   }
 
-  void RenderMap(Creature viewer, Point pos, Point[] vpts)
+  void RenderMap(Entity viewer, Point pos, Point[] vpts)
   { Rectangle rect = new Rectangle(pos.X-mapW/2, pos.Y-mapH/2, mapW, mapH);
     int size = mapW*mapH;
     if(buf==null || buf.Length<size) buf = new NTConsole.CharInfo[size];
     if(vis==null || vis.Length<size) vis = new bool[size];
 
-    Array.Clear(vis, 0, size);
-    for(int i=0; i<vpts.Length; i++)
-      if(rect.Contains(vpts[i])) vis[(vpts[i].Y-rect.Y)*rect.Width+vpts[i].X-rect.X] = true;
-
     Map map = viewer.Memory==null ? viewer.Map : viewer.Memory;
     if(map==viewer.Map)
     { for(int i=0,y=rect.Top; y<rect.Bottom; y++)
         for(int x=rect.Left; x<rect.Right; i++,x++) buf[i] = TileToChar(map[x,y], vis[i]);
-      RenderMonsters(map.Creatures, vpts, rect, true);
+      RenderMonsters(map.Creatures, vpts, rect);
     }
     else
-    { for(int i=0,y=rect.Top; y<rect.Bottom; y++)
+    { Array.Clear(vis, 0, size);
+      for(int i=0; i<vpts.Length; i++)
+        if(rect.Contains(vpts[i])) vis[(vpts[i].Y-rect.Y)*rect.Width+vpts[i].X-rect.X] = true;
+      for(int i=0,y=rect.Top; y<rect.Bottom; y++)
         for(int x=rect.Left; x<rect.Right; i++,x++)
         { Tile tile = map[x,y];
-          buf[i] = tile.Type==TileType.UpStairs || tile.Type==TileType.DownStairs || tile.Creature==null ?
-                    TileToChar(tile, vis[i]) : CreatureToChar(tile.Creature, vis[i]);
+          buf[i] = tile.Type==TileType.UpStairs || tile.Type==TileType.DownStairs || tile.Entity==null ?
+                    TileToChar(tile, vis[i]) : CreatureToChar(tile.Entity, vis[i]);
         }
       map = viewer.Map;
       for(int i=0,y=rect.Top; y<rect.Bottom; y++)
         for(int x=rect.Left; x<rect.Right; i++,x++) if(vis[i]) buf[i] = TileToChar(map[x,y], vis[i]);
-      RenderMonsters(map.Creatures, vpts, rect, true);
+      RenderMonsters(map.Creatures, vpts, rect);
     }
     console.PutBlock(new Rectangle(0, 0, rect.Width, rect.Height), buf);
   }
 
-  void RenderMonsters(System.Collections.ICollection coll, Point[] vpts, Rectangle rect, bool wantvis)
-  { foreach(Creature c in coll)
+  void RenderMonsters(System.Collections.ICollection coll, Point[] vpts, Rectangle rect)
+  { foreach(Entity c in coll)
     { Point cp = c.Position;
       int bi = (c.Y-rect.Y)*rect.Width + c.X-rect.X;
-      if(!rect.Contains(cp) || vis[bi]!=wantvis) continue;
-      for(int i=0; i<vpts.Length; i++)
-        if(vpts[i]==cp) { buf[bi] = CreatureToChar(c, vis[bi]); break; }
+      if(!rect.Contains(cp) || !vis[bi]) continue;
+      for(int i=0; i<vpts.Length; i++) if(vpts[i]==cp) { buf[bi] = CreatureToChar(c, vis[bi]); break; }
     }
   }
 
-  void RenderStats(Creature player)
+  void RenderStats(Entity player)
   { int x=MapWidth+2, y=0, xlines=0, width=console.Width-x;
     if(Diff(player, Attr.ExpLevel)) PutStringP(width, x, y, "{0} the {1}", player.Name, player.Title);
     PutStringP(width, x, y+1, "Human");
@@ -637,7 +760,13 @@ public sealed class ConsoleIO : InputOutput
     { PutStringP(width, x, y+11, "Turn: {0}", player.Age);
       PutStringP(width, x, y+12, "Dungeon level {0}", App.CurrentLevel+1);
     }
-    y += 13;
+    { Weapon w = player.Weapon;
+      if(w==null)
+      { if(weaponStr!="") PutStringP(width, x, y+13, "");
+      }
+      else if(weaponStr!=w.FullName) PutStringP(Color.LightCyan, width, x, y+13, "{0}) {1}", w.Char, w.FullName);
+    }
+    y += 14;
     if(hunger!=player.HungerLevel || playerFlags!=player.Flags)
     { if(player.HungerLevel==Hunger.Hungry) { PutStringP(Color.Warning, width, x, y++, "Hungry"); xlines++; }
       else if(player.HungerLevel==Hunger.Starving) { PutStringP(Color.Dire, width, x, y++, "Starving"); xlines++; }
@@ -678,59 +807,23 @@ public sealed class ConsoleIO : InputOutput
     }
   }
 
-  void ShowHelp()
-  { ClearScreen();
-    string helptext =
-@"                   Chrono Help
-a - use special ability     A - list abilities
-c - close door              C - check experience
-d - drop item(s)
-e - eat food                E - evoke item power
-f - fire weapon/attack
-i - inventory listing
-o - open door
-p - pray
-q - quaff a potion
-r - read scroll or book     R - remove a worn item
-s - search adjacent tiles   S - manage skills
-t - throw an item
-u - use item
-v - view item description   V - version info
-w - wield an item           W - wear an item
-x - examine surroundings    X - examine level map
-z - zap a wand              Z - cast a spell
-! - shout or command allies ' - wield item a/b
-, - pick up item(s)         . - rest one turn
-: - examine occupied tile   \ - check knowledge
-< - ascend staircase        > - descend staircase
-= - reassign item letters   ^ - describe religion
-/ . - rest 100 turns        / DIR - long walk
-Ctrl-A - toggle autopickup  Ctrl-Q - quit
-Ctrl-P - see old messages   Ctrl-X - quit + save";
-
-    console.SetCursorPosition(0, 0);
-    NTConsole.OutputModes mode = console.OutputMode;
-    console.OutputMode = NTConsole.OutputModes.Processed;
-    console.Write(helptext);
-    console.ReadChar();
-    console.OutputMode = mode;
-    RestoreScreen();
-  }
-
-  void UpdateStats(Creature player)
+  void UpdateStats(Entity player)
   { for(int i=0; i<(int)Attr.NumAttributes; i++) stats[i] = player.GetAttr((Attr)i);
     playerFlags = player.Flags;
     hunger = player.HungerLevel;
+    Weapon w = player.Weapon;
+    weaponStr = w==null ? "" : w.FullName;
   }
 
-  int WordWrap(string line)
-  { int width=console.Width, s=0, e=line.Length, height=0;
+  int WordWrap(string line) { return WordWrap(line, console.Width-1); }
+  int WordWrap(string line, int width)
+  { int s=0, e=line.Length, height=0;
     if(e==0) { AddWrapped(0, ""); return 1; }
 
     while(e-s>width)
     { for(int i=Math.Min(s+width, e)-1; i>=s; i--)
         if(char.IsWhiteSpace(line[i]))
-        { AddWrapped(height++, line.Substring(s, i));
+        { AddWrapped(height++, line.Substring(s, i-s));
           s = i+1;
           goto next;
         }
@@ -742,14 +835,20 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
     return height;
   }
 
+  void WriteWrapped(string text, int width)
+  { int height = WordWrap(text, width);
+    for(int i=0; i<height; i++) console.WriteLine(wrapped[i]);
+  }
+
   NTConsole.CharInfo[] buf;
   bool[] vis;
   MenuItem[] menu;
   string[] wrapped = new string[4];
 
   int[] stats = new int[(int)Attr.NumAttributes];
-  Creature.Flag playerFlags;
+  Entity.Flag playerFlags;
   Hunger hunger;
+  string weaponStr="";
 
   NTConsole console = new NTConsole();
   LinkedList lines = new LinkedList(); // a circular array would be more efficient...
@@ -766,7 +865,7 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
     return attr;
   }
 
-  static NTConsole.CharInfo CreatureToChar(Creature c, bool visible)
+  static NTConsole.CharInfo CreatureToChar(Entity c, bool visible)
   { return new NTConsole.CharInfo(raceMap[(int)c.Race], visible ? ColorToAttr(c.Color) : NTConsole.Attribute.DarkGrey);
   }
 
@@ -792,6 +891,7 @@ Ctrl-P - see old messages   Ctrl-X - quit + save";
       default: ci = new NTConsole.CharInfo(' ', NTConsole.Attribute.Black); break;
     }
     if(!visible && tile.Type!=TileType.ClosedDoor) ci.Attributes = NTConsole.Attribute.DarkGrey;
+    ci.Attributes |= NTConsole.ForeToBack((NTConsole.Attribute)(tile.Scent*15/1200));
     return ci;
   }
 

@@ -37,8 +37,8 @@ public class RoomyMapGenerator : MapGenerator
 
     for(int i=1; i<rooms.Count; i++) Connect((Room)rooms[i-1], (Room)rooms[i]);
 
-    AddStairs(true);
     AddStairs(false);
+    AddStairs(true);
     return map;
   }
 
@@ -161,8 +161,10 @@ public class RoomyMapGenerator : MapGenerator
     else map.SetType(x, y, TileType.Corridor);
   }
 
-  void AddStairs(bool up)
-  { map.SetType(map.RandomTile(TileType.RoomFloor), up ? TileType.UpStairs : TileType.DownStairs);
+  void AddStairs(bool down)
+  { Point point = map.RandomTile(TileType.RoomFloor);
+    map.SetType(point, down ? TileType.DownStairs : TileType.UpStairs);
+    map.AddLink(new Link(point, down));
   }
 
   bool IsWallJunction(int x, int y)

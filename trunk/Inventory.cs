@@ -10,9 +10,9 @@ public interface IInventory : ICollection
 
   Item Add(Item item);
 
-  Item[] GetItems(ItemClass itemClass);
+  Item[] GetItems(params ItemClass[] classes);
 
-  bool Has(ItemClass itemClass);
+  bool Has(params ItemClass[] itemClass);
 
   void Remove(Item item);
   void RemoveAt(int index);
@@ -22,7 +22,7 @@ public interface IKeyedInventory : IInventory
 { Item this[char c] { get; }
   string CharString();
   string CharString(ItemClass itemClass);
-  string CharString(ItemClass[] classes);
+  string CharString(params ItemClass[] classes);
 
   void Remove(char c);
 }
@@ -48,21 +48,16 @@ public sealed class ItemPile : IInventory
     return item;
   }
 
-  public Item[] GetItems(Chrono.ItemClass itemClass)
+  public Item[] GetItems(params Chrono.ItemClass[] classes)
   { if(items==null || items.Count==0) return new Item[0];
-    int count=0, mi=0;
-    for(int i=0; i<items.Count; i++) if(this[i].Class==itemClass) count++;
-    Item[] ret = new Item[count];
-    for(int i=0; i<items.Count; i++)
-      if(this[i].Class==itemClass)
-      { ret[mi++] = this[i];
-        if(mi==count) break;
-      }
-    return ret;
+    if(Array.IndexOf(classes, ItemClass.Any)!=-1) return (Item[])items.ToArray(typeof(Item));
+    ArrayList list = new ArrayList();
+    for(int i=0; i<items.Count; i++) if(Array.IndexOf(classes, this[i].Class)!=-1) list.Add(items[i]);
+    return (Item[])list.ToArray(typeof(Item));
   }
 
-  public bool Has(ItemClass itemClass)
-  { for(int i=0; i<items.Count; i++) if(this[i].Class==itemClass) return true;
+  public bool Has(params ItemClass[] classes)
+  { for(int i=0; i<items.Count; i++) if(Array.IndexOf(classes, this[i].Class)!=-1) return true;
     return false;
   }
 
@@ -124,29 +119,22 @@ public sealed class Inventory : IKeyedInventory
     return ret;
   }
 
-  public Item[] GetItems(ItemClass itemClass)
+  public Item[] GetItems(params ItemClass[] classes)
   { if(items==null || items.Count==0) return new Item[0];
-    Item[] ret;
-    if(itemClass==ItemClass.Any)
-    { ret = new Item[Count];
+    if(Array.IndexOf(classes, ItemClass.Any)!=-1)
+    { Item[] ret = new Item[Count];
       items.Values.CopyTo(ret, 0);
       return ret;
     }
     else
-    { int count=0, mi=0;
-      foreach(Item i in items.Values) if(i.Class==itemClass) count++;
-      ret = new Item[count];
-      foreach(Item i in items.Values)
-        if(i.Class==itemClass)
-        { ret[mi++]=i;
-          if(mi==count) break;
-        }
+    { ArrayList list = new ArrayList();
+      foreach(Item i in items.Values) if(Array.IndexOf(classes, i.Class)!=-1) list.Add(i);
+      return (Item[])list.ToArray(typeof(Item));
     }
-    return ret;
   }
 
-  public bool Has(ItemClass itemClass)
-  { for(int i=0; i<items.Count; i++) if(this[i].Class==itemClass) return true;
+  public bool Has(params ItemClass[] classes)
+  { for(int i=0; i<items.Count; i++) if(Array.IndexOf(classes, this[i].Class)!=-1) return true;
     return false;
   }
 

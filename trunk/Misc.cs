@@ -18,9 +18,14 @@ public enum Direction
 public sealed class Global
 { private Global() { }
 
-  public static bool Coinflip() { return Random.Next(1)==0; }
-  public static Point Move(Point pt, Direction d) { pt.Offset(DirMap[(int)d].X, DirMap[(int)d].Y); return pt; }
-  public static Point Move(Point pt, int d) { pt.Offset(DirMap[d].X, DirMap[d].Y); return pt; }
+  public static bool Coinflip() { return Random.Next(2)==0; }
+  public static Point Move(Point pt, Direction d) { return Move(pt, (int)d); }
+  public static Point Move(Point pt, int d)
+  { if(d<0) d = d%8+8;
+    else if(d>7) d = d%8;
+    pt.Offset(DirMap[d].X, DirMap[d].Y);
+    return pt;
+  }
   public static int NdN(int ndice, int nsides) // dice range from 1 to nsides, not 0 to nsides-1
   { int val=0;
     nsides++;

@@ -27,7 +27,7 @@ public class Food : Item
   { return base.CanStackWith(item) && (Flags&Flag.Partial)==0 && (((Food)item).Flags&Flag.Partial)==0;
   }
 
-  public virtual bool Eat(Creature user)
+  public virtual bool Eat(Entity user)
   { 
     int eaten = Math.Min(user.Hunger, Math.Min(FoodLeft, MaxFoodPerTurn));
     user.Hunger -= eaten;
@@ -43,7 +43,7 @@ public class FortuneCookie : Food
 { public FortuneCookie() { name="fortune cookie"; Color=Color.Brown; Weight=1; }
   public FortuneCookie(Item item) : base(item) { }
 
-  public override bool Eat(Creature user)
+  public override bool Eat(Entity user)
   { if((Flags&Read)==0)
     { App.IO.Print("The fortune cookie says: {0}",
                    "A starship ride has been promised to you by the galactic wizard.");

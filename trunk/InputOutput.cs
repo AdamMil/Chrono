@@ -6,7 +6,7 @@ namespace Chrono
 
 public enum Action
 { None, Quit, Rest, Move, MoveToInteresting, MoveToDanger, MoveAFAP, OpenDoor, CloseDoor, Pickup, Drop, DropType,
-  GoUp, GoDown, Eat, Wear, Remove, Wield, Inventory, ShowMap,
+  GoUp, GoDown, Eat, Wear, Remove, Wield, Inventory, ShowMap, Fire, Quaff, Read, ViewItem, Invoke, SwapAB, Reassign
 }
 
 public struct Input
@@ -80,7 +80,7 @@ public abstract class InputOutput
   public void DisplayInventory(IKeyedInventory items) { DisplayInventory(items, ItemClass.Any); }
   public abstract void DisplayInventory(IKeyedInventory items, params ItemClass[] classes);
   public abstract void DisplayTileItems(IInventory items);
-  public abstract void DisplayMap(Creature viewer);
+  public abstract void DisplayMap(Entity viewer);
 
   public abstract Input GetNextInput();
 
@@ -95,9 +95,11 @@ public abstract class InputOutput
   public abstract void Print();
   public abstract void Print(Color color, string line);
 
-  public abstract void Render(Creature viewer);
+  public abstract void Render(Entity viewer);
 
   public abstract void SetTitle(string title);
+
+  public abstract void ViewItem(Item item);
 
   public bool YesNo(string prompt, bool defaultYes) { return YesNo(Color.Normal, prompt, defaultYes); }
   public abstract bool YesNo(Color color, string prompt, bool defaultYes);

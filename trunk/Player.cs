@@ -21,7 +21,7 @@ public class Player : Creature
     if(inp.Count==0) inp = App.IO.GetNextInput();
     else inp.Count--;
     switch(inp.Action)
-    { case Action.Rest: break;
+    { case Action.Rest: VisibleTiles(); break;
       case Action.Move:
       { Point newpos = Global.Move(Position, inp.Direction);
         if(Map.IsPassable(newpos)) Position = newpos;

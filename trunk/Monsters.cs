@@ -157,9 +157,11 @@ public class Shopkeeper : AI
 { public Shopkeeper() { Race=Race.Human; GotoState(defaultState=AIState.Working); } // TODO: not always human...
   public Shopkeeper(SerializationInfo info, StreamingContext context) : base(info, context) { }
   
+  public void SetShop(Shop shop) { }
+
   protected override bool HandleState(AIState state)
   { if(state==AIState.Working)
-    { 
+    { return false;
     }
     else return base.HandleState(state);
   }

@@ -874,8 +874,13 @@ public class Player : Entity
         Entity c = Map.GetEntity(np);
         if(c!=null)
         { if(CarryStress==CarryStress.Overtaxed) goto carrytoomuch;
-          if(c is AI && !((AI)c).HostileTowards(this) &&
-             !App.IO.YesNo(string.Format("Are you sure you want to attack {0}?", c.theName), false)) goto next;
+          if(c is AI)
+          { if(CanSee(c))
+            { if(!((AI)c).HostileTowards(this) &&
+                 !App.IO.YesNo(string.Format("Are you sure you want to attack {0}?", c.theName), false)) goto next;
+            }
+            else if(!App.IO.YesNo("There is something here. Attack it?", false)) goto next;
+          }
           Weapon w = Weapon;
           Ammo   a = SelectAmmo(w);
           if(w!=null && a==null && w.Ranged && w.wClass!=WeaponClass.Thrown)

@@ -29,9 +29,9 @@ public enum Trap : byte { Dart, PoisonDart, Magic, MpDrain, Teleport, Pit }
 
 [Serializable]
 public class Shop
-{ public Shop(Rectangle area, Entity shopkeeper, ShopType type) { Area=area; Shopkeeper=shopkeeper; Type=type; }
+{ public Shop(Rectangle area, Shopkeeper shopkeeper, ShopType type) { Area=area; Shopkeeper=shopkeeper; Type=type; }
   public Rectangle Area;
-  public Entity Shopkeeper;
+  public Shopkeeper Shopkeeper;
   public ShopType Type;
 }
 
@@ -307,15 +307,15 @@ public class Map : UniqueObject
 
   public void AddShop(Rectangle rect, ShopType type) { AddShop(rect, type, true); }
   public void AddShop(Rectangle rect, ShopType type, bool stock)
-  { AddShop(rect, type, Entity.Generate(typeof(Shopkeeper), Global.Rand(3), EntityClass.Fighter), stock);
+  { AddShop(rect, type, (Shopkeeper)Entity.Generate(typeof(Shopkeeper), Global.Rand(3), EntityClass.Fighter), stock);
   }
-  public void AddShop(Rectangle rect, ShopType type, Entity shopkeeper, bool stock)
-  { 
-    Shop[] narr = new Shop[shops==null ? 1 : shops.Length+1];
+  public void AddShop(Rectangle rect, ShopType type, Shopkeeper shopkeeper, bool stock)
+  { Shop[] narr = new Shop[shops==null ? 1 : shops.Length+1];
     if(narr.Length!=1) Array.Copy(shops, narr, narr.Length-1);
     shops = narr;
-    narr[narr.Length-1] = new Shop(rect, shopkeeper, type);
-    if(stock) while(RestockShop(narr[narr.Length-1]));
+    Shop shop = narr[narr.Length-1] = new Shop(rect, shopkeeper, type);
+    if(stock) while(RestockShop(shop));
+    shopkeeper.SetShop(shop);
   }
 
   public void ClearLinks() { links = new Link[0]; }

@@ -48,7 +48,7 @@ public struct Link
   public bool Down;
 }
 
-public class PathNode : IComparable
+public class PathNode
 { public PathNode(int x, int y) { Point=new Point(x, y); }
   public enum State { New, Open, Closed };
 
@@ -56,41 +56,29 @@ public class PathNode : IComparable
   public PathNode Parent;
   public int      MinCost, PathCost;
   public State    Type;
-
-  public int CompareTo(object obj)
-  { PathNode on = (PathNode)obj;
-    int n = MinCost-on.MinCost;
-    if(n==0)
-    { n = Point.X-on.Point.X;
-      if(n==0) n = Point.Y-on.Point.Y;
-    }
-    return n;
-  }
 }
 
-public sealed class PathFinder
-{ public Point Goal { get { return goal; } }
+public sealed class PathFinder : IDisposable // FIXME: having this latch onto the .Node bits of a map is not clean
+{ public PathFinder() { queue = new BinaryTree(NodeComparer.Default); }
 
-  public bool Blocked(PathNode node)
-  { if(node.Parent.Type==PathNode.State.Closed) Insert(node.Parent, node.Parent.PathCost);
+  public Point Goal { get { return goal; } }
 
-    int kmin;
-    do kmin=ProcessState(); while(node.MinCost<node.PathCost && kmin!=-1);
-    return kmin!=-1;
-  }
+  public void Changed(PathNode node) { if(node.Type==PathNode.State.Closed) Insert(node, node.PathCost); }
+
+  public void Dispose() { Finish(); Clear(map); }
+  public void Finish() { queue.Clear(); }
 
   public PathNode GetPathFrom(Point pt) { return map[pt].Node; }
 
-  public bool Start(Map map, Point start, Point goal)
+  public bool Plan(Map map, Point start, Point goal)
   { queue.Clear();
-
     if(this.map!=map) Clear(this.map);
 
     for(int y=0; y<map.Height; y++)
       for(int x=0; x<map.Width; x++)
       { PathNode n = map[x, y].Node;
-if(true||n==null) map.SetNode(x, y, new PathNode(x, y));
-        else n.Type=PathNode.State.New;
+        if(n==null) map.SetNode(x, y, new PathNode(x, y));
+        else { n.Parent=null; n.Type=PathNode.State.New; }
       }
 
     this.map  = map;
@@ -101,7 +89,16 @@ if(true||n==null) map.SetNode(x, y, new PathNode(x, y));
     PathNode startnode = map[start].Node;
     int kmin;
     do kmin=ProcessState(); while(startnode.Type!=PathNode.State.Closed && kmin!=-1);
-    return startnode.Type!=PathNode.State.New;
+    if(kmin==-1) { queue.Clear(); return false; }
+    return true;
+  }
+
+  public bool Replan(PathNode from)
+  { int kmin=-1;
+    do kmin=ProcessState(); while(kmin<from.PathCost && kmin!=-1);
+    if(kmin!=-1) return true;
+    queue.Clear();
+    return false;
   }
 
   void Clear(Map map)
@@ -112,7 +109,11 @@ if(true||n==null) map.SetNode(x, y, new PathNode(x, y));
   void Insert(PathNode node, int cost)
   { switch(node.Type)
     { case PathNode.State.New: node.MinCost=cost; break;
-      case PathNode.State.Open: queue.Remove(node); if(cost<node.MinCost) node.MinCost=cost; break;
+      case PathNode.State.Open:
+int count = queue.Count;
+      queue.Remove(node); 
+if(count==queue.Count) throw new Exception();
+      if(cost<node.MinCost) node.MinCost=cost; break;
       case PathNode.State.Closed: node.MinCost = Math.Min(cost, node.PathCost); break;
     }
     node.PathCost = cost;
@@ -120,17 +121,16 @@ if(true||n==null) map.SetNode(x, y, new PathNode(x, y));
     queue.Add(node);
   }
 
-  int TileCost(Point pt) 
+  int TileCost(Point pt)
   { TileType type = map[pt].Type;
-    return Map.IsDangerous(type) ? 1000 : Map.IsPassable(type) ? 1 :
-            Map.IsDoor(type) && !map.GetFlag(pt, Tile.Flag.Locked) ? 3 : map.GetFlag(pt, Tile.Flag.Seen) ? 10000 : 4;
+    return Map.IsDangerous(type) ? 2000 : // dangerous tiles
+           Map.IsPassable(type) ? 1 :     // freely passable tiles
+           Map.IsDoor(type) && !map.GetFlag(pt, Tile.Flag.Locked) ? 2 : // doors
+           map.GetFlag(pt, Tile.Flag.Seen) ? 10000 : // known unpassable areas
+           10; // unknown areas
   }
 
-  int MoveCost(PathNode from, PathNode to)
-  { return Math.Max(TileCost(to.Point), TileCost(from.Point));
-    /* + Math.Sign(Math.Max(Math.Abs(to.Point.X-goal.X), Math.Abs(to.Point.Y-goal.Y)) -
-                                          Math.Max(Math.Abs(from.Point.X-goal.X), Math.Abs(from.Point.Y-goal.Y)));*/
-  }
+  int MoveCost(PathNode from, PathNode to) { return Math.Max(TileCost(to.Point), TileCost(from.Point)); }
 
   int ProcessState()
   { if(queue.Count==0) return -1;
@@ -178,7 +178,21 @@ if(true||n==null) map.SetNode(x, y, new PathNode(x, y));
     return queue.Count==0 ? -1 : ((PathNode)queue.GetMinimum()).MinCost;
   }
 
-  BinaryTree queue = new BinaryTree();
+  class NodeComparer : IComparer
+  { public int Compare(object x, object y)
+    { PathNode a=(PathNode)x, b=(PathNode)y;
+      int n = a.MinCost-b.MinCost;
+      if(n==0)
+      { n = a.Point.X-b.Point.X;
+        if(n==0) n = a.Point.Y-b.Point.Y;
+      }
+      return n;
+    }
+    
+    public static NodeComparer Default = new NodeComparer();
+  }
+
+  BinaryTree queue;
   Map map;
   Point goal;
 }
@@ -270,6 +284,8 @@ public sealed class Map
     narr[links.Length] = link;
     links = narr;
   }
+  
+  public void ClearLinks() { links = new Link[0]; }
 
   public void AddScent(int x, int y, int amount)
   { map[y,x].Scent = (ushort)Math.Min(map[y,x].Scent+Math.Min(amount, MaxScentAdd), MaxScent);

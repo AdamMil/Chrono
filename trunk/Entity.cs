@@ -250,10 +250,10 @@ public abstract class Entity
   }
 
   // attack in a direction, can be used for attacking locked doors, etc
-  public void Attack(Direction dir, Weapon weapon, Ammo ammo)
-  { Attack(dir==Direction.Self ? Position : Global.Move(Position, dir), weapon, ammo);
+  public void Attack(Weapon weapon, Ammo ammo, Direction dir)
+  { Attack(weapon, ammo, dir==Direction.Self ? Position : Global.Move(Position, dir), false);
   }
-  public void Attack(Point pt, Weapon weapon, Ammo ammo) // attacks a point on the map
+  public void Attack(Weapon weapon, Ammo ammo, Point pt) // attacks a point on the map
   { Attack(weapon, ammo, pt, false);
   }
 
@@ -273,12 +273,13 @@ public abstract class Entity
     Entity c = Map.GetEntity(res.Point);
     bool destroy = false;
     if(c!=null) destroy = Attack(c, item, ammo, ranged, thrown); // if ranged, TryHit has already been called
-    else if(w!=null)
+    else if(w!=null || item==null)
     { Tile t = Map[res.Point];
       string msg=null;
       byte noise=0;
       if(t.Type==TileType.ClosedDoor)
       { int damage = (w==null ? CalculateDamage(null) : w.CalculateDamage(this, ammo, null)).Total;
+        // FIXME: take skill into account?
         if(damage>=10)
         { msg = "Crash! You break down the door.";
           Map.SetType(res.Point, TileType.RoomFloor);
@@ -355,7 +356,8 @@ public abstract class Entity
       { int odam=phys;
         if(n<blockchance) phys /= 2;        // shield blocks 50% damage the other half of the time
         if(ac>5) Exercise(Skill.Armor);     // if wearing substantial armor, exercise it
-        if(ac>0) n = Global.NdN(2, ac);
+        if(ac>1) n = Global.NdN(4, ac/2);
+        else n=ac;
         phys -= n + n*GetSkill(Skill.Armor)*10/100; // armor absorbs phys (+10% per skill level)
         if(phys<0) phys = 0;                // normalize damage
         App.IO.Print(Color.DarkGrey, "DAMAGE: {0} -> {1}, HP: {2} -> {3}", odam, phys, HP, HP-phys);
@@ -880,16 +882,16 @@ public abstract class Entity
   // a table of skill experience requirements for level up for races
   public static readonly int[][] RaceSkills = new int[(int)Race.NumRaces][]
   { new int[(int)Skill.NumSkills] // human
-    { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,
+    { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,
       100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,
     },
     new int[(int)Skill.NumSkills] // orc
     { 110, 100,  80,  70,  80, // dagger, short, long, axe, mace
        80, 110, 120, 120, 130, // polearm, staff, bow, crossbow, thrown
-      120, 120, 150, 160, 160, // summon, enchant, translocate, transform, divine
-      100, 100, 115, 110, 100, // channel, necromancy, elemental, poison, locks/traps
-      100, 150,  90, 140,  70, // invoke, cast, unarmed, dodge, fight,
-       80,  90, 125,           // shield, armor, magicresist
+      120, 120, 135, 150, 160, // summon, enchant, telekinesis, translocate, transform,
+      160, 100, 100, 115, 110, // divine, channel, necromancy, elemental, poison,
+      100, 100, 150,  90, 140, // locks/traps, invoke, cast, unarmed, dodge, 
+       70,  80,  90, 125,      // fight, shield, armor, magicresist
     },
   };
 

@@ -5,7 +5,7 @@ namespace Chrono
 {
 
 public class Player : Entity
-{ public Player() { Color=Color.White; Timer=50; /*we get a headstart*/ }
+{ public Player() { Color=Color.White; Timer=50; Spells=new System.Collections.ArrayList(); }
 
   public override void Die(object killer, Death cause)
   { switch(cause)
@@ -73,7 +73,10 @@ public class Player : Entity
         IInventory inv;
         if(!GroundPackUse(typeof(Corpse), "Butcher", out item, out inv, ItemClass.Corpse)) goto next;
         Corpse corpse = (Corpse)item;
-        if(corpse.Skeleton) { App.IO.Print("You can't find any usable meat on this skeleton."); goto next; }
+        if((corpse.Flags&Corpse.Flag.Rotting)!=0) App.IO.Print("Eww, disgusting!");
+        else if((corpse.Flags&Corpse.Flag.Skeleton)!=0)
+        { App.IO.Print("You can't find any usable meat on this skeleton."); goto next;
+        }
 
         int turn=1, turns=(corpse.Weight+99)/100;
         corpse.CarveTurns++;
@@ -201,14 +204,14 @@ public class Player : Entity
             if(ammo==null) { App.IO.Print("You have no suitable ammunition!"); goto next; }
           }
           RangeTarget rt = App.IO.ChooseTarget(this, true);
-          if(rt.Dir!=Direction.Invalid) Attack(rt.Dir, w, ammo);
-          else if(rt.Point.X!=-1) Attack(rt.Point, w, ammo);
+          if(rt.Dir!=Direction.Invalid) Attack(w, ammo, rt.Dir);
+          else if(rt.Point.X!=-1) Attack(w, ammo, rt.Point);
           else goto nevermind;
         }
         else
         { Direction d = App.IO.ChooseDirection(false, false);
           if(d==Direction.Invalid) goto nevermind;
-          Attack(d, w, null);
+          Attack(w, null, d);
         }
         break;
       }
@@ -267,7 +270,7 @@ public class Player : Entity
           Ammo   a = SelectAmmo(w);
           if(w!=null && a==null && w.Ranged && w.wClass!=WeaponClass.Thrown)
             App.IO.Print(Color.Warning, "You're out of "+((FiringWeapon)w).AmmoName+'!');
-          Attack(np, w, a);
+          Attack(w, a, np);
         }
         else if(Map.IsPassable(np))
         { Position = np;

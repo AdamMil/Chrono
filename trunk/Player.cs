@@ -7,6 +7,12 @@ namespace Chrono
 public class Player : Creature
 { public Player() { Timer=100; } // we go first
 
+  public override void Generate(int level, CreatureClass myClass, Race race)
+  { base.Generate(level, myClass, race);
+    for(int i=0; i<5; i++) LevelUp(); // players get an advantage over monsters
+    ExpLevel -= 5;
+  }
+
   public override void Think()
   { base.Think();
     App.IO.Render(this);
@@ -82,6 +88,10 @@ public class Player : Creature
         if(App.IO.YesNo(Color.Warning, "Do you really want to quit?", false)) App.Quit=true;
         break;
     }
+  }
+  
+  public static Player Generate(CreatureClass myClass, Race race)
+  { return (Player)Creature.Generate(typeof(Player), 0, myClass, race);
   }
   
   Input inp;

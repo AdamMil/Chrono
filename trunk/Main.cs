@@ -21,14 +21,12 @@ public sealed class App
     IO.Print("Chrono 0.01 by Adam Milazzo");
     IO.Print();
 
-    Player player = (Player)Creature.MakeCreature(typeof(Player));
+    Player player = Player.Generate(CreatureClass.Fighter, Race.Human);
     player.Name = IO.Ask("Enter your name:", false, "I need to know what to call you!");
-    player.Title = "Grunt";
-    player.HP    = 8;
-    player.MaxHP = 10;
-    player.Speed = 25;
     Maps.Add(new RoomyMapGenerator().Generate());
     Maps[0].Creatures.Add(player);
+    Maps[0].Creatures.Add(Creature.Generate(typeof(Fighter), 0, CreatureClass.Fighter, Race.Orc));
+    Maps[0].Creatures[1].Position = Maps[0].FreeSpace();
     IO.Render(player);
 
     for(int y=0; y<Maps[0].Height; y++) // place player on the up staircase of the first level

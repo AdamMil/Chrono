@@ -30,7 +30,6 @@ public struct Tile
   public void SetFlag(Flag flag, bool on) { if(on) Flags|=(byte)flag; else Flags&=(byte)~flag; }
 
   public Inventory Items;
-  public Creature  Creature;
   public TileType  Type;
   public Point     Dest;    // destination on prev/next level
   public byte      Subtype; // subtype of tile (ie, type of trap/altar/etc)
@@ -110,17 +109,47 @@ public sealed class Map
   public void SetFlag(Point pt, Tile.Flag flag, bool on) { map[pt.Y,pt.X].SetFlag(flag, on); }
   public void SetFlag(int x, int y, Tile.Flag flag, bool on) { map[y,x].SetFlag(flag, on); }
 
-  public bool IsPassable(Point pt) { return IsPassable(this[pt.X,pt.Y].Type); }
-  public bool IsPassable(int x, int y) { return IsPassable(this[x,y].Type); }
+  public bool IsPassable(Point pt) { return IsPassable(pt.X, pt.Y); }
+  public bool IsPassable(int x, int y)
+  { Tile tile = this[x,y];
+    if(!IsPassable(tile.Type)) return false;
+    for(int i=0; i<creatures.Count; i++) if(creatures[i].X==x && creatures[i].Y==y) return false;
+    return true;
+  }
   public bool IsWall(Point pt) { return IsWall(this[pt.X,pt.Y].Type); }
   public bool IsWall(int x, int y) { return IsWall(this[x,y].Type); }
   public bool IsDoor(Point pt) { return IsDoor(this[pt.X,pt.Y].Type); }
   public bool IsDoor(int x, int y) { return IsDoor(this[x,y].Type); }
 
+  public Point FreeSpace() { return FreeSpace(false, false); }
+  public Point FreeSpace(bool allowItems) { return FreeSpace(allowItems, false); }
+  public Point FreeSpace(bool allowItems, bool allowCreatures)
+  { int tries = width*height;
+    while(tries-->0)
+    { Point pt = new Point(Global.Rand(width), Global.Rand(height));
+      if(!IsFreeSpace(pt, allowItems, allowCreatures)) continue;
+      return pt;
+    }
+    for(int y=0; y<height; y++)
+      for(int x=0; x<width; x++)
+        if(IsFreeSpace(x, y, allowItems, allowCreatures)) return new Point(x, y);
+    throw new ArgumentException("No free space found on this map!");
+  }
+  
+  public bool IsFreeSpace(Point pt, bool allowItems, bool allowCreatures)
+  { return IsFreeSpace(pt.X, pt.Y, allowItems, allowCreatures);
+  }
+  public bool IsFreeSpace(int x, int y, bool allowItems, bool allowCreatures)
+  { Tile tile = this[x, y];
+    if(!IsPassable(tile.Type) || !allowItems && tile.Items!=null && tile.Items.Count>0) return false;
+    if(!allowCreatures) for(int i=0; i<creatures.Count; i++) if(creatures[i].X==x && creatures[i].Y==y) return false;
+    return true;
+  }
+
   public Point RandomTile(TileType type)
   { int tries = width*height;
     while(tries-->0)
-    { int x = Global.Rand.Next(width), y = Global.Rand.Next(height);
+    { int x = Global.Rand(width), y = Global.Rand(height);
       if(map[y, x].Type==type) return new Point(x, y);
     }
     for(int y=0; y<height; y++) for(int x=0; x<width; x++) if(map[y, x].Type==type) return new Point(x, y);
@@ -153,7 +182,7 @@ public sealed class Map
 
     thinking++;
     while(thinkQueue.Count!=0)
-    { Creature c = (Creature)thinkQueue.DequeueMaximum();
+    { Creature c = (Creature)thinkQueue.Dequeue();
       if(removedCreatures.Contains(c)) continue;
       if(c==player) { thinking--; return; }
       c.Think();

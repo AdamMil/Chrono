@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8" ?> 
+
+<map:map id="gtown" name="Grass Town" generator="TownGenerator"
+  xmlns:map="http://www.adammil.net/Chrono/map"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.adammil.net/Chrono/map map.xsd">
+
+  <room id="pcHouse" width="3-5" height="3-5" required="true"/>
+
+  <npc data="fatherOfPC" ai="fatherOfPC">
+    <location room="pcHouse"/>
+  </npc>
+</map:map>

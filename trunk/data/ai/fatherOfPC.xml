@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8" ?> 
+
+<ai:ai id="fatherOfPC"
+  xmlns:ai="http://www.adammil.net/Chrono/ai"
+  xmlns:qs="http://www.adammil.net/Chrono/ai/questStatus"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.adammil.net/Chrono/ai ai.xsd">
+
+  <charData class="Townsperson" name="Pa" gender="male" defaultState="Idle">
+    <give class="Gold" count="1000"/>
+  </charData>
+
+  <declare>
+    <quest id="FindJohn">
+      <qs:during>
+      Your uncle John has gone missing in the hills around TOWN NAME.
+      Your father, always something of a coward, has asked you to go look for him.
+      </qs:during>
+      <qs:success>
+      You found your uncle John unable to walk after having barely escaped becoming wolf food.
+      But you saved the day. Yippee.
+      </qs:success>
+      <qs:failure>
+      Your uncle John died due to your incompetence.
+      </qs:failure>
+    </quest>
+  </declare>
+
+  <dialog id="FindJohnDialog">
+    <text id="Intro">
+      Hello, son. I have grave news. John, my beloved brother, has gone missing in the hills around the town.
+      Will you go look for him?
+    </text>
+    <text id="WillLook">Yes father, I will look for him.</text>
+    <text id="WontLook">But I'm just a young {man/woman}! Why don't you go?</text>
+    <text id="Accept">
+      Thank you son. I'd been saving this for your education, but you'll need to equip yourself.
+      Take it and visit the shops in town, and come back to me when you find John.
+    </text>
+    <text id="Reject">Why-you-little! Err, okay {name}, please think about it.</text>
+    <text id="Okay">Okay.</text>
+    <text id="FoundYet">Have you found him yet?</text>
+    <text id="StillLooking">I'm still looking.</text>
+    <text id="PleaseHurry">Okay, but please hurry! I fear for the worst!</text>
+
+    <!--don't have quest yet-->
+    <simpleNode name="Ask" text="Intro" options="WillLook:Accept,WontLook:Reject"/>
+    <node name="Accept" text="Accept">
+      <option text="Okay">
+        <give class="Gold" count="1000"/>
+        <giveQuest name="FindJohn"/>
+        <end/>
+      </option>
+    </node>
+    <simpleNode name="Reject" text="Reject" options="Okay:*END*"/>
+
+    <!--quest in progress-->
+    <simpleNode name="FoundYet" text="FoundYet" options="StillLooking:PleaseHurry,GaveUp:Reject"/>
+    <simpleNode name="PleaseHurry" text="PleaseHurry" options="Okay:*END*"/>
+
+    <onInit>
+      <if haveQuest="FindJohn">
+        <goto name="FoundYet"/>
+        <else><goto name="Ask"/></else>
+      </if>
+    </onInit>
+  </dialog>
+
+  <onSpeak>
+    <if questSuccess="FindJohn">
+      <quipGroup>
+        <quip>Thank you for finding John!</quip>
+        <quip>I knew you could do it!</quip>
+      </quipGroup>
+    </if>
+    <if questFailed="FindJohn">
+      <quipGroup>
+        <quip>Oh, my poor brother.</quip>
+        <quip>You've failed me.</quip>
+      </quipGroup>
+    </if>
+    <if questNotDone="FindJohn">
+      <say dialog="FindJohnDialog"/>
+    </if>
+  </onSpeak>
+</ai:ai>

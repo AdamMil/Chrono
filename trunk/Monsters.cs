@@ -9,7 +9,7 @@ namespace Chrono
 #region Orc
 [Serializable]
 public class Orc : AI
-{ public Orc() { Race=Race.Orc; Color=Color.Yellow; baseKillExp=10; }
+{ public Orc() { Race=Race.Orc; Color=Color.Yellow; baseKillExp=10; canOpenDoors=true; }
   public Orc(SerializationInfo info, StreamingContext context) : base(info, context) { }
   
   public override void Generate(int level, EntityClass myClass)
@@ -47,12 +47,10 @@ public class Townsperson : AI
     { baseName    = jobs[Global.Rand(jobs.Length)];
       baseKillExp = 3;
     }
-    else
-    { baseName    = Race.ToString().ToLower() + (Global.Coinflip() ? " boy" : " girl");
-      baseKillExp = 1;
-    }
+    else baseKillExp = 1;
 
     alwaysHostile=false;
+    canOpenDoors =true;
   }
   public Townsperson(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
@@ -63,6 +61,8 @@ public class Townsperson : AI
     { SetSkill(Skill.Fighting, 1);
       SetSkill(Skill.UnarmedCombat, 1);
       
+      Male = baseName!="houseWife" && baseName!="prostitute";
+
       switch(baseName)
       { case "hunter":
           SetSkill(Skill.Fighting, 2);
@@ -119,11 +119,13 @@ public class Townsperson : AI
       }
     }
     else
-    { AlterBaseAttr(Attr.Str, -1);    // children are weak,
+    { Male = Global.Coinflip();
+      baseName = Race.ToString().ToLower() + (Male ? " boy" : " girl");
+      AlterBaseAttr(Attr.Str, -1);    // children are weak,
       AlterBaseAttr(Attr.Dex, -1);    // clumsy,
       HP = SetBaseAttr(Attr.MaxHP, GetBaseAttr(Attr.MaxHP)/2);  // frail,
       AlterBaseAttr(Attr.Speed, 10);  // and slow
-      if(baseName.IndexOf(" boy")!=-1)
+      if(Male)
       { SetSkill(Skill.Dagger, 1);
         // TODO: give him a knife
       }
@@ -177,6 +179,7 @@ public class Shopkeeper : AI
     baseName = "shopkeeper";
     alwaysHostile = false;
     canOpenDoors  = true;
+    baseKillExp   = 50;
   }
   public Shopkeeper(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
@@ -200,6 +203,7 @@ public class Shopkeeper : AI
 
   public override void Generate(int level, EntityClass myClass)
   { base.Generate(level, myClass);
+    Male = Global.Rand(100)<80; // 80% chance of being male
     priceMod = Global.Rand(85, 115) / 100.0;
 
     // shopkeepers are tough

@@ -258,32 +258,57 @@
                     BuildAction = "Compile"
                 />
                 <File
-                    RelPath = "data\dialog\fatherOfPC.xml"
+                    RelPath = "data\common.xsd"
                     BuildAction = "Content"
                 />
                 <File
-                    RelPath = "data\dialog\quips.xml"
+                    RelPath = "data\ai\ai.xsd"
                     BuildAction = "Content"
                 />
                 <File
-                    RelPath = "data\dialog\quips.xsd"
+                    RelPath = "data\ai\fatherOfPC.xml"
                     BuildAction = "Content"
                 />
                 <File
-                    RelPath = "data\dialog\textData.xsd"
+                    RelPath = "data\ai\quips.xml"
                     BuildAction = "Content"
                 />
                 <File
-                    RelPath = "data\dialog\textData.xsx"
-                    DependentUpon = "textData.xsd"
+                    RelPath = "data\ai\quips.xsd"
+                    BuildAction = "Content"
+                />
+                <File
+                    RelPath = "data\dungeon\dungeon.xsd"
+                    BuildAction = "Content"
+                />
+                <File
+                    RelPath = "data\dungeon\dungeon.xsx"
+                    DependentUpon = "dungeon.xsd"
                     BuildAction = "None"
                 />
                 <File
-                    RelPath = "data\maps\MapFormat.txt"
+                    RelPath = "data\dungeon\overworld.xml"
                     BuildAction = "Content"
                 />
                 <File
-                    RelPath = "data\maps\overworld.xml"
+                    RelPath = "data\map\gtown.xml"
+                    BuildAction = "Content"
+                />
+                <File
+                    RelPath = "data\map\map.xsd"
+                    BuildAction = "Content"
+                />
+                <File
+                    RelPath = "data\map\map.xsx"
+                    DependentUpon = "map.xsd"
+                    BuildAction = "None"
+                />
+                <File
+                    RelPath = "data\map\MapFormat.txt"
+                    BuildAction = "Content"
+                />
+                <File
+                    RelPath = "data\map\overworld.xml"
                     BuildAction = "Content"
                 />
             </Include>

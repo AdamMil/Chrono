@@ -1,6 +1,8 @@
 using System;
+using System.Collections;
 using System.Drawing;
 using System.Runtime.Serialization;
+using System.Xml;
 
 namespace Chrono
 {
@@ -9,6 +11,12 @@ namespace Chrono
 public class Player : Entity
 { public Player() { Color=Color.White; Timer=50; SocialGroup=Global.NewSocialGroup(false, true); }
   public Player(SerializationInfo info, StreamingContext context) : base(info, context) { }
+
+  public void DeclareQuest(XmlNode node)
+  { Quest quest = new Quest(node);
+    if(GetQuest(quest.Name, false)!=null) throw new ArgumentException("quest declared twice: "+quest.Name);
+    quests.Add(quest);
+  }
 
   public override void Die(object killer, Death cause)
   { switch(cause)
@@ -50,6 +58,17 @@ public class Player : Entity
     LevelUp(); ExpLevel--; // players start with slightly higher stats
     ExpPool = (level+1)*25;
   }
+
+  public void GiveQuest(string name, string state)
+  { Quest q = GetQuest(name);
+    for(int i=0; i<q.States.Length; i++)
+      if(state==q.States[i]) { q.State=i; goto recv; }
+    throw new ArgumentException("quest "+name+" has no state "+state);
+    recv:
+    q.Received = true;
+  }
+
+  public bool HasQuest(string name) { return GetQuest(name).Received; }
 
   public override void OnAttrChange(Attr attribute, int amount, bool fromExercise)
   { string feel=null;
@@ -252,6 +271,27 @@ public class Player : Entity
   public override void OnWear(Wearable item) { App.IO.Print("You put on {0}.", item.GetAName(this)); }
 
   public void Quit() { HP=0; App.Quit=true; Die(Death.Quit); }
+
+  public bool QuestDone(string name)
+  { Quest q = GetQuest(name);
+    return q.Success[q.State] || q.Failure[q.State];
+  }
+
+  public bool QuestFailed(string name)
+  { Quest q = GetQuest(name);
+    return q.Failure[q.State];
+  }
+
+  public string QuestState(string name)
+  { Quest q = GetQuest(name);
+    return q.States[q.State];
+  }
+  
+  public bool QuestSucceeded(string name)
+  { Quest q = GetQuest(name);
+    return q.Success[q.State];
+  }
+
   public void Save() { App.Quit=true; }
 
   public override void TalkTo() { App.IO.Print("Talking to yourself again?"); }
@@ -275,6 +315,28 @@ public class Player : Entity
   }
   
   protected const int OverworldMoveTime=100;
+
+  protected class Quest
+  { public Quest(XmlNode node)
+    { Name    = node.Attributes["id"].Value;
+      States  = new string[node.ChildNodes.Count];
+      Success = new bool[node.ChildNodes.Count];
+      Failure = new bool[node.ChildNodes.Count];
+
+      for(int i=0; i<node.ChildNodes.Count; i++)
+      { XmlNode child = node.ChildNodes[i];
+        States[i]  = child.LocalName;
+        Success[i] = Xml.IsTrue(child.Attributes["success"]);
+        Failure[i] = Xml.IsTrue(child.Attributes["failure"]);
+      }
+    }
+
+    public string Name;
+    public string[] States;
+    public bool[]   Success, Failure;
+    public int  State;
+    public bool Received;
+  }
 
   #region DefaultHandler
   protected bool DefaultHandler(ref Point[] vis)
@@ -1110,6 +1172,13 @@ public class Player : Entity
     return App.IO.ChooseDirection(false, false);
   }
 
+  protected Quest GetQuest(string name) { return GetQuest(name, true); }
+  protected Quest GetQuest(string name, bool throwOnError)
+  { foreach(Quest q in quests) if(q.Name==name) return q;
+    if(throwOnError) throw new ArgumentException("no such quest: "+name);
+    return null;
+  }
+
   protected bool GroundPackUse(Type type, string verb, out Item item, out IInventory inv, params ItemClass[] classes)
   { item = null; inv = null;
     if(Map.HasItems(Position))
@@ -1225,8 +1294,14 @@ public class Player : Entity
       return true;
     }
     else if(type==TileType.Border && Map.IsTown && App.IO.YesNo("Leave the town?", false))
-    { OnMove(Map.GetLink(0));
-      return true;
+    { for(int i=0; i<Map.Links.Length; i++)
+      { Link link = Map.Links[i];
+        if(link.ToSection[link.ToLevel].IsOverworld)
+        { OnMove(Map.GetLink(i));
+          return true;
+        }
+      }
+      throw new ApplicationException("Unable to link the town with the overworld");
     }
     else return false;
   }
@@ -1268,9 +1343,10 @@ public class Player : Entity
   { ItemClass.Amulet, ItemClass.Armor, ItemClass.Ring, ItemClass.Shield
   };
 
+  ArrayList quests = new ArrayList();
   [NonSerialized] Input inp;
-  HungerLevel oldHungerLevel;
   [NonSerialized] PathFinder path = new PathFinder();
+  HungerLevel oldHungerLevel;
 }
 
 } // namespace Chrono

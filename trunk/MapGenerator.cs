@@ -327,7 +327,7 @@ public class TownGenerator : MapGenerator
 
     while(AddRandomRoom());
     
-    // TODO: this could cause problems because of its randomness... (eg, a room may fill up with people and then
+    // FIXME: this could cause problems because of its randomness... (eg, a room may fill up with people and then
     // FreeSpace(Rectangle) may fail, or something similar)
     for(int npeople=size/200; npeople>0; npeople--)
     { Entity peon = Entity.Generate(typeof(Townsperson), Global.Rand(0, 3), EntityClass.Plain);

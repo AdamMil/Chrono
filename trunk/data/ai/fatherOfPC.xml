@@ -13,7 +13,7 @@
   <declare>
     <quest id="FindJohn">
       <qs:during>
-      Your uncle John has gone missing in the hills around TOWN NAME.
+      Your uncle John has gone missing in the hills around Grass Town.
       Your father, always something of a coward, has asked you to go look for him.
       </qs:during>
       <qs:success>
@@ -76,7 +76,7 @@
     <if questFailed="FindJohn">
       <quipGroup>
         <quip>Oh, my poor brother.</quip>
-        <quip>You've failed me.</quip>
+        <quip>You've failed me!</quip>
       </quipGroup>
     </if>
     <if questNotDone="FindJohn">

@@ -5,6 +5,10 @@
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://www.adammil.net/Chrono/map map.xsd">
 
+  <link to="overworld" type="None">
+    <location room="pcHouse"/>
+  </link>
+
   <room id="pcHouse" width="4:6" height="4:6" required="true"/>
 
   <npc id="fatherOfPC" ai="fatherOfPC">

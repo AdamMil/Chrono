@@ -51,14 +51,27 @@
   </xs:restriction>
 </xs:simpleType>
 
+<!-- varString
+  [prefix:]name
+  
+  Where "prefix" can be
+    local   - variables local to each entity using the script
+    script  - variables local to the script (the default)
+    global  - global to the application
+-->
+<xs:simpleType name="varString">
+  <xs:restriction base="xs:string">
+    <xs:pattern value="((local|script|global):)\w+"/>
+  </xs:restriction>
+</xs:simpleType>
+
 <!-- item -->
 <xs:complexType name="item">
   <xs:sequence>
-    <xs:element name="count" type="expression" minOccurs="0"/>
+    <xs:any processContents="skip" maxOccurs="unbounded"/>
   </xs:sequence>
+
   <xs:attribute name="class" type="xs:string" use="required"/>
-  <xs:attribute name="count" type="xs:integer" default="1"/>
-  
   <xs:anyAttribute processContents="skip"/>
 </xs:complexType>
 
@@ -114,7 +127,7 @@
 
 <!-- varAccess -->
 <xs:complexType name="varAccess">
-  <xs:attribute name="var" type="xs:string" use="required"/>
+  <xs:attribute name="var" type="varString" use="required"/>
 </xs:complexType>
 
 <!-- expressionGroup -->
@@ -159,13 +172,13 @@
   <xs:attribute name="questNotDone" type="xs:IDREF"/>
   <xs:attribute name="questSuccess" type="xs:IDREF"/>
   <xs:attribute name="questFailed" type="xs:IDREF"/>
-  <xs:attribute name="var" type="xs:string"/>
+  <xs:attribute name="var" type="varString"/>
 
   <xs:attribute name="op"  type="operator"/>
 
   <!--rhs-->
   <xs:attribute name="rhs" type="xs:string"/>
-  <xs:attribute name="var2" type="xs:string"/>
+  <xs:attribute name="var2" type="varString"/>
 </xs:attributeGroup>
 
 <!-- condition -->
@@ -232,7 +245,7 @@
   <xs:sequence>
     <xs:element name="value" type="expression" minOccurs="0"/>
   </xs:sequence>
-  <xs:attribute name="var" type="xs:string" use="required"/>
+  <xs:attribute name="var" type="varString" use="required"/>
   <xs:attribute name="value" type="xs:string"/>
 </xs:complexType>
 
@@ -269,7 +282,7 @@
 
 <!-- var -->
 <xs:complexType name="var">
-  <xs:attribute name="id" type="xs:IDREF" use="required"/>
+  <xs:attribute name="name" type="xs:IDREF" use="required"/>
   <xs:attribute name="value" type="xs:string"/>
 </xs:complexType>
 
@@ -344,8 +357,8 @@
     <xs:element name="text" minOccurs="0" maxOccurs="unbounded" type="text"/>
     <xs:element name="dialog" minOccurs="0" maxOccurs="unbounded" type="dialog"/>
 
-    <xs:element name="onInit" minOccurs="0" type="action"/>
     <xs:element name="onSpeak" minOccurs="0" type="action"/>
+    <xs:element name="onBirth" minOccurs="0" type="action"/>
     <xs:element name="onDeath" minOccurs="0" type="action"/>
   </xs:sequence>
   <xs:attribute name="id" type="xs:string" use="required"/>

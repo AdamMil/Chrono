@@ -46,7 +46,7 @@ public abstract class Food : Item
   { base.Think(holder);
     if(DecayTime>0)
     { if(Age>=DecayTime*2)
-      { if(holder==App.Player) App.IO.Print("Your {0} rot{1} away.", GetFullName(holder), Count>1 ? "" : "s");
+      { if(holder==App.Player) App.IO.Print("Your {0} rot{1} away.", GetFullName(holder), VerbS);
         return true;
       }
       else if(Age>=DecayTime && (Flags&Flag.Rotten)==0) Rot(holder);

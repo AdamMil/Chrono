@@ -41,3 +41,7 @@ add messages like "You are no longer burdened."
 improve spell description (add MP usage, etc)
 improve spell target prompting (add custom messages, etc)
 have corpses rot, too (not just go from plain -> skeleton)
+rework skill system so top level is 10
+add critical hits
+look into spells going through walls (bouncing through walls in tight corridors)
+look into screen corruption when pathfinding

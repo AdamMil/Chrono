@@ -16,7 +16,26 @@ public enum Attr
 
 public enum CarryStress { Normal, Burdened, Stressed, Overtaxed } // states related to how much we're carrying
 
+public struct Damage
+{ public Damage(int damage) { Physical=(ushort)damage; Direct=Heat=Cold=Electricity=Poison=0; }
+  public int Total { get { return Direct+Physical+Heat+Cold+Electricity; } } // doesn't count poison
+  public ushort Direct, Physical, Heat, Cold, Electricity, Poison;
+}
+
 public enum Death { Combat, Falling, Poison, Starvation, Sickness, Trap } // causes of death
+
+public struct Effect
+{ public Effect(object source, Attr attr, int value, int timeout)
+  { Source=source; Attr=attr; Value=value; Timeout=timeout;
+  }
+  public Effect(object source, Entity.Flag mods, int timeout)
+  { Source=source; Attr=Attr.Flags; Value=(int)mods; Timeout=timeout;
+  }
+  public object Source;
+  public Attr Attr;
+  public int  Value;
+  public int  Timeout;
+}
 
 public enum EntityClass
 { Other=-2, // not a monster (boulder or some other entity)
@@ -33,7 +52,7 @@ public enum Skill
 { // these match weapon classes
   Dagger, ShortBlade, LongBlade, Axe, MaceFlail, PoleArm, Staff, Bow, Crossbow, Throwing, WeaponSkills,
   // these match magic types
-  Summoning=WeaponSkills, Enchantment, Translocation, Transformation, Divination, Channeling, Necromancy,
+  Summoning=WeaponSkills, Enchantment, Telekinesis, Translocation, Transformation, Divination, Channeling, Necromancy,
   Elemental, Poison, MagicSkills,
   
   LocksTraps=MagicSkills, Invoking, Casting, // general
@@ -45,19 +64,6 @@ public enum Skill
 public enum Slot // where an item can be worn
 { Ring=-2, // either ring finger, only valid for Wearable.Slot. not valid for functions like Wearing(Slot) (yet?)
   Invalid=-1, Head, Cloak, Torso, Legs, Neck, Hands, Feet, LRing, RRing, NumSlots
-}
-
-public struct Effect
-{ public Effect(object source, Attr attr, int value, int timeout)
-  { Source=source; Attr=attr; Value=value; Timeout=timeout;
-  }
-  public Effect(object source, Entity.Flag mods, int timeout)
-  { Source=source; Attr=Attr.Flags; Value=(int)mods; Timeout=timeout;
-  }
-  public object Source;
-  public Attr Attr;
-  public int  Value;
-  public int  Timeout;
 }
 
 public abstract class Entity
@@ -199,6 +205,10 @@ public abstract class Entity
   public virtual string TheName { get { return Name==null ? "The "+Race.ToString().ToLower() : Name; } }
   public virtual string theName { get { return Name==null ? "the "+Race.ToString().ToLower() : Name; } }
 
+  public void AddEffect(object source, Attr attr, int value, int timeout)
+  { AddEffect(new Effect(source, attr, value, timeout));
+  }
+  public void AddEffect(object source, Entity.Flag mods, int timeout) { AddEffect(new Effect(source, mods, timeout)); }
   public void AddEffect(Effect effect)
   { int i;
     if(effects==null || numEffects==effects.Length)
@@ -268,7 +278,7 @@ public abstract class Entity
       string msg=null;
       byte noise=0;
       if(t.Type==TileType.ClosedDoor)
-      { int damage = w==null ? CalculateDamage(null) : w.CalculateDamage(this, ammo, null);
+      { int damage = (w==null ? CalculateDamage(null) : w.CalculateDamage(this, ammo, null)).Total;
         if(damage>=10)
         { msg = "Crash! You break down the door.";
           Map.SetType(res.Point, TileType.RoomFloor);
@@ -316,11 +326,49 @@ public abstract class Entity
   public void Die(Death cause) { Die(null, cause); }
   public abstract void Die(object killer, Death cause);
 
-  public void DoDamage(object killer, Death cause, int amount)
-  { HP -= amount;
+  public void DoDamage(Death cause, int damage)
+  { Damage d = new Damage();
+    d.Direct = (ushort)damage;
+    DoDamage(null, cause, d);
+  }
+  public void DoDamage(Death cause, Damage dam) { DoDamage(null, cause, dam); }
+  public void DoDamage(Entity entity, Death cause, Damage dam)
+  { DoDamage((object)entity, cause, dam);
+    if(HP<=0)
+    { entity.OnKill(this);
+      entity.GiveKillExp(this);
+    }
+  }
+  public void DoDamage(object killer, Death cause, Damage dam)
+  { int ac=AC, n, phys=dam.Physical;
+
+    if(phys>0)
+    { Shield shield = Shield;
+      int blockchance;
+      if(shield!=null)
+      { blockchance = shield.BlockChance + (shield.BlockChance*GetSkill(Skill.Shields)*10+50)/100; // +10% PSL rounded
+        Exercise(Skill.Shields);
+        n = Global.Rand(100);
+      }
+      else { n=0; blockchance=0; }
+      if(n*2>=blockchance)                  // shield blocks 100% damage half the time that it comes into effect
+      { int odam=phys;
+        if(n<blockchance) phys /= 2;        // shield blocks 50% damage the other half of the time
+        if(ac>5) Exercise(Skill.Armor);     // if wearing substantial armor, exercise it
+        if(ac>0) n = Global.NdN(2, ac);
+        phys -= n + n*GetSkill(Skill.Armor)*10/100; // armor absorbs phys (+10% per skill level)
+        if(phys<0) phys = 0;                // normalize damage
+        App.IO.Print(Color.DarkGrey, "DAMAGE: {0} -> {1}, HP: {2} -> {3}", odam, phys, HP, HP-phys);
+        HP -= phys;
+      }
+      else App.IO.Print(Color.DarkGrey, "BLOCKED");
+    }
+
+    HP -= dam.Direct + dam.Heat + dam.Cold + dam.Electricity; // FIXME: no resistance to these yet...
+
+    if(dam.Poison>0) AddEffect(killer, Attr.Poison, dam.Poison, -1);
     if(HP<=0) Die(killer, cause);
   }
-  public void DoDamage(Death cause, int amount) { DoDamage(null, cause, amount); }
 
   public Item Drop(char c) // drops an item (assumes it's droppable), returns item dropped
   { Item i = Inv[c];
@@ -533,8 +581,8 @@ public abstract class Entity
   public virtual void OnDrop(Item item) { }
   public virtual void OnEquip(Wieldable item) { }
   public virtual void OnFlagsChanged(Flag oldFlags, Flag newFlags) { }
-  public virtual void OnHit(Entity hit, object item, int damage) { }
-  public virtual void OnHitBy(Entity attacker, object item, int damage) { }
+  public virtual void OnHit(Entity hit, object item, Damage damage) { }
+  public virtual void OnHitBy(Entity attacker, object item, Damage damage) { }
   public virtual void OnInvoke(Item item) { }
   public virtual void OnKill(Entity killed) { }
   public virtual void OnMiss(Entity hit, object item) { }
@@ -608,8 +656,9 @@ public abstract class Entity
   { Age++;
     Timer-=Speed;
     if(Age%10==0)
-    { if(HP<MaxHP) HP++;
-      if(MP<MaxMP) MP++;
+    { int maxHP=MaxHP, maxMP=MaxMP;
+      if(HP<maxHP) HP += (maxHP+39)/40; // heal 2.5% every 10 turns (rounded up)
+      if(MP<maxMP) MP += (maxMP+39)/40;
     }
 
     bool healthup=false;
@@ -880,8 +929,9 @@ public abstract class Entity
   }
 
   // calculates our unarmed combat damage without skill bonuses
-  protected virtual int CalculateDamage(Entity target)
-  { return Math.Max(1, StrBonus); // FIXME: make this much higher for entities skilled in unarmed combat
+  protected virtual Damage CalculateDamage(Entity target)
+  { // FIXME: make this higher for entities skilled in unarmed combat, and lower for those without
+    return new Damage(Math.Max(1, StrBonus));
   }
 
   protected void CheckFlags() // check if our flags have changed and call OnFlagsChanged if so
@@ -947,42 +997,21 @@ public abstract class Entity
 
   bool TryDamage(Entity c, Item item, Ammo ammo) // returns true if 'item' should be destroyed
   { Weapon w = item as Weapon;
-    Shield shield = c.Shield;
-    int blockchance=0, n;
     int wepskill = GetSkill(Skill.Fighting) +
                    (w==null ? GetSkill(item==null ? Skill.UnarmedCombat : Skill.Throwing) : GetSkill((Skill)w.wClass));
     wepskill = (wepskill+1)/2; // average of fighting and weapon skill
     bool destroyed=false;
-    if(shield!=null)
-    { blockchance = shield.BlockChance + (shield.BlockChance*c.GetSkill(Skill.Shields)*10+50)/100;
-      c.Exercise(Skill.Shields);
-      n = Global.Rand(100);
-    }
-    else n=0;
-    if(n*2>=blockchance)        // shield blocks 100% damage half the time that it comes into effect
-    { int damage;
-      if(item==null || w!=null) damage=(w==null ? CalculateDamage(c) : w.CalculateDamage(this, ammo, c)); // real weapon (possibly our fists)
-      else damage = (item.Weight+4)/5; // regular item, one damage per pound (rounded up)
 
-      int odam=damage, ac=c.AC;
-      if(n<blockchance) damage /= 2;      // shield blocks 50% damage the other half of the time
-      if(ac>5) c.Exercise(Skill.Armor);   // if wearing substantial armor, exercise it
-      if(ac>0) n = Global.Rand(ac)+1;     // block 1 to AC damage
-      damage -= n + n*c.GetSkill(Skill.Armor)*10/100; // armor absorbs damage (+10% per skill level)
-      if(damage<0) damage = 0;            // normalize damage
-      App.IO.Print(Color.DarkGrey, "DAMAGE: {0} -> {1}, HP: {2} -> {3}", odam, damage, c.HP, c.HP-damage);
-      damage += damage * wepskill*10/100; // damage up 10% per skill level
-      c.OnHitBy(this, item, damage);
-      OnHit(c, item, damage);
-      if(item!=null) if(item.Hit(this, c)) destroyed=true;
+    Damage dam;
+    if(item==null || w!=null) dam=(w==null ? CalculateDamage(c) : w.CalculateDamage(this, ammo, c)); // real weapon (possibly our fists)
+    else dam = new Damage((item.Weight+4)/5); // regular item, one damage per pound (rounded up)
+    dam.Physical += (ushort)(dam.Physical * wepskill*10/100); // damage up 10% per skill level
 
-      DoDamage(c, Death.Combat, damage);
-      if(c.HP<=0)
-      { OnKill(c);
-        GiveKillExp(c);
-      }
-    }
-    else App.IO.Print(Color.DarkGrey, "BLOCKED");
+    c.OnHitBy(this, item, dam);
+    OnHit(c, item, dam);
+    if(item!=null) if(item.Hit(this, c)) destroyed=true;
+    c.DoDamage(this, Death.Combat, dam);
+
     return destroyed;
   }
 

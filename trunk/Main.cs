@@ -27,7 +27,7 @@ public sealed class App
     map.Creatures.Add(Creature.Generate(typeof(Fighter), 0, CreatureClass.Fighter, Race.Orc));
     map.Creatures[0].Position = map.FreeSpace();
 
-    for(int i=0; i<50; i++) map.AddItem(map.FreeSpace(true, true), new FortuneCookie());
+    for(int i=0; i<20; i++) map.AddItem(map.FreeSpace(true, true), new FortuneCookie());
 
     for(int y=0; y<map.Height; y++) // place player on the up staircase of the first level
       for(int x=0; x<map.Width; x++)

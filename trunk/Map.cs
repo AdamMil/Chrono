@@ -29,7 +29,7 @@ public struct Tile
   public bool GetFlag(Flag f) { return (Flags&(byte)f)!=0; }
   public void SetFlag(Flag flag, bool on) { if(on) Flags|=(byte)flag; else Flags&=(byte)~flag; }
 
-  public Inventory Items;
+  public ItemPile  Items;
   public Creature  Creature; // for memory only
   public TileType  Type;
   public Point     Dest;     // destination on prev/next level
@@ -106,8 +106,8 @@ public sealed class Map
 
   public void AddItem(Point pt, Item item) { AddItem(pt.X, pt.Y, item); }
   public void AddItem(int x, int y, Item item)
-  { Inventory inv = map[y,x].Items;
-    if(inv==null) map[y,x].Items = inv = new Inventory();
+  { ItemPile inv = map[y,x].Items;
+    if(inv==null) map[y,x].Items = inv = new ItemPile();
     inv.Add(item);
   }
 

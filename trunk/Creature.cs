@@ -115,15 +115,14 @@ public abstract class Creature
   }
 
   public virtual Item Pickup(Item item)
-  { if(Inv==null) Inv = new Inventory();
-    return Inv.Add(item);
+  { return Inv.Add(item);
   }
-  public Item Pickup(Inventory inv, int index)
+  public Item Pickup(IInventory inv, int index)
   { Item item = inv[index];
     inv.RemoveAt(index);
     return Pickup(item);
   }
-  public Item Pickup(Inventory inv, Item item)
+  public Item Pickup(IInventory inv, Item item)
   { inv.Remove(item);
     return Pickup(item);
   }
@@ -198,7 +197,7 @@ public abstract class Creature
   }
   
   protected internal virtual void OnMapChanged() { }
-  
+
   protected void UpdateMemory()
   { if(Memory==null) return;
     UpdateMemory(VisibleTiles());

@@ -19,6 +19,8 @@ public abstract class Item : ICloneable
 
   public abstract bool Use(Creature user);
 
+  public string AreIs { get { return Count>1 ? "are" : "is"; } }
+
   public string FullName
   { get
     { string ret = Count>1 ? Count+" "+PluralPrefix+Name+PluralSuffix : Prefix+Name;
@@ -26,6 +28,9 @@ public abstract class Item : ICloneable
       return ret;
     }
   }
+
+  public string ItOne { get { return Count>1 ? "one" : "it"; } }
+  public string ItThem { get { return Count>1 ? "them" : "it"; } }
 
   #region ICloneable Members
   public virtual object Clone() { return GetType().GetConstructor(copyCons).Invoke(new object[] { this }); }

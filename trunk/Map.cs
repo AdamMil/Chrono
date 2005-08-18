@@ -4,7 +4,6 @@ using System.Collections.Specialized;
 using System.Drawing;
 using System.IO;
 using System.Reflection;
-using System.Runtime.Serialization;
 using System.Xml;
 using GameLib.Collections;
 
@@ -31,7 +30,6 @@ public enum TileType : byte
 
 public enum Trap : byte { Dart, PoisonDart, Magic, MpDrain, Teleport, Pit }
 
-[Serializable]
 public class Room : UniqueObject
 { public Room(Rectangle area, string name) { OuterArea=area; Name=name; }
   
@@ -41,7 +39,6 @@ public class Room : UniqueObject
   public string Name;
 }
 
-[Serializable]
 public class Shop : Room
 { public Shop(Rectangle area, Shopkeeper shopkeeper, ShopType type) : base(area, null)
   { Shopkeeper=shopkeeper; Type=type;
@@ -96,7 +93,6 @@ public class Shop : Room
   public ShopType   Type;
 }
 
-[Serializable]
 public struct Tile
 { [Flags] public enum Flag : byte { None=0, Hidden=1, Locked=2, Seen=4 };
 
@@ -114,7 +110,6 @@ public struct Tile
   public static Tile Border { get { return new Tile(); } }
 }
 
-[Serializable]
 public struct Link
 { public Link(Point from, bool down, Dungeon.Section toSection, int toLevel)
   { ToPoint=new Point(-1, -1);
@@ -226,7 +221,6 @@ public sealed class PathFinder // FIXME: having this latch onto the .Node bits o
 #endregion
 
 #region Map
-[Serializable]
 public class Map : UniqueObject
 { // maximum scent on a tile, maximum scent add on a single call (maximum entity smelliness), maximum sound on a tile
   public const int MaxScent=1200, MaxScentAdd=800, MaxSound=255;
@@ -237,7 +231,6 @@ public class Map : UniqueObject
   };
 
   #region EntityCollection
-  [Serializable]
   public class EntityCollection : ArrayList
   { public EntityCollection(Map map) { this.map = map; }
 
@@ -295,7 +288,6 @@ public class Map : UniqueObject
     if(fill!=TileType.Border) Fill(fill);
     if(seen) for(int y=0; y<height; y++) for(int x=0; x<width; x++) map[y,x].Flags=(byte)Tile.Flag.Seen;
   }
-  public Map(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   static Map()
   { Type[] types = typeof(Item).Assembly.GetTypes();
@@ -629,7 +621,7 @@ public class Map : UniqueObject
       for(int x=area.X; x<area.Right; x++)
         if(!HasItems(x, y))
         { SpawnInfo[] arr = objSpawns[(int)shop.Type];
-          AddItem(x, y, Global.SpawnItem(arr[Global.Rand(arr.Length)])).Shop=shop;
+          AddItem(x, y, arr[Global.Rand(arr.Length)].MakeItem()).Shop=shop;
           return true;
         }
     return false;
@@ -935,7 +927,6 @@ public class Map : UniqueObject
     age++;
   }
 
-  [Serializable]
   class EntityComparer : IComparer
   { public int Compare(object x, object y) { return ((Entity)x).Timer - ((Entity)y).Timer; }
   }
@@ -953,6 +944,14 @@ public class Map : UniqueObject
     if(c.Class!=EntityClass.Other) numCreatures--;
   }
   
+  Point FindLink(TileType type)
+  { for(int i=0; i<links.Length; i++)
+    { Point pt = links[i].FromPoint;
+      if(this[pt].Type==type) return pt;
+    }
+    throw new ApplicationException("link not found: "+type);
+  }
+
   Point FindXmlLocation(XmlNode node, ListDictionary links) { return FindXmlLocation(node, links, false); }
   Point FindXmlLocation(XmlNode node, ListDictionary links, bool optional)
   { string av = Xml.Attr(node, "location");
@@ -984,8 +983,8 @@ public class Map : UniqueObject
         { XmlNode relTo = node.SelectSingleNode("relTo");
           Point rp = FindXmlLocation(relTo, links);
 
-          int amin, amax, dmin, dmax, tri;
-          Xml.Range(relTo.Attributes["distance"].Value, out dmin, out dmax);
+          Range range = new Range(relTo.Attributes["distance"]);
+          int amin, amax, tri;
           av = Xml.Attr(relTo, "direction", "Random");
           if(av=="Random") { amin=0; amax=360; }
           else
@@ -995,7 +994,7 @@ public class Map : UniqueObject
           
           tryagain:
           for(tri=0; tri<25; tri++)
-          { GameLib.Mathematics.TwoD.Vector v = new GameLib.Mathematics.TwoD.Vector(0, -Global.Rand(dmin, dmax));
+          { GameLib.Mathematics.TwoD.Vector v = new GameLib.Mathematics.TwoD.Vector(0, -range.RandValue());
             v.Rotate(Global.Rand(amin, amax) * GameLib.Mathematics.MathConst.DegreesToRadians);
             pt = v.ToPoint().ToPoint();
             pt.X += rp.X;
@@ -1008,7 +1007,17 @@ public class Map : UniqueObject
 
         found:
         av = Xml.Attr(node, "pathTo");
-        if(av!=null) throw new NotImplementedException("'pathTo' attribute not implemented");
+        if(av!=null)
+        { PathFinder pf = new PathFinder();
+          Point goalPt;
+          switch(av)
+          { case "UpStairs": goalPt=FindLink(TileType.UpStairs); break;
+            case "DownStairs": goalPt=FindLink(TileType.DownStairs); break;
+            case "Portal": goalPt=FindLink(TileType.Portal); break;
+            default: throw new NotSupportedException("pathTo attribute not supported: "+av);
+          }
+          pf.Plan(this, pt, goalPt);
+        }
         return pt;
       }
     }

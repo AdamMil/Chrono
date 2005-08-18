@@ -54,15 +54,15 @@ public class RoomyDungeonGenerator : MapGenerator
     { int size = map.Width*map.Height;
       minRooms = Math.Max(size/900, 1);
       maxRooms = Math.Max(size/300, 1);
-      maxRoomSize = new Size(20, 20);
+      defaultWidth.R = defaultHeight.R = 20;
     }
 
     XmlNode opts = root.SelectSingleNode("generatorOptions");
     if(opts!=null)
-    { maxRoomSize.Width  = Xml.RangeInt(opts.Attributes["maxRoomWidth"], maxRoomSize.Width);
-      maxRoomSize.Height = Xml.RangeInt(opts.Attributes["maxRoomHeight"], maxRoomSize.Height);
-      minRooms = Xml.IntValue(opts.Attributes["minRooms"], minRooms);
-      maxRooms = Xml.IntValue(opts.Attributes["maxRooms"], maxRooms);
+    { defaultWidth.R  = Xml.RangeInt(opts, "maxRoomWidth", defaultWidth.R);
+      defaultHeight.R = Xml.RangeInt(opts, "maxRoomHeight", defaultHeight.R);
+      minRooms = Xml.IntValue(opts, "minRooms", minRooms);
+      maxRooms = Xml.IntValue(opts, "maxRooms", maxRooms);
     }
 
     rooms.Clear();
@@ -106,19 +106,17 @@ public class RoomyDungeonGenerator : MapGenerator
 
   bool FindRoom(XmlNode room, out Rectangle area)
   { int tri, r;
-    Size min=new Size(4, 4), max=maxRoomSize;
+    Range width=defaultWidth, height=defaultHeight;
 
     if(room!=null)
-    { int mw=min.Width, mh=min.Height, Mw=max.Width, Mh=max.Height;
-      Xml.Range(room.Attributes["width"], ref mw, ref Mw);
-      Xml.Range(room.Attributes["height"], ref mh, ref Mh);
-      min = new Size(mw, mh); max = new Size(Mw, Mh);
+    { if(!Xml.IsEmpty(room, "width")) width = new Range(room, "width");
+      if(!Xml.IsEmpty(room, "height")) height = new Range(room, "height");
     }
 
     area = new Rectangle();
     for(tri=0; tri<50; tri++)
-    { area = new Rectangle(Rand.Next(map.Width-min.Width), Rand.Next(map.Height-min.Height),
-                           Rand.Next(min.Width, max.Width), Rand.Next(min.Height, max.Height));
+    { area = new Rectangle(Rand.Next(map.Width-width.L), Rand.Next(map.Height-height.L),
+                           width.RandValue(), height.RandValue());
       if(area.Right>map.Width || area.Bottom>map.Height) continue; // size/location
       if(area.Height*3<=area.Width || area.Width*3<=area.Height) continue; // aspect ratio
       Rectangle bounds = area; bounds.Inflate(2, 2);
@@ -247,7 +245,7 @@ public class RoomyDungeonGenerator : MapGenerator
 
   Map map;
   ArrayList rooms = new ArrayList();
-  Size maxRoomSize;
+  Range defaultWidth=new Range(4, 12), defaultHeight=new Range(4, 12);
 }
 #endregion
 
@@ -337,14 +335,11 @@ public class TownGenerator : MapGenerator
   }
 
   bool AddRoom(XmlNode room)
-  { Size min=new Size(5, 5), max=new Size(12, 12);
-    int mw=min.Width, mh=min.Height, Mw=max.Width, Mh=max.Height;
-    Xml.Range(room.Attributes["width"], ref mw, ref Mw);
-    Xml.Range(room.Attributes["height"], ref mh, ref Mh);
-    min = new Size(mw, mh); max = new Size(Mw, Mh);
+  { Range width  = new Range(room, "width", 5, 12);
+    Range height = new Range(room, "height", 5, 12);
 
     Rectangle rect;
-    if(DigRoom(min, max, out rect))
+    if(DigRoom(width, height, out rect))
     { map.AddRoom(rect, Xml.Attr(room, "id"));
       return true;
     }
@@ -371,16 +366,16 @@ public class TownGenerator : MapGenerator
   }
 
   bool DigRoom(int min, int max, out Rectangle rect)
-  { return DigRoom(new Size(min, min), new Size(max, max), out rect);
+  { return DigRoom(new Range(min, max), new Range(min, max), out rect);
   }
-  bool DigRoom(Size min, Size max, out Rectangle rect)
+  bool DigRoom(Range width, Range height, out Rectangle rect)
   { Rectangle bounds;
     rect = bounds = new Rectangle();
 
     int tri, r;
     for(tri=0; tri<50; tri++)
-    { rect = new Rectangle(Rand.Next(map.Width-min.Width)+2, Rand.Next(map.Height-min.Height)+2,
-                           Rand.Next(min.Width, max.Width), Rand.Next(min.Height, max.Height));
+    { rect = new Rectangle(Rand.Next(map.Width-width.L)+2, Rand.Next(map.Height-height.L)+2,
+                           width.RandValue(), height.RandValue());
       if(rect.Right>map.Width-2 || rect.Bottom>map.Height-2) continue; // size/location
       if(rect.Height*3<=rect.Width || rect.Width*3<=rect.Height) continue; // aspect ratio
       bounds = rect; bounds.Inflate(3, 2);

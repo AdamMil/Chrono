@@ -1,14 +1,11 @@
 <?xml version="1.0" encoding="utf-8" ?> 
 
-<ai:ai id="fatherOfPC"
+<ai:ai id="fatherOfPC" defaultState="Idle"
+
   xmlns:ai="http://www.adammil.net/Chrono/ai"
   xmlns:qs="http://www.adammil.net/Chrono/ai/questStatus"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://www.adammil.net/Chrono/ai ai.xsd">
-
-  <charData type="Townsperson" name="Pa" gender="male" defaultState="Idle" IsAdult="true" baseName="clerk">
-    <give class="Gold" count="1000"/>
-  </charData>
 
   <declare>
     <var name="asked"/>
@@ -55,6 +52,7 @@
       <option text="Okay">
         <give class="Gold" count="1000"/>
         <giveQuest name="FindJohn"/>
+        <joinPlayer/>
         <end/>
       </option>
     </node>
@@ -64,7 +62,7 @@
     <simpleNode name="FoundYet" text="FoundYet" options="StillLooking:PleaseHurry,GaveUp:Reject"/>
     <simpleNode name="PleaseHurry" text="PleaseHurry" options="Okay:*END*"/>
 
-    <onInit>
+    <onDialog>
       <if haveQuest="FindJohn">
         <goto name="FoundYet"/>
         <else>
@@ -77,7 +75,7 @@
           </if>
         </else>
       </if>
-    </onInit>
+    </onDialog>
   </dialog>
 
   <onSpeak>

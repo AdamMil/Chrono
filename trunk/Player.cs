@@ -1,16 +1,13 @@
 using System;
 using System.Collections;
 using System.Drawing;
-using System.Runtime.Serialization;
 using System.Xml;
 
 namespace Chrono
 {
 
-[Serializable]
 public class Player : Entity
-{ public Player() { Color=Color.White; Timer=50; SocialGroup=Global.NewSocialGroup(false, true); }
-  public Player(SerializationInfo info, StreamingContext context) : base(info, context) { }
+{ public Player() { Color=Color.White; Timer=50; SocialGroup=Global.GetSocialGroup("player"); }
 
   public class Quest
   { public Quest(XmlNode node)
@@ -198,11 +195,11 @@ public class Player : Entity
 
   public override void OnFlagsChanged(Chrono.Entity.Flag oldFlags, Chrono.Entity.Flag newFlags)
   { Flag diff = oldFlags ^ newFlags;
-    if((diff&oldFlags&Flag.Asleep)!=0) App.IO.Print("You wake up.");
-    if((diff&Flag.Confused)!=0)
-      App.IO.Print((newFlags&Flag.Confused)==0 ? "Your head clears a bit." : "You stumble, confused.");
-    if((diff&Flag.Hallucinating)!=0)
-      App.IO.Print((newFlags&Flag.Hallucinating)==0 ? "Everything looks SO boring now." : "Whoa, trippy, man!");
+    if((diff&oldFlags&Flag.Sleep)!=0) App.IO.Print("You wake up.");
+    if((diff&Flag.Confuse)!=0)
+      App.IO.Print((newFlags&Flag.Confuse)==0 ? "Your head clears a bit." : "You stumble, confused.");
+    if((diff&Flag.Hallucinate)!=0)
+      App.IO.Print((newFlags&Flag.Hallucinate)==0 ? "Everything looks SO boring now." : "Whoa, trippy, man!");
     if((diff&(Flag.Invisible|Flag.SeeInvisible))!=0)
     { if((diff&Flag.Invisible)!=0) // invisibility changed
       { if((newFlags&Flag.Invisible)!=0 && (newFlags&Flag.SeeInvisible)==0) App.IO.Print("You vanish from sight.");
@@ -547,7 +544,7 @@ public class Player : Entity
               else continue;
             }
             Item newItem = item.Count==item.Item.Count ? Pickup(inv, item.Item) : Pickup(item.Item.Split(item.Count));
-            if(newitem==null) { App.IO.Print("Your pack is full."); return false; }
+            if(newItem==null) { App.IO.Print("Your pack is full."); return false; }
             string s = string.Format("{0} - {1}", newItem.Char, item.Item.GetAName(this));
             if(item.Count!=newItem.Count) s += string.Format(" (now {0})", newItem.Count);
             App.IO.Print(s);
@@ -643,12 +640,12 @@ public class Player : Entity
           else
           { App.IO.Print("Something has gone wrong! Dark energies cloud your mind.");
             int effect = Global.Rand(chance);
-            AddEffect(book, Flag.Confused, 100-effect);
+            AddEffect(book, Flag.Confuse, 100-effect);
             if(effect<30) TeleportSpell.Default.Cast(this);
             if(effect<10) AmnesiaSpell.Default.Cast(this);
             if(effect<5)
             { App.IO.Print("You start to shake uncontrollably, and the world goes dark.");
-              AddEffect(book, Flag.Asleep, Global.NdN(4, 15));
+              AddEffect(book, Flag.Sleep, Global.NdN(4, 15));
             }
           }
         }
@@ -777,12 +774,12 @@ public class Player : Entity
         Item i = items[0].Item;
         bool consume;
         if(Map.IsOverworld && i.Usability!=ItemUse.Self) { App.IO.Print("You can't use that here."); return false; }
-        if((i.Usability&ItemUse.UseTarget)!=0)
-        { RangeTarget r = App.IO.ChooseTarget(this, (i.Usability&ItemUse.UseDirection)!=0);
+        if((i.Usability&ItemUse.Target)!=0)
+        { RangeTarget r = App.IO.ChooseTarget(this, (i.Usability&ItemUse.Direction)!=0);
           if(r.Dir==Direction.Invalid && r.Point.X==-1) goto nevermind;
           consume = r.Dir==Direction.Invalid ? i.Use(this, r.Point) : i.Use(this, r.Dir);
         }
-        else if(i.Usability==ItemUse.UseDirection)
+        else if(i.Usability==ItemUse.Direction)
         { Direction d = App.IO.ChooseDirection();
           if(d==Direction.Invalid) goto nevermind;
           consume = i.Use(this, d);
@@ -876,7 +873,7 @@ public class Player : Entity
 
   protected virtual void Die(string cause)
   { App.IO.Print("You die.");
-    if(Is(Flag.Asleep)) cause += ", while sleeping";
+    if(Is(Flag.Sleep)) cause += ", while sleeping";
     App.IO.Print("Goodbye {0} the {1}...", Name, Title);
     App.IO.Print("You were killed by: "+cause);
     if(!App.Quit && !App.IO.YesNo("Die?", false))
@@ -902,7 +899,7 @@ public class Player : Entity
     if(--count<=0)
     { UpdateMemory(vis);
       App.IO.Render(this);
-      inp = Is(Flag.Asleep) ? new Input(Action.Rest) : App.IO.GetNextInput();
+      inp = Is(Flag.Sleep) ? new Input(Action.Rest) : App.IO.GetNextInput();
       count = inp.Count;
     }
     inp.Count=0; // inp.Count drops to zero unless set to 'count' by an action
@@ -1226,7 +1223,7 @@ public class Player : Entity
     if(--count<=0)
     { UpdateMemory(vis);
       App.IO.Render(this);
-      inp = Is(Flag.Asleep) ? new Input(Action.Rest) : App.IO.GetNextInput();
+      inp = Is(Flag.Sleep) ? new Input(Action.Rest) : App.IO.GetNextInput();
       count = inp.Count;
     }
     inp.Count=0; // inp.Count drops to zero unless set to 'count' by an action

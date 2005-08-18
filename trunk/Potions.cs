@@ -1,7 +1,7 @@
 using System;
 using System.Collections;
 using System.Drawing;
-using System.Runtime.Serialization;
+using System.Xml;
 
 namespace Chrono
 {
@@ -15,7 +15,6 @@ public abstract class Potion : Item
     if(i==null) { Color = colors[namei]; namemap[GetType().ToString()] = namei++; }
     else Color = colors[(int)i];
   }
-  protected Potion(SerializationInfo info, StreamingContext context) : base(info, context) { }
   static Potion() { Global.Randomize(names, colors); }
 
   public override bool CanStackWith(Item item)
@@ -32,30 +31,15 @@ public abstract class Potion : Item
     return rn;
   }
 
-  public static void Deserialize(System.IO.Stream stream, IFormatter formatter)
-  { namemap = (Hashtable)formatter.Deserialize(stream);
-    names   = (string[])formatter.Deserialize(stream);
-    colors  = (Color[])formatter.Deserialize(stream);
-    namei   = (int)formatter.Deserialize(stream);
-  }
-  public static void Serialize(System.IO.Stream stream, IFormatter formatter)
-  { formatter.Serialize(stream, namemap);
-    formatter.Serialize(stream, names);
-    formatter.Serialize(stream, colors);
-    formatter.Serialize(stream, namei);
-  }
-
   static Hashtable namemap = new Hashtable();
-  static string[] names = new string[] { "green", "purple", "bubbly", "fizzy" };
-  static Color[]  colors = new Color[] { Color.Green, Color.Purple, Color.Grey, Color.Brown };
+  static readonly string[] names;
+  static readonly Color[]  colors;
   static int namei;
 }
 #endregion
 
-[Serializable]
 public class HealPotion : Potion
 { public HealPotion() { name="healing"; }
-  public HealPotion(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override void Drink(Entity user)
   { user.OnDrink(this);
@@ -79,5 +63,18 @@ public class HealPotion : Potion
   public static readonly int SpawnChance=200; // 2% chance
   public static readonly int ShopValue=50;
 }
+
+#region XmlPotion
+public sealed class XmlPotion : Potion
+{ public XmlPotion(XmlNode node)
+  { XmlItem.Init(this, node);
+    Spell = XmlItem.GetSpell(node);
+  }
+
+  public override void Drink(Entity user) { Spell.Cast(user, Status); }
+
+  public Spell Spell;
+}
+#endregion
 
 } // namespace Chrono

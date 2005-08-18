@@ -84,36 +84,50 @@ public class Xml
     return sb.ToString();
   }
 
+  public static float FloatValue(XmlAttribute attr) { return FloatValue(attr, 0); }
+  public static float FloatValue(XmlAttribute attr, float defaultValue)
+  { return attr==null ? defaultValue : float.Parse(attr.Value);
+  }
+  public static float FloatValue(XmlNode node, string attr) { return FloatValue(node.Attributes[attr], 0); }
+  public static float FloatValue(XmlNode node, string attr, float defaultValue)
+  { return FloatValue(node.Attributes[attr], defaultValue);
+  }
+
+  public static int IntValue(XmlAttribute attr) { return IntValue(attr, 0); }
   public static int IntValue(XmlAttribute attr, int defaultValue)
   { return attr==null ? defaultValue : int.Parse(attr.Value);
   }
+  public static int IntValue(XmlNode node, string attr) { return IntValue(node.Attributes[attr], 0); }
+  public static int IntValue(XmlNode node, string attr, int defaultValue)
+  { return IntValue(node.Attributes[attr], defaultValue);
+  }
+
+  public static bool IsEmpty(XmlAttribute attr) { return attr==null || IsEmpty(attr.Value); }
+  public static bool IsEmpty(string str) { return str==null || str==""; }
+  public static bool IsEmpty(XmlNode node, string attr) { return IsEmpty(node.Attributes[attr]); }
 
   public static bool IsTrue(XmlAttribute attr) { return attr!=null && IsTrue(attr.Value); }
   public static bool IsTrue(string str) { return str!=null && str!="" && str!="0" && str.ToLower()!="false"; }
+  public static bool IsTrue(XmlNode node, string attr) { return IsTrue(node.Attributes[attr]); }
 
-  public static int RangeInt(string range)
-  { int pos = range.IndexOf(':');
-    if(pos==-1) return int.Parse(range);
-    return Global.Rand(int.Parse(range.Substring(0, pos)), int.Parse(range.Substring(pos+1)));
+  public static int RangeInt(string range) { return RangeInt(range, 0); }
+  public static int RangeInt(string range, int defaultValue)
+  { return range==null || range=="" ? defaultValue : new Range(range, defaultValue).RandValue();
   }
+
+  public static int RangeInt(XmlAttribute range) { return RangeInt(range, 0); }
   public static int RangeInt(XmlAttribute range, int defaultValue)
   { return range==null ? defaultValue : RangeInt(range.Value);
   }
-  
-  public static void Range(string range, out int low, out int high)
-  { int pos = range.IndexOf(':');
-    if(pos==-1) low=high=int.Parse(range);
-    else
-    { low  = int.Parse(range.Substring(0, pos));
-      high = int.Parse(range.Substring(pos+1));
-    }
+
+  public static int RangeInt(XmlNode node, string attr) { return RangeInt(node.Attributes[attr], 0); }
+  public static int RangeInt(XmlNode node, string attr, int defaultValue)
+  { return RangeInt(node.Attributes[attr], defaultValue);
   }
-  public static void Range(XmlAttribute range, ref int low, ref int high)
-  { if(range!=null) Range(range.Value, out low, out high);
-  }
-  
+
   public static string String(XmlAttribute str) { return str==null ? null : str.Value; }
   public static string String(XmlAttribute str, string defaultValue) { return str==null ? defaultValue : str.Value; }
+  public static string String(XmlNode node, string attr) { return String(node.Attributes[attr]); }
   
   static Regex ltbl = new Regex(@"^(?:\s*\n)+|\s+$", RegexOptions.Singleline);
   static Regex lspc = new Regex(@"^\s+", RegexOptions.Singleline);

@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?> 
 
-<map:map id="gtownDungeonCave" generator="MetaCaveGenerator"
+<map:map id="gtownDungeonCave" generator="RoomyDungeonGenerator"
   xmlns:map="http://www.adammil.net/Chrono/map"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://www.adammil.net/Chrono/map map.xsd">

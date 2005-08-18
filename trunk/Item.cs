@@ -1,7 +1,7 @@
 using System;
 using System.Drawing;
 using System.Reflection;
-using System.Runtime.Serialization;
+using System.Xml;
 
 namespace Chrono
 {
@@ -13,7 +13,7 @@ public enum ItemClass : sbyte
   Treasure, NumClasses
 }
 
-[Flags] public enum ItemUse : byte { NoUse=0, Self=1, UseTarget=2, UseDirection=4, UseBoth=UseTarget|UseDirection };
+[Flags] public enum ItemUse : byte { NoUse=0, Self=1, Target=2, Direction=4, Both=Target|Direction };
 
 [Flags] public enum ItemStatus : byte
 { None=0, Identified=1, KnowCB=2, Burnt=4, Rotted=8, Rusted=16, Cursed=32, Blessed=64
@@ -27,7 +27,6 @@ public abstract class Item : UniqueObject, ICloneable
 { public Item()
   { Prefix=PluralPrefix=string.Empty; PluralSuffix="s"; Count=1; Color=Color.White; Durability=-1;
   }
-  protected Item(SerializationInfo info, StreamingContext context) : base(info, context) { }
   
   public string AreIs { get { return Count>1 ? "are" : "is"; } }
   
@@ -53,7 +52,10 @@ public abstract class Item : UniqueObject, ICloneable
 
   public bool Identified { get { return (Status&ItemStatus.Identified)!=0; } }
 
-  public virtual string Name { get { return name; } }
+  public virtual string Name
+  { get { return name; }
+    set { name=value; }
+  }
 
   public string ItOne  { get { return Count>1 ? "one"  : "it"; } }
   public string ItThem { get { return Count>1 ? "them" : "it"; } }
@@ -141,7 +143,7 @@ public abstract class Item : UniqueObject, ICloneable
 
   public bool Use(Entity user) { return Use(user, Direction.Self); } // returns true if item should be consumed
   public virtual bool Use(Entity user, Direction dir)
-  { if((Usability&ItemUse.UseDirection)==0 && (int)dir<8) return Use(user, Global.Move(user.Position, dir));
+  { if((Usability&ItemUse.Direction)==0 && (int)dir<8) return Use(user, Global.Move(user.Position, dir));
     if(user==App.Player) App.IO.Print("Nothing seems to happen.");
     return false;
   }
@@ -180,7 +182,6 @@ public abstract class Item : UniqueObject, ICloneable
 #region Modifying
 public abstract class Modifying : Item
 { protected Modifying() { }
-  protected Modifying(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override bool CanStackWith(Item item) { return false; }
 
@@ -215,7 +216,6 @@ public abstract class Modifying : Item
 #region Wearable, Wieldable, Readable, Chargeable
 public abstract class Wearable : Modifying
 { public Wearable() { Slot=Slot.Invalid; }
-  protected Wearable(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override string GetInvName(Entity e)
   { string ret = "";
@@ -235,7 +235,6 @@ public abstract class Wearable : Modifying
 
 public abstract class Wieldable : Modifying
 { protected Wieldable() { }
-  protected Wieldable(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override string GetInvName(Entity e)
   { string ret = "";
@@ -255,27 +254,64 @@ public abstract class Wieldable : Modifying
 
 public abstract class Readable : Item
 { protected Readable() { }
-  protected Readable(SerializationInfo info, StreamingContext context) : base(info, context) { }
 }
 
 public abstract class Chargeable : Item
 { public Chargeable() { }
-  protected Chargeable(SerializationInfo info, StreamingContext context) : base(info, context) { }
   public int Charges, Recharged;
 }
 #endregion
 
-[Serializable]
+#region Gold
 public class Gold : Item
 { public Gold() { name="gold piece"; Color=Color.Yellow; Class=ItemClass.Gold; }
   public Gold(int count) : this() { Count=count; }
-  public Gold(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override bool CanStackWith(Item item) { return item.Class==ItemClass.Gold; }
   
   public static readonly int SpawnChance=200; // 2% chance
-  public static readonly int SpawnMin=3, SpawnMax=16; // 2% chance
+  public static readonly int SpawnMin=3, SpawnMax=16; // 3-16 pieces
   public static readonly int ShopValue=1;
 }
+#endregion
 
+#region XmlItem
+public sealed class XmlItem
+{ public static void Init(Item item, XmlNode node)
+  { item.Name = Xml.String(node, "name");
+    if(!Xml.IsEmpty(node, "prefix")) item.Prefix = Xml.String(node, "prefix");
+    if(!Xml.IsEmpty(node, "pluralPrefix")) item.PluralPrefix = Xml.String(node, "pluralPrefix");
+    if(!Xml.IsEmpty(node, "pluralSuffix")) item.PluralSuffix = Xml.String(node, "pluralSuffix");
+    // TODO: implement these
+    //if(!Xml.IsEmpty(node, "shortDesc")) item.ShortDesc = Xml.String(node, "shortDesc");
+    //if(!Xml.IsEmpty(node, "longDesc")) item.LongDesc = Xml.String(node, "longDesc");
+    //{ XmlNode child = node.SelectSingleNode("longDesc");
+    //  if(child!=null) item.LongDesc = child.InnerText;
+    //}
+    if(!Xml.IsEmpty(node, "color")) item.Color = GetColor(node);
+    if(!Xml.IsEmpty(node, "weight")) item.Weight = Xml.IntValue(node, "weight");
+    if(!Xml.IsEmpty(node, "material")) ((Wearable)item).Material = GetMaterial(node);
+  }
+  
+  public static Color GetColor(XmlNode node)
+  { return (Color)Enum.Parse(typeof(Color), Xml.Attr(node, "color"));
+  }
+
+  public static Entity.Flag GetEffect(XmlNode node)
+  {
+  }
+
+  public static Material GetMaterial(XmlNode node)
+  { return (Material)Enum.Parse(typeof(Material), Xml.Attr(node, "material"));
+  }
+
+  public static Slot GetSlot(XmlNode node)
+  { return (Slot)Enum.Parse(typeof(Slot), Xml.Attr(node, "slot"));
+  }
+
+  public static Spell GetSpell(XmlNode node)
+  {
+  }
+}
+#endregion
 } // namespace Chrono

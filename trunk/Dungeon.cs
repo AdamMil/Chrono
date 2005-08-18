@@ -2,25 +2,21 @@ using System;
 using System.Collections;
 using System.Collections.Specialized;
 using System.Xml;
-using System.Runtime.Serialization;
 
 namespace Chrono
 {
 
-[Serializable]
 public class Dungeon
 { public Dungeon(string path) : this(LoadDungeon(path)) { }
   public Dungeon(XmlElement dungeon) { node=dungeon; }
 
   #region Section
-  [Serializable]
   public class Section : UniqueObject
   { public Section(XmlNode section, Dungeon dungeon)
     { node=section; this.dungeon=dungeon;
       foreach(XmlNode part in node.SelectNodes("levels")) // convert depth ranges to constant values
         part.Attributes["depth"].Value = Xml.RangeInt(part.Attributes["depth"].Value).ToString();
     }
-    public Section(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
     public Map this[int index]
     { get
@@ -111,13 +107,6 @@ public class Dungeon
   { Dungeon d = (Dungeon)dungeons[name];
     if(d==null) dungeons[name] = d = new Dungeon(name);
     return d;
-  }
-
-  public static void Deserialize(System.IO.Stream stream, IFormatter formatter)
-  { dungeons = (HybridDictionary)formatter.Deserialize(stream);
-  }
-  public static void Serialize(System.IO.Stream stream, IFormatter formatter)
-  { formatter.Serialize(stream, dungeons);
   }
 
   static XmlElement LoadDungeon(string path)

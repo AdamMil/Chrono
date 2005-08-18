@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.IO;
-using System.Runtime.Serialization.Formatters.Binary;
 using ICSharpCode.SharpZipLib.GZip;
 
 namespace Chrono
@@ -48,10 +47,10 @@ public sealed class App
         Player.Pickup(new FoolsBook());
         Player.MemorizeSpell(ForceBolt.Default, 5000);
       }
-      Player.Pickup(new Hamburger()).Count = 2;
-      Player.Pickup(new TeleportScroll());
+      Player.Pickup(Item.Make(ItemClass.Food, "hamburger")).Count = 2;
+      Player.Pickup(Item.Make(ItemClass.Scroll, "teleport"));
       Player.Pickup(new HealPotion()).Count = 2;
-      Player.Pickup(new Deodorant());
+      Player.Pickup(Item.Make(ItemClass.Tool, "deodorant"));
       Player.Pickup(new Gold()).Count = 100;
       foreach(Item i in Player.Inv) Player.AddKnowledge(i);
 
@@ -87,44 +86,11 @@ public sealed class App
   { if(!test) throw new ApplicationException("ASSERT: "+String.Format(format, parms));
   }
 
-  public static void Load(Stream stream)
-  { GZipInputStream s = new GZipInputStream(stream);
-    BinaryFormatter f = new BinaryFormatter();
-
-    Global.ObjHash = new Hashtable();
-
-    Global.Deserialize(s, f);
-    Dungeon.Deserialize(s, f);
-    Potion.Deserialize(s, f);
-    Ring.Deserialize(s, f);
-    Scroll.Deserialize(s, f);
-    Wand.Deserialize(s, f);
-
-    World  = (Dungeon)f.Deserialize(s);
-    Player = (Player)f.Deserialize(s);
-
-    Global.ObjHash = null;
-  }
+  public static void Load(Stream stream) { throw new NotImplementedException(); }
 
   public static void Save(Stream stream)
   { App.IO.Print("Saving...");
-    GZipOutputStream s = new GZipOutputStream(stream);
-    BinaryFormatter f = new BinaryFormatter();
-
-    Global.ObjHash = new Hashtable();
-
-    Global.Serialize(s, f);
-    Dungeon.Serialize(s, f);
-    Potion.Serialize(s, f);
-    Ring.Serialize(s, f);
-    Scroll.Serialize(s, f);
-    Wand.Serialize(s, f);
-
-    f.Serialize(s, World);
-    f.Serialize(s, Player);
-
-    Global.ObjHash = null;
-    s.Close();
+    throw new NotImplementedException();
   }
 }
 

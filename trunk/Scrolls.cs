@@ -1,6 +1,6 @@
 using System;
 using System.Collections;
-using System.Runtime.Serialization;
+using System.Xml;
 
 namespace Chrono
 {
@@ -10,9 +10,8 @@ namespace Chrono
 public abstract class Scroll : Readable
 { public Scroll()
   { Class=ItemClass.Scroll; Prefix="scroll of "; PluralSuffix=""; PluralPrefix="scrolls of "; Weight=1;
-    Durability=75;
+    Durability=75; Color=Color.White;
   }
-  protected Scroll(SerializationInfo info, StreamingContext context) : base(info, context) { }
   static Scroll() { Global.Randomize(names); }
 
   public override string Name { get { return Spell.Name; } }
@@ -60,38 +59,16 @@ public abstract class Scroll : Readable
 
   protected string Prompt;
 
-  public static void Deserialize(System.IO.Stream stream, IFormatter formatter)
-  { namemap = (Hashtable)formatter.Deserialize(stream);
-    names   = (string[])formatter.Deserialize(stream);
-    namei   = (int)formatter.Deserialize(stream);
-  }
-  public static void Serialize(System.IO.Stream stream, IFormatter formatter)
-  { formatter.Serialize(stream, namemap);
-    formatter.Serialize(stream, names);
-    formatter.Serialize(stream, namei);
-  }
-
   static System.Collections.Hashtable namemap = new System.Collections.Hashtable();
-  static string[] names = new string[] { "READ ME", "XGOCL APLFLCH", "DROWSSAP", "EUREKA!" };
+  static readonly string[] names;
   static int namei;
 }
 #endregion
 
-[Serializable]
-public class TeleportScroll : Scroll
-{ public TeleportScroll() { name="teleport"; Color=Color.White; Spell=TeleportSpell.Default; }
-  public TeleportScroll(SerializationInfo info, StreamingContext context) : base(info, context) { }
-
-  public static readonly int SpawnChance=100; // 1% chance
-  public static readonly int ShopValue=75;
-}
-
-[Serializable]
 public class IdentifyScroll : Scroll
 { public IdentifyScroll()
-  { name="identify"; Color=Color.White; Spell=IdentifySpell.Default; Prompt="Identify which item?";
+  { name="identify"; Spell=IdentifySpell.Default; Prompt="Identify which item?";
   }
-  public IdentifyScroll(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override void Read(Entity user)
   { if(Cursed && Global.Coinflip()) App.IO.Print("Nothing seems to happen.");
@@ -111,5 +88,15 @@ public class IdentifyScroll : Scroll
   public static readonly int SpawnChance=250; // 2.5% chance
   public static readonly int ShopValue=40;
 }
+
+#region XmlScroll
+public sealed class XmlScroll : Scroll
+{ public XmlScroll(XmlNode node)
+  { XmlItem.Init(this, node);
+    Spell = XmlItem.GetSpell(node);
+    if(!Xml.IsEmpty(node, "prompt")) Prompt = Xml.String(node, "prompt");
+  }
+}
+#endregion
 
 } // namespace Chrono

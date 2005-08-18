@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xs:schema xmlns="http://www.adammil.net/Chrono/socialGroups"
+           xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://www.adammil.net/Chrono/socialGroups"
+           elementFormDefault="qualified">
+
+  <xs:complexType name="group">
+    <xs:attribute name="name" type="xs:id" use="required"/>
+    <xs:attribute name="hostile" type="xs:boolean" default="false"/>
+    <xs:attribute name="permanent" type="xs:boolean" default="false"/>
+  </xs:complexType>
+  
+  <xs:complexType name="socialGroups">
+    <xs:sequence>
+      <xs:element name="list" type="list" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:element name="socialGroups" type="socialGroups"/>
+</xs:schema>

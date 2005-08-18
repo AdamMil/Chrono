@@ -1,0 +1,34 @@
+﻿<?xml version="1.0" encoding="utf-8" ?> 
+
+<ai:ai id="fathersBrother" defaultState="Idle"
+
+  xmlns:ai="http://www.adammil.net/Chrono/ai"
+  xmlns:qs="http://www.adammil.net/Chrono/ai/questStatus"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.adammil.net/Chrono/ai ai.xsd">
+
+  <dialog id="UncleJohnDialog">
+    <text id="Intro">{name}, is that you? Get me outta this trap, will ya?</text>
+    <text id="Please">Please???</text>
+    <text id="Thanks">Thanks!</text>
+    <text id="DontLeave">Hey, don't leave me!</text>
+    <text id="LetsGo">Come with me if you want to live.</text>
+    <text id="Fine">Fine!</text>
+    <text id="ScrewYou1">Screw you! You never bought me any presents anyway!</text>
+    <text id="ScrewYou2">Screw you!</text>
+    <text id="Hrmph">Hrmph.</text>
+
+    <simpleNode name="Start" text="Intro" options="LetsGo:Accept,ScrewYou1:Reject"/>
+    <simpleNode name="Reject" text="Please" options="Fine:Accept,ScrewYou2:Reject"/>
+    <node name="Accept" text="Thanks">
+      <option text="Hrmph">
+        <joinPlayer/>
+        <end/>
+      </option>
+    </node>
+  </dialog>
+  
+  <onSpeak>
+    <say dialog="UncleJohnDialog"/>
+  </onSpeak>
+</ai:ai>

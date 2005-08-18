@@ -1,5 +1,4 @@
 using System;
-using System.Runtime.Serialization;
 
 namespace Chrono
 {
@@ -13,7 +12,6 @@ public enum WeaponClass
 #region Weapon, FiringWeapon, Ammo
 public abstract class Weapon : Wieldable
 { public Weapon() { Class=ItemClass.Weapon; }
-  protected Weapon(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public int DamageBonus { get { return BaseDamage+DamageMod; } }
   public int ToHitBonus  { get { return BaseToHit+ToHitMod; } }
@@ -48,7 +46,6 @@ public abstract class Weapon : Wieldable
 
 public abstract class FiringWeapon : Weapon
 { public FiringWeapon() { Ranged=true; }
-  protected FiringWeapon(SerializationInfo info, StreamingContext context) : base(info, context) { }
   public abstract Compatibility CompatibleWith(Ammo ammo);
   
   public string AmmoName;
@@ -57,7 +54,6 @@ public abstract class FiringWeapon : Weapon
 [NoClone]
 public abstract class Ammo : Item
 { public Ammo() { Class=ItemClass.Ammo; }
-  protected Ammo(SerializationInfo info, StreamingContext context) : base(info, context) { }
   
   public virtual Damage ModDamage(Damage damage) { return damage; }
 }
@@ -66,22 +62,17 @@ public abstract class Ammo : Item
 #region Arrows
 public abstract class Arrow : Ammo
 { public Arrow() { Weight=3; }
-  protected Arrow(SerializationInfo info, StreamingContext context) : base(info, context) { }
 }
 
-[Serializable]
 public class BasicArrow : Arrow
 { public BasicArrow() { name="arrow"; }
-  public BasicArrow(SerializationInfo info, StreamingContext context) : base(info, context) { }
   
   public static readonly int SpawnChance=300, SpawnMin=4, SpawnMax=12; // 3% chance, 4-12 arrows
   public static readonly int ShopValue=8;
 }
 
-[Serializable]
 public class FlamingArrow : Arrow
 { public FlamingArrow() { name="flaming arrow"; }
-  public FlamingArrow(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override Damage ModDamage(Damage damage)
   { damage.Heat += (ushort)Global.NdN(1, 4);
@@ -93,10 +84,8 @@ public class FlamingArrow : Arrow
 }
 #endregion
 
-[Serializable]
 public class PoisonDart : Weapon
 { public PoisonDart() { wClass=WeaponClass.Thrown; Ranged=true; name="poisoned dart"; Weight=2; }
-  public PoisonDart(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override Damage CalculateDamage(Entity user, Ammo ammo, Entity target)
   { Damage d = new Damage(Global.NdN(1, 3+(int)CompatibleWith(user)) + user.StrBonus/3 + DamageBonus);
@@ -109,13 +98,11 @@ public class PoisonDart : Weapon
   public static readonly int ShopValue=10;
 }
 
-[Serializable]
 public class Bow : FiringWeapon
 { public Bow()
   { name="recurved bow"; AmmoName="arrows"; AllHandWield=true;
     Color=Color.LightCyan; Weight=20; Delay=25; wClass=WeaponClass.Bow; Exercises=Attr.Dex; Noise=2;
   }
-  public Bow(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override Compatibility CompatibleWith(Ammo ammo)
   { return ammo is Arrow ? Compatibility.Okay : Compatibility.None;
@@ -132,13 +119,11 @@ public class Bow : FiringWeapon
   public static readonly int ShopValue=225;
 }
 
-[Serializable]
 public class ShortSword : Weapon
 { public ShortSword()
   { name="short sword"; Color=Color.Purple; Weight=35; Delay=5;
     wClass=WeaponClass.ShortBlade; Exercises=Attr.Str; Noise=5;
   }
-  public ShortSword(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override Damage CalculateDamage(Entity user, Ammo ammo, Entity target)
   { return new Damage(Global.NdN(1, 6+(int)CompatibleWith(user)) + user.StrBonus + DamageBonus);

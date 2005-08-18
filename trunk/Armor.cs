@@ -1,12 +1,12 @@
 using System;
-using System.Runtime.Serialization;
+using System.Xml;
 
 namespace Chrono
 {
 
+#region Armor
 public class Armor : Wearable
 { public Armor() { Class=ItemClass.Armor; }
-  protected Armor(SerializationInfo info, StreamingContext context) : base(info, context) { }
   
   public override string GetFullName(Entity e, bool forceSingular)
   { if(!Identified) return base.GetFullName(e, forceSingular);
@@ -19,17 +19,18 @@ public class Armor : Wearable
 
   protected int baseAC;
 }
+#endregion
 
-[Serializable]
-public class PaperBag : Armor
-{ public PaperBag()
-  { Slot=Slot.Head; name="paper bag"; Color=Color.Brown; Weight=2; Material=Material.Paper;
-    SetAttr(Attr.AC, baseAC=3); SetAttr(Attr.EV, -2);
+#region XmlArmor
+public sealed class XmlArmor : Armor
+{ public XmlArmor(XmlNode node)
+  { XmlItem.Init(this, node);
+
+    Slot = XmlItem.GetSlot(node);
+    if(!Xml.IsEmpty(node, "ac")) SetAttr(Attr.AC, baseAC=Xml.IntValue(node, "ac"));
+    if(!Xml.IsEmpty(node, "ev")) SetAttr(Attr.EV, Xml.IntValue(node, "ev"));
   }
-  public PaperBag(SerializationInfo info, StreamingContext context) : base(info, context) { }
-
-  public static readonly int SpawnChance=100; // 1% chance
-  public static readonly int ShopValue=75;
 }
+#endregion
 
 } // namespace Chrono

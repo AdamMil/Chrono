@@ -1,12 +1,11 @@
 using System;
-using System.Runtime.Serialization;
+using System.Xml;
 
 namespace Chrono
 {
 
 public abstract class Shield : Wieldable
 { public Shield() { Class=ItemClass.Shield; }
-  protected Shield(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override string GetFullName(Entity e, bool forceSingular)
   { if(!Identified) return base.GetFullName(e, forceSingular);
@@ -20,16 +19,14 @@ public abstract class Shield : Wieldable
   public int BlockChance; // base percentage chance that this shield will block a blow
 }
 
-[Serializable]
-public class Buckler : Shield
-{ public Buckler()
-  { name="buckler"; BlockChance=15; Weight=40; Color=Color.Grey; AC=0; EV=-1;
+#region XmlShield
+public sealed class XmlShield : Shield
+{ public XmlShield(XmlNode node)
+  { XmlItem.Init(this, node);
+    BlockChance = Xml.IntValue(node, "blockChance");
+    if(!Xml.IsEmpty("ev")) SetAttr(Attr.EV, Xml.IntValue(node, "ev"));
   }
-  public Buckler(SerializationInfo info, StreamingContext context) : base(info, context) { }
-
-  public static readonly int SpawnChance=100; // 1% chance
-  public static readonly int ShopValue=125;
-  public static readonly string ShortDesc="A small, round shield.";
 }
+#endregion
 
 } // namespace Chrono

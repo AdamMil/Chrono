@@ -28,7 +28,6 @@ public interface IKeyedInventory : IInventory
 }
 
 #region ItemPile
-[Serializable]
 public sealed class ItemPile : IInventory
 {
   public ItemPile Clone() // will only be called if there are items
@@ -95,7 +94,6 @@ public sealed class ItemPile : IInventory
 #endregion
 
 #region Inventory
-[Serializable]
 public sealed class Inventory : IKeyedInventory
 { public Inventory() : this(52) { }
   public Inventory(int maxItems)

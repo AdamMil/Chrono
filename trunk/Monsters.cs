@@ -1,16 +1,13 @@
 using System;
 using System.Drawing;
 using System.Reflection;
-using System.Runtime.Serialization;
 
 namespace Chrono
 {
 
 #region Orc
-[Serializable]
 public class Orc : AI
 { public Orc() { Race=Race.Orc; Color=Color.Yellow; baseKillExp=10; canOpenDoors=true; }
-  public Orc(SerializationInfo info, StreamingContext context) : base(info, context) { }
   
   public override void Generate(int level, EntityClass myClass)
   { base.Generate(level, myClass);
@@ -25,15 +22,14 @@ public class Orc : AI
     else if(Global.Rand(100)<10) { AddItem(new ShortSword()); SetSkill(Skill.ShortBlade, 1); }
     else if(Global.Rand(100)<10) { AddItem(new PoisonDart()).Count = 5; SetSkill(Skill.Throwing, 1); }
     else SetSkill(Skill.UnarmedCombat, 1);
-    if(Global.Rand(100)<10) AddItem(new PaperBag());
-    if(Global.Rand(100)<10) AddItem(new TeleportScroll());
+    if(Global.Rand(100)<10) AddItem(Item.Make(ItemClass.Armor, "paper bag"));
+    if(Global.Rand(100)<10) AddItem(Item.Make(ItemClass.Scroll, "teleport"));
     if(Global.Rand(100)<10) AddItem(new HealPotion());
   }
 }
 #endregion
 
 #region Townsperson
-[Serializable]
 public class Townsperson : AI
 { public Townsperson()
   { switch(Global.Rand(4))
@@ -52,7 +48,6 @@ public class Townsperson : AI
     alwaysHostile=false;
     canOpenDoors =true;
   }
-  public Townsperson(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override void Generate(int level, EntityClass myClass)
   { base.Generate(level, myClass);
@@ -132,6 +127,7 @@ public class Townsperson : AI
     }
   }
 
+  // FIXME: only ring an alarm bell if we're in town
   public override void OnHitBy(Entity attacker, object item, Damage damage)
   { if(SocialGroup!=-1 && attacker.SocialGroup==App.Player.SocialGroup && !Global.GetSocialGroup(SocialGroup).Hostile)
     { Map.MakeNoise(attacker.Position, attacker, Noise.Alert, Map.MaxSound);
@@ -176,7 +172,6 @@ public class Townsperson : AI
 #endregion
 
 #region Shopkeeper
-[Serializable]
 public class Shopkeeper : AI
 { public Shopkeeper()
   { Race     = Race.Human; // TODO: not always human...
@@ -185,7 +180,6 @@ public class Shopkeeper : AI
     canOpenDoors  = true;
     baseKillExp   = 50;
   }
-  public Shopkeeper(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public int Credit { get { return credit; } }
 
@@ -234,8 +228,8 @@ public class Shopkeeper : AI
     SetRawFlag(Flag.TeleportControl, true);
 
     // TODO: give better armor
-    AddItem(new Buckler());
-    AddItem(new PaperBag());
+    AddItem(Item.Make(ItemClass.Shield, "buckler"));
+    AddItem(Item.Make(ItemClass.Armor, "paper bag"));
 
     AddItem(new HealPotion()).Count += 2;
 

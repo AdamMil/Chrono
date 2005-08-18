@@ -1,6 +1,6 @@
 using System;
 using System.Collections;
-using System.Runtime.Serialization;
+using System.Xml;
 
 namespace Chrono
 {
@@ -10,13 +10,12 @@ namespace Chrono
 public abstract class Ring : Wearable
 { public Ring()
   { Class=ItemClass.Ring; Slot=Slot.Ring; Prefix="ring of "; PluralSuffix=""; PluralPrefix="rings of "; Weight=1;
-    Durability=95;
+    Durability=95; ExtraHunger=1;
 
     object i = namemap[GetType().ToString()];
     if(i==null) { Color = colors[namei]; namemap[GetType().ToString()] = namei++; }
     else Color = colors[(int)i];
   }
-  protected Ring(SerializationInfo info, StreamingContext context) : base(info, context) { }
   static Ring() { Global.Randomize(names, colors); }
 
   public override string GetFullName(Entity e, bool forceSingular)
@@ -27,48 +26,29 @@ public abstract class Ring : Wearable
     return rn;
   }
 
-  public static void Deserialize(System.IO.Stream stream, IFormatter formatter)
-  { namemap = (Hashtable)formatter.Deserialize(stream);
-    names   = (string[])formatter.Deserialize(stream);
-    colors  = (Color[])formatter.Deserialize(stream);
-    namei   = (int)formatter.Deserialize(stream);
-  }
-  public static void Serialize(System.IO.Stream stream, IFormatter formatter)
-  { formatter.Serialize(stream, namemap);
-    formatter.Serialize(stream, names);
-    formatter.Serialize(stream, colors);
-    formatter.Serialize(stream, namei);
+  public override bool Think(Entity holder)
+  { base.Think(holder);
+    if(holder==App.Player && ExtraHunger!=0) holder.Hunger += ExtraHunger;
+    return false;
   }
 
+  public int ExtraHunger;
+
   static Hashtable namemap = new Hashtable();
-  static string[] names = new string[] { "gold", "silver", "brass", "iron" };
-  static Color[] colors = new Color[] { Color.Yellow, Color.Grey, Color.Yellow, Color.DarkGrey };
+  static readonly string[] names;
+  static readonly Color[] colors;
   static int namei;
 }
 #endregion
 
-[Serializable]
-public class InvisibilityRing : Ring
-{ public InvisibilityRing() { name="invisibility"; FlagMods=Entity.Flag.Invisible; }
-  public InvisibilityRing(SerializationInfo info, StreamingContext context) : base(info, context) { }
-
-  public override bool Think(Entity holder)
-  { base.Think(holder);
-    if(holder==App.Player) holder.Hunger += 2;
-    return false;
+#region XmlRing
+public sealed class XmlRing : Ring
+{ public XmlRing(XmlNode node)
+  { XmlItem.Init(this, node);
+    FlagMods = XmlItem.GetEffect(node);
+    if(!Xml.IsEmpty(node, "extraHunger")) ExtraHunger = Xml.IntValue(node, "extraHunger");
   }
-
-  public static readonly int SpawnChance=50; // 0.5% chance
-  public static readonly int ShopValue=400;
 }
-
-[Serializable]
-public class SeeInvisibleRing : Ring
-{ public SeeInvisibleRing() { name="see invisible"; FlagMods=Entity.Flag.SeeInvisible; }
-  public SeeInvisibleRing(SerializationInfo info, StreamingContext context) : base(info, context) { }
-
-  public static readonly int SpawnChance=50; // 0.5% chance
-  public static readonly int ShopValue=250;
-}
+#endregion
 
 } // namespace Chrono

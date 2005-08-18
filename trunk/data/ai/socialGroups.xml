@@ -1,0 +1,8 @@
+﻿<?xml version="1.0" encoding="utf-8" ?> 
+
+<socialGroups:socialGroups
+  xmlns:socialGroups="http://www.adammil.net/Chrono/socialGroups"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.adammil.net/Chrono/socialGroups socialGroups.xsd">
+
+</socialGroups:socialGroups>

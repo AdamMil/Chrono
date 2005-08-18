@@ -1,13 +1,11 @@
 <?xml version="1.0" encoding="utf-8" ?> 
 
-<map:map id="gtownDungeonRoomy" generator="RoomyDungeonGenerator"
+<map:map id="gtownDungeonBottom" generator="RoomyDungeonGenerator"
   xmlns:map="http://www.adammil.net/Chrono/map"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://www.adammil.net/Chrono/map map.xsd">
 
-<spawns>
-  <spawn group="bugs" chance="40"/>
-  <spawn group="humanoids"/>
-</spawns>
-
+  <npc entity="Uncle John">
+    <location pathTo="UpStairs" tile="RoomFloor"/>
+  </npc>
 </map:map>

@@ -1,0 +1,44 @@
+﻿<?xml version="1.0" encoding="utf-8" ?> 
+
+<items:items
+  xmlns:items="http://www.adammil.net/Chrono/items"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.adammil.net/Chrono/items items.xsd">
+
+<!-- colors/names for randomization -->
+<amulets/>
+<potions>Green/green, Purple/purple, Grey/bubbly, Brown/fizzy</potions>
+<rings>Yellow/gold, Grey/silver, Yellow/brass, DarkGrey/iron</rings>
+<scrolls>READ ME, XGOCL APLFLCH, DROWSSAP, EUREKA!</scrolls>
+<wands>Yellow/gold, Blue/forked, Grey/lead, Brown/pointy</wands>
+
+<!-- armor -->
+<armor name="paper bag" slot="Head" color="Brown" weight="2" material="Paper" ac="3" ev="-2" chance="1" value="75"/>
+
+<!-- food -->
+<food name="hamburger" color="Red" weight="5" chance="2.5" value="10"/>
+
+<!-- rings -->
+<ring name="invisibility" effects="Invisible" chance="0.5" value="400" extraHunger="2"/>
+<ring name="see invisible" effects="SeeInvisible" chance="0.5" value="250" extraHunger="2"/>
+
+<!-- scrolls -->
+<scroll name="teleport" spell="Teleport" chance="1" value="75"/>
+
+<!-- shield -->
+<shield name="buckler" blockChance="15" weight="40" color="Grey" ev="-1" chance="1" value="125"
+  shortDesc="A small, round shield."/>
+
+<!-- tools -->
+<tool name="deodorant" prefix="stick of " pluralPrefix="sticks of " weight="2" charges="3d3"
+      chance="0.5" value="100" shortDesc="A travel-size stick of deodorant." spell="RemoveScent">
+  <longDesc>
+    When applied to strategic locations on your body, this item considerably reduces the strength 
+    of your funk. This deodorant goes on clear -- no icky white stuff! Fresh spring scent.
+  </longDesc>
+</tool>
+
+<!-- wands -->
+<wand spell="Fire" charges="3:7" effectDesc="Flames fly from the wand." chance="0.1" value="200"/>
+
+</items:items>

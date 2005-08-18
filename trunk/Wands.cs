@@ -1,7 +1,7 @@
 using System;
 using System.Collections;
 using System.Drawing;
-using System.Runtime.Serialization;
+using System.Xml;
 
 namespace Chrono
 {
@@ -16,7 +16,6 @@ public abstract class Wand : Chargeable
     else Color = colors[(int)i];
   }
   static Wand() { Global.Randomize(names, colors); }
-  protected Wand(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override string Name { get { return "wand of "+Spell.Name; } }
 
@@ -61,35 +60,22 @@ public abstract class Wand : Chargeable
     Spell.Cast(user, Status, target, dir);
   }
 
-  public static void Deserialize(System.IO.Stream stream, IFormatter formatter)
-  { namemap = (Hashtable)formatter.Deserialize(stream);
-    names   = (string[])formatter.Deserialize(stream);
-    colors  = (Color[])formatter.Deserialize(stream);
-    namei   = (int)formatter.Deserialize(stream);
-  }
-  public static void Serialize(System.IO.Stream stream, IFormatter formatter)
-  { formatter.Serialize(stream, namemap);
-    formatter.Serialize(stream, names);
-    formatter.Serialize(stream, colors);
-    formatter.Serialize(stream, namei);
-  }
-
   static Hashtable namemap = new Hashtable();
-  static string[] names = new string[] { "gold", "forked", "lead", "pointy" };
-  static Color[] colors = new Color[] { Color.Yellow, Color.Blue, Color.Grey, Color.Brown };
+  static readonly string[] names;
+  static readonly Color[] colors;
   static int namei;
 }
 #endregion
 
-[Serializable]
-public class WandOfFire : Wand
-{ public WandOfFire()
-  { Spell=FireSpell.Default; Charges=Global.Rand(3, 7); Effect="Flames fly from the wand.";
+#region XmlWand
+public sealed class XmlWand : Wand
+{ public XmlWand(XmlNode node)
+  { XmlItem.Init(this, node);
+    Spell = XmlItem.GetSpell(node);
+    Charges = Xml.RangeInt(node, "charges");
+    if(!Xml.IsEmpty("effectDesc")) Effect = Xml.String(node, "effectDesc");
   }
-  public WandOfFire(SerializationInfo info, StreamingContext context) : base(info, context) { }
-
-  public static readonly int SpawnChance=10; // 0.1% chance
-  public static readonly int ShopValue=200;
 }
+#endregion
 
 } // namespace Chrono

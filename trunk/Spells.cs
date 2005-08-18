@@ -2,7 +2,6 @@ using System;
 using System.Collections;
 using System.Drawing;
 using System.Reflection;
-using System.Runtime.Serialization;
 
 namespace Chrono
 {
@@ -15,22 +14,14 @@ public enum SpellClass // remember to add these to the Skill enum as well
 }
 public enum SpellTarget { Self, Item, Tile };
 
-[Serializable]
-public sealed class DefaultSpellProxy : ISerializable, IObjectReference
-{ public DefaultSpellProxy(SerializationInfo info, StreamingContext context) { typename = info.GetString("Type"); }
-  public void GetObjectData(SerializationInfo info, StreamingContext context) { } // never called
-  public object GetRealObject(StreamingContext context)
-  { return Type.GetType(typename).GetField("Default", BindingFlags.Static|BindingFlags.DeclaredOnly|BindingFlags.Public).GetValue(null);
-  }
-  string typename;
-}
-
 #region Spell
 public abstract class Spell : UniqueObject
 { public Spell() { ID=Global.NextID; }
-  protected Spell(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public void Cast(Entity user) { Cast(user, ItemStatus.None, user.Position, Direction.Self); }
+  public void Cast(Entity user, ItemStatus buc) { Cast(user, buc, user.Position, Direction.Self); }
+  public void Cast(Entity user, Direction dir) { Cast(user, ItemStatus.None, new RangeTarget(dir)); }
+  public void Cast(Entity user, ItemStatus buc, Direction dir) { Cast(user, buc, new RangeTarget(dir)); }
   public void Cast(Entity user, RangeTarget rt) { Cast(user, ItemStatus.None, rt); }
   public void Cast(Entity user, ItemStatus buc, RangeTarget rt)
   { if(rt.Dir!=Direction.Invalid)
@@ -42,16 +33,9 @@ public abstract class Spell : UniqueObject
   public void Cast(Entity user, Item target) { Cast(user, ItemStatus.None, target); }
   public virtual void Cast(Entity user, ItemStatus buc, Item target) { }
   public void Cast(Entity user, Point tile) { Cast(user, ItemStatus.None, tile, Direction.Invalid); }
+  public void Cast(Entity user, ItemStatus buc, Point tile) { Cast(user, buc, tile, Direction.Invalid); }
   public void Cast(Entity user, Point tile, Direction dir) { Cast(user, ItemStatus.None, tile, dir); }
   public virtual void Cast(Entity user, ItemStatus buc, Point tile, Direction dir) { }
-
-  public override void GetObjectData(SerializationInfo info, StreamingContext context)
-  { if(Global.ObjHash==null && this==GetType().GetField("Default", BindingFlags.Static|BindingFlags.DeclaredOnly|BindingFlags.Public).GetValue(null))
-    { info.AddValue("Type", GetType().FullName);
-      info.SetType(typeof(DefaultSpellProxy));
-    }
-    else base.GetObjectData(info, context);
-  }
 
   public int Level { get { return (Difficulty+1)/2; } } // returns skill level (1-9)
   public Skill Skill { get { return (Skill)((int)Class+(int)Skill.MagicSkills); } }
@@ -148,7 +132,6 @@ public abstract class Spell : UniqueObject
 #region BeamSpell
 public abstract class BeamSpell : Spell
 { protected BeamSpell() { target=SpellTarget.Tile; Range=10; }
-  protected BeamSpell(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override void Cast(Entity user, ItemStatus buc, Point tile, Direction dir)
   { FromStatus = buc;
@@ -227,10 +210,8 @@ public abstract class BeamSpell : Spell
 #endregion
 
 #region ForceBolt
-[Serializable]
 public class ForceBolt : BeamSpell
 { public ForceBolt() { Name="force bolt"; Class=SpellClass.Telekinesis; Difficulty=1; Power=2; }
-  public ForceBolt(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   protected override bool Affect(Entity user, Direction dir)
   { if(dir==Direction.Above)
@@ -254,12 +235,10 @@ public class ForceBolt : BeamSpell
 #endregion
 
 #region Fire
-[Serializable]
 public class FireSpell : BeamSpell
 { public FireSpell()
   { Name="fire"; Class=SpellClass.Elemental; Difficulty=10; Power=12; AutoIdentify=true;
   }
-  public FireSpell(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   protected override object Hit(Entity user, Point pt)
   { Entity e = user.Map.GetEntity(pt);
@@ -333,12 +312,10 @@ public class FireSpell : BeamSpell
 #endregion
 
 #region Teleport
-[Serializable]
 public class TeleportSpell : Spell
 { public TeleportSpell()
   { Name="teleport"; Class=SpellClass.Translocation; Difficulty=6; Power=9; AutoIdentify=true;
   }
-  public TeleportSpell(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override void Cast(Entity user, ItemStatus buc, Point tile, Direction dir)
   { Point telTo = user.Is(Entity.Flag.TeleportControl) ? tile : user.Map.FreeSpace();
@@ -364,12 +341,10 @@ public class TeleportSpell : Spell
 #endregion
 
 #region Amnesia
-[Serializable]
 public class AmnesiaSpell : Spell
 { public AmnesiaSpell()
   { Name="amnesia"; Class=SpellClass.Divination; Difficulty=2; Power=2; target=SpellTarget.Self;
   }
-  public AmnesiaSpell(SerializationInfo info, StreamingContext context) : base(info, context) { }
   
   public override void Cast(Entity user, ItemStatus buc, Point tile, Direction dir)
   { if(user.Memory!=null)
@@ -411,12 +386,10 @@ public class AmnesiaSpell : Spell
 #endregion
 
 #region Identify
-[Serializable]
 public class IdentifySpell : Spell
 { public IdentifySpell()
   { Name="identify"; Class=SpellClass.Divination; Difficulty=5; Power=3; target=SpellTarget.Item; AutoIdentify=true;
   }
-  public IdentifySpell(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
   public override void Cast(Entity user, ItemStatus buc, Item target)
   { if(user==App.Player)

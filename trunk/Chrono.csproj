@@ -95,19 +95,19 @@
                     HintPath = "..\..\WINDOWS\Microsoft.NET\Framework\v1.1.4322\System.Drawing.dll"
                 />
                 <Reference
-                    Name = "GameLib"
-                    Project = "{79014105-2BDA-4D27-98AE-2DE3F5254252}"
-                    Package = "{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}"
+                    Name = "System.XML"
+                    AssemblyName = "System.Xml"
+                    HintPath = "..\..\WINDOWS\Microsoft.NET\Framework\v1.1.4322\System.XML.dll"
                 />
                 <Reference
                     Name = "ICSharpCode.SharpZipLib"
                     AssemblyName = "ICSharpCode.SharpZipLib"
-                    HintPath = "..\SharpZipLib\ICSharpCode.SharpZipLib.dll"
+                    HintPath = "..\dlls\ICSharpCode.SharpZipLib.dll"
                 />
                 <Reference
-                    Name = "System.XML"
-                    AssemblyName = "System.Xml"
-                    HintPath = "..\..\WINDOWS\Microsoft.NET\Framework\v1.1.4322\System.XML.dll"
+                    Name = "GameLib"
+                    Project = "{79014105-2BDA-4D27-98AE-2DE3F5254252}"
+                    Package = "{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}"
                 />
             </References>
         </Build>
@@ -267,6 +267,27 @@
                     BuildAction = "Content"
                 />
                 <File
+                    RelPath = "data\entities.xml"
+                    BuildAction = "Content"
+                />
+                <File
+                    RelPath = "data\entities.xsd"
+                    BuildAction = "Content"
+                />
+                <File
+                    RelPath = "data\entities.xsx"
+                    DependentUpon = "entities.xsd"
+                    BuildAction = "None"
+                />
+                <File
+                    RelPath = "data\items.xml"
+                    BuildAction = "Content"
+                />
+                <File
+                    RelPath = "data\items.xsd"
+                    BuildAction = "Content"
+                />
+                <File
                     RelPath = "data\ai\ai.xsd"
                     BuildAction = "Content"
                 />
@@ -275,11 +296,23 @@
                     BuildAction = "Content"
                 />
                 <File
+                    RelPath = "data\ai\fathersBrother.xml"
+                    BuildAction = "Content"
+                />
+                <File
                     RelPath = "data\ai\quips.xml"
                     BuildAction = "Content"
                 />
                 <File
                     RelPath = "data\ai\quips.xsd"
+                    BuildAction = "Content"
+                />
+                <File
+                    RelPath = "data\ai\socialGroups.xml"
+                    BuildAction = "Content"
+                />
+                <File
+                    RelPath = "data\ai\socialGroups.xsd"
                     BuildAction = "Content"
                 />
                 <File
@@ -297,6 +330,10 @@
                 />
                 <File
                     RelPath = "data\map\gtown.xml"
+                    BuildAction = "Content"
+                />
+                <File
+                    RelPath = "data\map\gtownDungeonBottom.xml"
                     BuildAction = "Content"
                 />
                 <File

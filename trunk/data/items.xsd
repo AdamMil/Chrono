@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xs:schema xmlns="http://www.adammil.net/Chrono/items"
+           xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://www.adammil.net/Chrono/items">
+
+<!-- color -->
+<xs:simpleType name="color">
+  <xs:restriction base="xs:string">
+    <xs:enumeration value="Black"/>
+    <xs:enumeration value="Red"/>
+    <xs:enumeration value="Green"/>
+    <xs:enumeration value="Blue"/>
+    <xs:enumeration value="Cyan"/>
+    <xs:enumeration value="Purple"/>
+    <xs:enumeration value="Brown"/>
+    <xs:enumeration value="Grey"/>
+    <xs:enumeration value="DarkGrey"/>
+    <xs:enumeration value="LightRed"/>
+    <xs:enumeration value="LightGreen"/>
+    <xs:enumeration value="LightBlue"/>
+    <xs:enumeration value="LightCyan"/>
+    <xs:enumeration value="Magenta"/>
+    <xs:enumeration value="Yellow"/>
+    <xs:enumeration value="White"/>
+    <xs:enumeration value="Normal"/>
+    <xs:enumeration value="Warning"/>
+    <xs:enumeration value="Dir"/>
+  </xs:restriction>
+</xs:simpleType>
+
+<!-- intRange -->
+<xs:simpleType name="intRange">
+  <xs:restriction base="xs:string">
+    <xs:pattern value="\d+((:|d)\d+)?"/>
+  </xs:restriction>
+</xs:simpleType>
+
+<xs:simpleType name="material">
+  <xs:restriction base="xs:string">
+    <xs:enumeration value="Paper"/>
+    <xs:enumeration value="Leather"/>
+    <xs:enumeration value="Wood"/>
+    <xs:enumeration value="Metal"/>
+    <xs:enumeration value="Glass"/>
+  </xs:restriction>
+</xs:simpleType>
+
+<!-- percent -->
+<xs:simpleType name="percent">
+  <xs:restriction base="xs:integer">
+    <xs:minInclusive value="0"/>
+    <xs:maxInclusive value="100"/>
+  </xs:restriction>
+</xs:simpleType>
+
+<!--xs:include schemaLocation="common.xsd"/--> <!-- above definitions should go in common.xsd -->
+
+<xs:complexType name="item">
+  <xs:attribute name="name" type="xs:string" use="required"/>
+  <xs:attribute name="prefix" type="xs:string"/>
+  <xs:attribute name="pluralPrefix" type="xs:string"/>
+  <xs:attribute name="pluralSuffix" type="xs:string"/>
+  <xs:attribute name="color" type="color"/>
+  <xs:attribute name="weight" type="xs:integer"/>
+  <xs:attribute name="chance" type="percent" use="required"/>
+  <xs:attribute name="value" type="xs:integer"/>
+  <xs:attribute name="shortDesc" type="xs:string"/>
+  <xs:attribute name="longDesc" type="xs:string"/>
+  <xs:attribute name="spawn" type="intRange" default="1"/>
+
+  <xs:sequence>
+    <xs:element name="longDesc" type="xs:string" minOccurs="0"/>
+  </xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="effectItem">
+  <xs:complexContent>
+    <xs:extension base="item">
+      <xs:attribute name="effects">
+        <xs:simpleType>
+          <xs:list>
+            <xs:simpleType>
+              <xs:restriction base="xs:string">
+                <xs:enumeration value="Confuse"/>
+                <xs:enumeration value="Hallucinate"/>
+                <xs:enumeration value="Sleep"/>
+                <xs:enumeration value="Invisible"/>
+                <xs:enumeration value="SeeInvisible"/>
+                <xs:enumeration value="TeleportControl"/>
+              </xs:restriction>
+            </xs:simpleType>
+          </xs:list>
+        </xs:simpleType>
+      </xs:attribute>
+    </xs:extension>
+  </xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="spellItem">
+  <xs:complexContent>
+    <xs:extension base="item">
+      <xs:attribute name="spell">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="ForceBolt"/>
+            <xs:enumeration value="Fire"/>
+            <xs:enumeration value="Teleport"/>
+            <xs:enumeration value="Amnesia"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+    </xs:extension>
+  </xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="wearableItem">
+  <xs:complexContent>
+    <xs:extension base="item">
+      <xs:attribute name="material" type="material"/>
+    </xs:extension>
+  </xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="armor">
+  <xs:complexContent>
+    <xs:extension base="wearableItem">
+      <xs:attribute name="ac" type="xs:integer"/>
+      <xs:attribute name="ev" type="xs:integer"/>
+
+      <xs:attribute name="slot" use="required">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="Ring"/>
+            <xs:enumeration value="Head"/>
+            <xs:enumeration value="Cloak"/>
+            <xs:enumeration value="Torso"/>
+            <xs:enumeration value="Legs"/>
+            <xs:enumeration value="Neck"/>
+            <xs:enumeration value="Hands"/>
+            <xs:enumeration value="Feet"/>
+            <xs:enumeration value="LRing"/>
+            <xs:enumeration value="RRing"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+    </xs:extension>
+  </xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="food">
+  <xs:complexContent>
+    <xs:extension base="item">
+      <xs:attribute name="decayTime" type="xs:integer"/>
+    </xs:extension>
+  </xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="potion">
+  <xs:complexContent>
+    <xs:extension base="spellItem"/>
+  </xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="ring">
+  <xs:complexContent>
+    <xs:extension base="effectItem">
+      <xs:attribute name="extraHunger" type="xs:integer"/>
+      <xs:attribute name="material" type="material"/>
+    </xs:extension>
+  </xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="scroll">
+  <xs:complexContent>
+    <xs:extension base="spellItem">
+      <xs:attribute name="prompt" type="xs:string"/>
+    </xs:extension>
+  </xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="shield">
+  <xs:complexContent>
+    <xs:extension base="wearableItem">
+      <xs:attribute name="blockChance" type="xs:integer" use="required"/>
+      <xs:attribute name="ev" type="xs:integer"/>
+    </xs:extension>
+  </xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="tool">
+  <xs:complexContent>
+    <xs:extension base="spellItem">
+      <xs:attribute name="charges" type="intRange"/>
+    </xs:extension>
+  </xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="wand">
+  <xs:complexContent>
+    <xs:extension base="spellItem">
+      <xs:attribute name="charges" type="intRange" use="required"/>
+      <xs:attribute name="effectDesc" type="xs:string"/>
+    </xs:extension>
+  </xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="items">
+  <xs:sequence>
+    <xs:element name="amulets" type="xs:string"/>
+    <xs:element name="potions" type="xs:string"/>
+    <xs:element name="rings" type="xs:string"/>
+    <xs:element name="scrolls" type="xs:string"/>
+    <xs:element name="wands" type="xs:string"/>
+
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="item" type="item"/>
+      <xs:element name="armor" type="armor"/>
+      <xs:element name="food" type="food"/>
+      <xs:element name="ring" type="ring"/>
+      <xs:element name="scroll" type="scroll"/>
+      <xs:element name="shield" type="shield"/>
+      <xs:element name="tool" type="tool"/>
+      <xs:element name="wand" type="wand"/>
+    </xs:choice>
+  </xs:sequence>
+</xs:complexType>
+
+<xs:element name="items" type="items"/>
+
+</xs:schema>

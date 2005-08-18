@@ -6,7 +6,15 @@
 <!-- intRange -->
 <xs:simpleType name="intRange">
   <xs:restriction base="xs:string">
-    <xs:pattern value="\d+(:\d+)?"/>
+    <xs:pattern value="\d+((:|d)\d+)?"/>
+  </xs:restriction>
+</xs:simpleType>
+
+<!-- percent -->
+<xs:simpleType name="percent">
+  <xs:restriction base="xs:integer">
+    <xs:minInclusive value="0"/>
+    <xs:maxInclusive value="100"/>
   </xs:restriction>
 </xs:simpleType>
 
@@ -24,15 +32,6 @@
     <xs:enumeration value="DownLeft"/>
     <xs:enumeration value="Left"/>
     <xs:enumeration value="UpLeft"/>
-  </xs:restriction>
-</xs:simpleType>
-
-<!-- generator -->
-<xs:simpleType name="generator">
-  <xs:restriction base="xs:string">
-    <xs:enumeration value="RoomyDungeonGenerator"/>
-    <xs:enumeration value="MetaCaveGenerator"/>
-    <xs:enumeration value="TownGenerator"/>
   </xs:restriction>
 </xs:simpleType>
 
@@ -186,22 +185,11 @@
   <xs:attribute name="id" type="xs:ID"/>
 </xs:complexType>
 
-<!-- npc -->
-<xs:complexType name="npc">
-  <xs:sequence>
-    <xs:element name="location" type="location" minOccurs="0"/>
-  </xs:sequence>
-
-  <xs:attribute name="id" type="xs:ID"/>
-  <xs:attribute name="data" type="xs:string"/>
-  <xs:attribute name="ai" type="xs:string"/>
-  <xs:attribute name="location" type="locationString"/>
-</xs:complexType>
-
 <!-- map -->
 <xs:complexType name="map">
   <xs:sequence>
     <xs:element name="generatorOptions" type="generatorOptions" minOccurs="0"/>
+    <xs:element name="spawn" type="spawn"/>
     <xs:element name="room" type="room" minOccurs="0" maxOccurs="unbounded"/>
     <xs:element name="link" type="link" minOccurs="0" maxOccurs="unbounded"/>
     <xs:element name="npc" type="npc" minOccurs="0" maxOccurs="unbounded"/>
@@ -220,8 +208,43 @@
     </xs:simpleType>
   </xs:attribute>
 
-  <xs:attribute name="generator" type="generator"/>
+  <xs:attribute name="generator">
+    <xs:simpleType>
+      <xs:restriction base="xs:string">
+        <xs:enumeration value="RoomyDungeonGenerator"/>
+        <xs:enumeration value="MetaCaveGenerator"/>
+        <xs:enumeration value="TownGenerator"/>
+      </xs:restriction>
+    </xs:simpleType>
+  </xs:attribute>
+</xs:complexType>
+
+<!-- spawn -->
+<xs:complexType name="spawn">
+  <xs:attribute name="entity" type="xs:string"/>
+  <xs:attribute name="group" type="xs:string"/>
+  <xs:attribute name="chance" type="percent"/>
+</xs:complexType>
+
+<!-- spawns -->
+<xs:complexType name="spawns">
+  <xs:sequence>
+    <xs:element name="spawn" type="spawn" maxOccurs="unbounded"/>
+  </xs:sequence>
+  <xs:attribute name="min" type="xs:integer"/>
+  <xs:attribute name="max" type="xs:integer"/>
+  <xs:attribute name="start" type="xs:integer"/>
+  <xs:attribute name="rate" type="xs:integer"/>
+</xs:complexType>
+
+<!-- npc -->
+<xs:complexType name="npc"
+  <xs:sequence>
+    <xs:element name="location" type="location" minOccurs="0"/>
+  </xs:sequence>
+  <xs:attribute name="entity" type="xs:string"/>
 </xs:complexType>
 
 <xs:element name="map" type="map"/>
+
 </xs:schema>

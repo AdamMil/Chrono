@@ -808,7 +808,7 @@ public sealed class ConsoleIO : InputOutput
   }
 
   public override void Render(Entity viewer)
-  { if(viewer.Is(Entity.Flag.Asleep)) return;
+  { if(viewer.Is(Entity.Flag.Sleep)) return;
     mapW = Math.Min(console.Width, MapWidth); mapH = Math.Min(console.Height, MapHeight);
     RenderMap(viewer, viewer.Position, viewer.VisibleTiles());
     RenderStats(viewer);
@@ -963,14 +963,17 @@ public sealed class ConsoleIO : InputOutput
         else if(healthpct>=25) AddLine("It looks heavily wounded.");
         else AddLine("It looks almost dead.");
 
-        if(e is AI) switch(((AI)e).State)
-        { case AIState.Asleep: AddLine("It appears to be asleep."); break;
-          case AIState.Attacking: AddLine("It looks angry!"); break;
-          case AIState.Escaping: AddLine("It looks frightened."); break;
-          case AIState.Idle: case AIState.Patrolling: case AIState.Wandering: AddLine("It looks bored."); break;
-          case AIState.Working: AddLine("It's busy working."); break;
-          default: AddLine("UNKNOWN AI STATE"); break;
-        }
+        if(e is AI)
+          switch(((AI)e).State)
+          { case AIState.Asleep: AddLine("It appears to be asleep."); break;
+            case AIState.Attacking: AddLine("It looks angry!"); break;
+            case AIState.Escaping: AddLine("It looks frightened."); break;
+            case AIState.Guarding: AddLine("It looks alert."); break;
+            case AIState.Following: AddLine("It appears to be following you."); break;
+            case AIState.Idle: case AIState.Patrolling: case AIState.Wandering: AddLine("It looks bored."); break;
+            case AIState.Working: AddLine("It's busy working."); break;
+            default: AddLine("UNKNOWN AI STATE"); break;
+          }
       }
     }
     if(viewer.Map.HasItems(pos)) DisplayTileItems(viewer, map[pos].Items, visible);
@@ -1023,7 +1026,7 @@ Ctrl-P - see old messages";
   void DisplayMessages(bool fromTop)
   { int width=MapWidth, height=console.Height, ls, lss;
     System.Collections.ArrayList list = new System.Collections.ArrayList();
-    for(LinkedList.Node node=lines.Head; node!=null; node=node.NextNode)
+    for(LinkedList.Node node=lines.Head; node!=null; node=node.Next)
     { Line line = (Line)node.Data;
       if(line.Text=="--more--") continue;
       int lh = WordWrap(line.Text, width);
@@ -1064,7 +1067,7 @@ Ctrl-P - see old messages";
       { Line line = (Line)node.Data;
         int height = WordWrap(line.Text);
         while(height-->0 && li>=0) arr[li--] = new Line(line.Color, wrapped[height]);
-        node=node.PrevNode;
+        node=node.Previous;
       }
     }
 
@@ -1212,8 +1215,8 @@ Ctrl-P - see old messages";
       case CarryStress.Overtaxed: x += Write(Color.Dire, "Overtax "); break;
     }
 
-    if(player.Is(Entity.Flag.Confused)) x += Write(Color.Warning, "Conf ");
-    if(player.Is(Entity.Flag.Hallucinating)) x += Write(Color.Warning, "Halluc ");
+    if(player.Is(Entity.Flag.Confuse)) x += Write(Color.Warning, "Conf ");
+    if(player.Is(Entity.Flag.Hallucinate)) x += Write(Color.Warning, "Halluc ");
 
     while(x++<width) console.WriteChar(' ');
     x = 0; y++;

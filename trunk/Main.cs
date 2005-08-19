@@ -44,19 +44,19 @@ public sealed class App
         Player.SetSkill(Skill.Telekinesis, 1);
         Player.SetSkill(Skill.Divination, 1);
         Player.Pickup(new PoisonDart()).Count = 10;
-        Player.Pickup(new FoolsBook());
+        Player.Pickup(Item.Make(ItemClass.Spellbook, "tinker toys"));
         Player.MemorizeSpell(ForceBolt.Default, 5000);
       }
       Player.Pickup(Item.Make(ItemClass.Food, "hamburger")).Count = 2;
       Player.Pickup(Item.Make(ItemClass.Scroll, "teleport"));
-      Player.Pickup(new HealPotion()).Count = 2;
+      Player.Pickup(Item.Make(ItemClass.Potion, "healing")).Count = 2;
       Player.Pickup(Item.Make(ItemClass.Tool, "deodorant"));
       Player.Pickup(new Gold()).Count = 100;
       foreach(Item i in Player.Inv) Player.AddKnowledge(i);
 
       Map map = World[World.StartSection][0];
       map.Entities.Add(Player);
-      Player.Position = map.FreeSpaceNear(map.GetEntity("fatherOfPC").Position);
+      Player.Position = map.FreeSpaceNear(map.GetEntity("Pa").Position);
 
       for(int y=0; y<Player.Map.Height; y++) // magic mapping + find items
         for(int x=0; x<Player.Map.Width; x++)

@@ -3,69 +3,19 @@
            xmlns:xs="http://www.w3.org/2001/XMLSchema"
            targetNamespace="http://www.adammil.net/Chrono/entities">
 
-<!-- color -->
-<xs:simpleType name="color">
-  <xs:restriction base="xs:string">
-    <xs:enumeration value="Black"/>
-    <xs:enumeration value="Red"/>
-    <xs:enumeration value="Green"/>
-    <xs:enumeration value="Blue"/>
-    <xs:enumeration value="Cyan"/>
-    <xs:enumeration value="Purple"/>
-    <xs:enumeration value="Brown"/>
-    <xs:enumeration value="Grey"/>
-    <xs:enumeration value="DarkGrey"/>
-    <xs:enumeration value="LightRed"/>
-    <xs:enumeration value="LightGreen"/>
-    <xs:enumeration value="LightBlue"/>
-    <xs:enumeration value="LightCyan"/>
-    <xs:enumeration value="Magenta"/>
-    <xs:enumeration value="Yellow"/>
-    <xs:enumeration value="White"/>
-    <xs:enumeration value="Normal"/>
-    <xs:enumeration value="Warning"/>
-    <xs:enumeration value="Dir"/>
-  </xs:restriction>
-</xs:simpleType>
-
-<!-- intRange -->
-<xs:simpleType name="intRange">
-  <xs:restriction base="xs:string">
-    <xs:pattern value="\d+((:|d)\d+)?"/>
-  </xs:restriction>
-</xs:simpleType>
-
-<!-- percent -->
-<xs:simpleType name="percent">
-  <xs:restriction base="xs:integer">
-    <xs:minInclusive value="0"/>
-    <xs:maxInclusive value="100"/>
-  </xs:restriction>
-</xs:simpleType>
-
-<!-- item -->
-<xs:complexType name="item">
-  <xs:sequence>
-    <xs:any processContents="skip" maxOccurs="unbounded"/>
-  </xs:sequence>
-
-  <xs:attribute name="class" type="xs:string" use="required"/>
-  <xs:anyAttribute processContents="skip"/>
-</xs:complexType>
-
-<!--xs:include schemaLocation="common.xsd"/--> <!-- above definitions should go in common.xsd -->
+<xs:include schemaLocation="common.xsd"/>
 
 <!-- attack -->
 <xs:complexType name="attack">
   <xs:attribute name="type" type="attackType" use="required"/>
   <xs:attribute name="damage" type="damageType" default="Physical"/>
-  <xs:attribute name="amount" type="damageAmount"/>
+  <xs:attribute name="amount" type="intRange"/>
   <xs:attribute name="chance" type="percent"/>
 </xs:complexType>
 
 <!-- attackType -->
 <xs:simpleType name="attackType">
-  <xs:restriction>
+  <xs:restriction base="xs:string">
     <xs:enumeration value="Bite"/>
     <xs:enumeration value="Breath"/>
     <xs:enumeration value="Claw"/>
@@ -87,61 +37,40 @@
   <xs:attribute name="chance" type="percent"/>
 </xs:complexType>
 
-<!-- damageAmount -->
-<xs:simpleType name="damageAmount">
-  <xs:restriction base="xs:string">
-    <xs:pattern value="\d+((:|d)\d+)?"/>
-  </xs:restriction>
-</xs:simpleType>
-
-<!-- damageType -->
-<xs:simpleType name="damageType">
-  <xs:restriction base="xs:string">
-    <xs:enumeration value="Acid"/>
-    <xs:enumeration value="Blind"/>
-    <xs:enumeration value="Cold"/>
-    <xs:enumeration value="Direct"/>
-    <xs:enumeration value="DrainDex"/>
-    <xs:enumeration value="DrainInt"/>
-    <xs:enumeration value="DrainStr"/>
-    <xs:enumeration value="Electricity"/>
-    <xs:enumeration value="Fire"/>
-    <xs:enumeration value="Magic"/>
-    <xs:enumeration value="Paralyse"/>
-    <xs:enumeration value="Petrify"/>
-    <xs:enumeration value="Physical"/>
-    <xs:enumeration value="Poison"/>
-    <xs:enumeration value="Slow"/>
-    <xs:enumeration value="StealGold"/>
-    <xs:enumeration value="StealItem"/>
-    <xs:enumeration value="Stun"/>
-    <xs:enumeration value="Teleport"/>
-  </xs:restriction>
-</xs:simpleType>
-
 <!-- entity -->
 <xs:complexType name="entity">
-  <xs:choice minOccurs="0" maxOccurs="unbounded">
-    <xs:element name="attack" type="attack"/>
-    <xs:element name="specialAttack" type="specialAttack"/>
-    <xs:element name="resist" type="resist"/>
-    <xs:element name="confer" type="confer"/>
-    <xs:element name="give" type="item"/>
-  </xs:choice>
+  <xs:sequence>
+    <xs:element name="description" minOccurs="0" type="xs:string"/>
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="attack" type="attack"/>
+      <xs:element name="specialAttack" type="specialAttack"/>
+      <xs:element name="resist" type="resist"/>
+      <xs:element name="confer" type="confer"/>
+      <xs:element name="give" type="itemDef"/>
+    </xs:choice>
+  </xs:sequence>
 
   <xs:attribute name="ai" type="xs:string"/>
   <xs:attribute name="class" type="classList"/>
   <xs:attribute name="chance" type="percent"/>
   <xs:attribute name="color" type="color"/>
-  <xs:attribute name="defaultState" type="aiState"/>
-  <xs:attribute name="id" type="xs:string" use="required"/>
+  <xs:attribute name="corpseChance" type="percent"/>
+  <xs:attribute name="id" type="xs:string"/>
   <xs:attribute name="inherit" type="xs:IDREF"/>
   <xs:attribute name="level" type="intRange"/>
   <xs:attribute name="flies" type="xs:boolean" default="false"/>
-  <xs:attribute name="maxSpawn" type="xs:integer" default="120"/>
-
+  <xs:attribute name="maxSpawn" type="nnint" default="120"/>
   <xs:attribute name="name" type="xs:string"/>
-  <xs:attribute name="race" type="xs:string"/>
+
+  <xs:attribute name="race">
+    <xs:simpleType>
+      <xs:restriction base="xs:string">
+        <xs:enumeration value="Player"/>
+        <xs:enumeration value="Human"/>
+        <xs:enumeration value="Orc"/>
+      </xs:restriction>
+    </xs:simpleType>
+  </xs:attribute>
 
   <xs:attribute name="size">
     <xs:simpleType>
@@ -157,25 +86,26 @@
 
   <xs:attribute name="socialGroup" type="xs:string"/>
   <xs:attribute name="spawnSize" type="intRange" default="1"/>
-  <xs:attribute name="type" type="xs:string" use="required"/>
+  <xs:attribute name="type" type="xs:string"/>
 
   <xs:attribute name="gender" default="either">
     <xs:simpleType>
       <xs:restriction base="xs:string">
-        <xs:enumeration value="male"/>
-        <xs:enumeration value="female"/>
-        <xs:enumeration value="neither"/>
-        <xs:enumeration value="either"/>
+        <xs:enumeration value="Male"/>
+        <xs:enumeration value="Female"/>
+        <xs:enumeration value="Neither"/>
+        <xs:enumeration value="Either"/>
       </xs:restriction>
     </xs:simpleType>
   </xs:attribute>
   
-  <xs:attribute name="str" type="intRange" default="0"/>
-  <xs:attribute name="int" type="intRange" default="0"/>
-  <xs:attribute name="dex" type="intRange" default="0"/>
-  <xs:attribute name="ev" type="intRange" default="0"/>
-  <xs:attribute name="ac" type="intRange" default="0"/>
-  <xs:attribute name="speed" type="intRange" default="50"/>
+  <xs:attribute name="str" type="intRange"/>
+  <xs:attribute name="int" type="intRange"/>
+  <xs:attribute name="dex" type="intRange"/>
+  <xs:attribute name="ev" type="intRange"/>
+  <xs:attribute name="ac" type="intRange"/>
+  <xs:attribute name="light" type="intRange"/>
+  <xs:attribute name="speed" type="intRange"/>
   <xs:attribute name="maxHP" type="intRange"/>
   <xs:attribute name="maxMP" type="intRange"/>
 
@@ -185,9 +115,9 @@
 <!-- entityClass -->
 <xs:simpleType name="entityClass">
   <xs:restriction base="xs:string">
-    <xs:enumeration value="*Melee*"/>
-    <xs:enumeration value="*Ranged*"/>
-    <xs:enumeration value="*Magic*"/>
+    <xs:enumeration value="Melee"/>
+    <xs:enumeration value="Ranged"/>
+    <xs:enumeration value="Magic"/>
 
     <xs:enumeration value="Fighter"/>
     <xs:enumeration value="Wizard"/>
@@ -216,22 +146,18 @@
       </xs:complexType>
     </xs:element>
   </xs:choice>
-  <xs:attribute name="name" type="xs:string"/>
-</xs:complexType>
 
-<!-- resist -->
-<xs:complexType name="resist">
-  <xs:attribute name="type" type="damageType" use="required"/>
-  <xs:attribute name="amount" type="damageAmount"/>
+  <xs:attribute name="name" type="xs:string"/>
 </xs:complexType>
 
 <!-- specialAttack -->
 <xs:complexType name="specialAttack">
-  <xs:attribute name="name" type="xs:string" use="required"/>
-  <xs:attribute name="chance" type="percent" use="required"/>
   <xs:sequence>
     <xs:element name="attack" type="attack" minOccurs="1" maxOccurs="unbounded"/>
   </xs:sequence>
+
+  <xs:attribute name="name" type="xs:string" use="required"/>
+  <xs:attribute name="chance" type="percent" use="required"/>
 </xs:complexType>
 
 <!-- entities -->

@@ -84,22 +84,37 @@ public class Xml
     return sb.ToString();
   }
 
-  public static float FloatValue(XmlAttribute attr) { return FloatValue(attr, 0); }
-  public static float FloatValue(XmlAttribute attr, float defaultValue)
-  { return attr==null ? defaultValue : float.Parse(attr.Value);
-  }
-  public static float FloatValue(XmlNode node, string attr) { return FloatValue(node.Attributes[attr], 0); }
-  public static float FloatValue(XmlNode node, string attr, float defaultValue)
-  { return FloatValue(node.Attributes[attr], defaultValue);
+  public static Color Color(XmlAttribute attr) { return Color(attr.Value); }
+  public static Color Color(string color) { return (Color)Enum.Parse(typeof(Color), color); }
+
+  public static EntityClass EntityClass(XmlNode node, string attr) { return EntityClass(node.Attributes[attr].Value); }
+  public static EntityClass EntityClass(XmlAttribute attr) { return EntityClass(attr.Value); }
+  public static EntityClass EntityClass(string entClass)
+  { return (EntityClass)Enum.Parse(typeof(EntityClass), entClass);
   }
 
-  public static int IntValue(XmlAttribute attr) { return IntValue(attr, 0); }
-  public static int IntValue(XmlAttribute attr, int defaultValue)
+  public static float Float(XmlAttribute attr) { return Float(attr, 0); }
+  public static float Float(XmlAttribute attr, float defaultValue)
+  { return attr==null ? defaultValue : float.Parse(attr.Value);
+  }
+  public static float Float(XmlNode node, string attr) { return Float(node.Attributes[attr], 0); }
+  public static float Float(XmlNode node, string attr, float defaultValue)
+  { return Float(node.Attributes[attr], defaultValue);
+  }
+
+  public static Gender Gender(XmlAttribute attr) { return Gender(attr.Value); }
+  public static Gender Gender(string gender)
+  { return gender=="Either" ? Global.Coinflip() ? Chrono.Gender.Male : Chrono.Gender.Female :
+                            (Gender)Enum.Parse(typeof(Gender), gender);
+  }
+
+  public static int Int(XmlAttribute attr) { return Int(attr, 0); }
+  public static int Int(XmlAttribute attr, int defaultValue)
   { return attr==null ? defaultValue : int.Parse(attr.Value);
   }
-  public static int IntValue(XmlNode node, string attr) { return IntValue(node.Attributes[attr], 0); }
-  public static int IntValue(XmlNode node, string attr, int defaultValue)
-  { return IntValue(node.Attributes[attr], defaultValue);
+  public static int Int(XmlNode node, string attr) { return Int(node.Attributes[attr], 0); }
+  public static int Int(XmlNode node, string attr, int defaultValue)
+  { return Int(node.Attributes[attr], defaultValue);
   }
 
   public static bool IsEmpty(XmlAttribute attr) { return attr==null || IsEmpty(attr.Value); }
@@ -109,6 +124,16 @@ public class Xml
   public static bool IsTrue(XmlAttribute attr) { return attr!=null && IsTrue(attr.Value); }
   public static bool IsTrue(string str) { return str!=null && str!="" && str!="0" && str.ToLower()!="false"; }
   public static bool IsTrue(XmlNode node, string attr) { return IsTrue(node.Attributes[attr]); }
+
+  public static string[] List(XmlNode node, string attr) { return List(node.Attributes[attr]); }
+  public static string[] List(XmlAttribute attr) { return IsEmpty(attr) ? new string[0] : split.Split(attr.Value); }
+  public static string[] List(string data) { return IsEmpty(data) ? new string[0] : split.Split(data); }
+
+  public static Race Race(XmlNode node, string attr) { return Race(node.Attributes[attr].Value); }
+  public static Race Race(XmlAttribute attr) { return Race(attr.Value); }
+  public static Race Race(string race)
+  { return race=="Player" ? App.Player.Race : (Race)Enum.Parse(typeof(Race), race);
+  }
 
   public static int RangeInt(string range) { return RangeInt(range, 0); }
   public static int RangeInt(string range, int defaultValue)
@@ -129,8 +154,9 @@ public class Xml
   public static string String(XmlAttribute str, string defaultValue) { return str==null ? defaultValue : str.Value; }
   public static string String(XmlNode node, string attr) { return String(node.Attributes[attr]); }
   
-  static Regex ltbl = new Regex(@"^(?:\s*\n)+|\s+$", RegexOptions.Singleline);
-  static Regex lspc = new Regex(@"^\s+", RegexOptions.Singleline);
+  static Regex ltbl  = new Regex(@"^(?:\s*\n)+|\s+$", RegexOptions.Singleline);
+  static Regex lspc  = new Regex(@"^\s+", RegexOptions.Singleline);
+  static Regex split = new Regex(@"\s+", RegexOptions.Singleline);
 }
 
 } // namespace Chrono

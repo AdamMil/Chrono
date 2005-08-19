@@ -21,10 +21,10 @@ public abstract class Shield : Wieldable
 
 #region XmlShield
 public sealed class XmlShield : Shield
-{ public XmlShield(XmlNode node)
-  { XmlItem.Init(this, node);
-    BlockChance = Xml.IntValue(node, "blockChance");
-    if(!Xml.IsEmpty("ev")) SetAttr(Attr.EV, Xml.IntValue(node, "ev"));
+{ public XmlShield() { }
+  public XmlShield(XmlNode node)
+  { XmlItem.InitModifying(this, node);
+    BlockChance = Xml.Int(node, "blockChance");
   }
 }
 #endregion

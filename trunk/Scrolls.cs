@@ -12,7 +12,6 @@ public abstract class Scroll : Readable
   { Class=ItemClass.Scroll; Prefix="scroll of "; PluralSuffix=""; PluralPrefix="scrolls of "; Weight=1;
     Durability=75; Color=Color.White;
   }
-  static Scroll() { Global.Randomize(names); }
 
   public override string Name { get { return Spell.Name; } }
 
@@ -22,22 +21,26 @@ public abstract class Scroll : Readable
 
   public override string GetFullName(Entity e, bool forceSingular)
   { if(e==null || e.KnowsAbout(this)) return base.GetFullName(e, forceSingular);
-    string tn = GetType().ToString(), rn = (string)namemap[tn];
-    if(rn==null) namemap[tn] = rn = names[namei++];
+    string rn = names[NameIndex];
     rn = (!forceSingular && Count>1 ? Count+" scrolls" : "scroll") + " labeled "+rn;
     if(Title!=null) rn += " named "+Title;
     return rn;
   }
 
   public virtual void Read(Entity user) // only called interactively
-  { if(Spell.AutoIdentify && user==App.Player && !user.KnowsAbout(this))
-    { user.AddKnowledge(this);
-      App.IO.Print("This is {0}.", GetAName(user));
-    }
+  { if(user==App.Player) AutoIdentify();
     if(!Cast(user)) App.IO.Print("The scroll crumbles into dust.");
   }
 
   public Spell Spell;
+  public int NameIndex;
+
+  protected void AutoIdentify()
+  { if(Spell.AutoIdentify && !App.Player.KnowsAbout(this))
+    { App.Player.AddKnowledge(this);
+      App.IO.Print("This is {0}.", GetAName(App.Player));
+    }
+  }
 
   protected bool Cast(Entity user)
   { switch(Spell.GetSpellTarget(user))
@@ -58,35 +61,25 @@ public abstract class Scroll : Readable
   }
 
   protected string Prompt;
-
-  static System.Collections.Hashtable namemap = new System.Collections.Hashtable();
-  static readonly string[] names;
-  static int namei;
 }
 #endregion
 
 public class IdentifyScroll : Scroll
-{ public IdentifyScroll()
-  { name="identify"; Spell=IdentifySpell.Default; Prompt="Identify which item?";
-  }
+{ public IdentifyScroll() { Spell=IdentifySpell.Default; Prompt="Identify which item?"; ShopValue=40; }
 
   public override void Read(Entity user)
-  { if(Cursed && Global.Coinflip()) App.IO.Print("Nothing seems to happen.");
+  { if(user==App.Player) AutoIdentify();
+
+    if(Blessed && Global.Coinflip())
+    { foreach(Item i in user.Inv) if(!i.Identified) Spell.Cast(user, Status, i);
+    }
     else
-    { if(Spell.AutoIdentify && user==App.Player && !user.KnowsAbout(this))
-      { user.AddKnowledge(this);
-        App.IO.Print("This is {0}.", GetAName(user));
-      }
-      if(!Blessed || Global.Rand(100)<80)
-      { int n = Blessed ? Global.Rand(3) + 2 : 1;
-        while(n-->0) Cast(user);
-      }
-      else foreach(Item i in user.Inv) if(!i.Identified) Spell.Cast(user, i);
+    { int n = Blessed ? Global.Rand(3) + 2 : 1;
+      while(n-->0) Cast(user);
     }
   }
 
   public static readonly int SpawnChance=250; // 2.5% chance
-  public static readonly int ShopValue=40;
 }
 
 #region XmlScroll

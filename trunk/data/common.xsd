@@ -1,3 +1,119 @@
 <?xml version="1.0" encoding="utf-8" ?> 
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+<!-- color -->
+<xs:simpleType name="color">
+  <xs:restriction base="xs:string">
+    <xs:enumeration value="Black"/>
+    <xs:enumeration value="Red"/>
+    <xs:enumeration value="Green"/>
+    <xs:enumeration value="Blue"/>
+    <xs:enumeration value="Cyan"/>
+    <xs:enumeration value="Purple"/>
+    <xs:enumeration value="Brown"/>
+    <xs:enumeration value="Grey"/>
+    <xs:enumeration value="DarkGrey"/>
+    <xs:enumeration value="LightRed"/>
+    <xs:enumeration value="LightGreen"/>
+    <xs:enumeration value="LightBlue"/>
+    <xs:enumeration value="LightCyan"/>
+    <xs:enumeration value="Magenta"/>
+    <xs:enumeration value="Yellow"/>
+    <xs:enumeration value="White"/>
+    <xs:enumeration value="Normal"/>
+    <xs:enumeration value="Warning"/>
+    <xs:enumeration value="Dir"/>
+  </xs:restriction>
+</xs:simpleType>
+
+<!-- damageType -->
+<xs:simpleType name="damageType">
+  <xs:restriction base="xs:string">
+    <xs:enumeration value="Acid"/>
+    <xs:enumeration value="Blind"/>
+    <xs:enumeration value="Cold"/>
+    <xs:enumeration value="Direct"/>
+    <xs:enumeration value="DrainDex"/>
+    <xs:enumeration value="DrainInt"/>
+    <xs:enumeration value="DrainStr"/>
+    <xs:enumeration value="Electricity"/>
+    <xs:enumeration value="Fire"/>
+    <xs:enumeration value="Magic"/>
+    <xs:enumeration value="Paralyse"/>
+    <xs:enumeration value="Petrify"/>
+    <xs:enumeration value="Physical"/>
+    <xs:enumeration value="Poison"/>
+    <xs:enumeration value="Slow"/>
+    <xs:enumeration value="StealGold"/>
+    <xs:enumeration value="StealItem"/>
+    <xs:enumeration value="Stun"/>
+    <xs:enumeration value="Teleport"/>
+  </xs:restriction>
+</xs:simpleType>
+
+<!-- intRange -->
+<xs:simpleType name="intRange">
+  <xs:restriction base="xs:string">
+    <xs:pattern value="\d+((:|d)\d+)?"/>
+  </xs:restriction>
+</xs:simpleType>
+
+<!-- nnint -->
+<xs:simpleType name="nnint">
+  <xs:restriction base="xs:integer">
+    <xs:minInclusive value="0"/>
+  </xs:restriction>
+</xs:simpleType>
+
+<!-- material -->
+<xs:simpleType name="material">
+  <xs:restriction base="xs:string">
+    <xs:enumeration value="Paper"/>
+    <xs:enumeration value="Leather"/>
+    <xs:enumeration value="Wood"/>
+    <xs:enumeration value="Metal"/>
+    <xs:enumeration value="Glass"/>
+  </xs:restriction>
+</xs:simpleType>
+
+<!-- percent -->
+<xs:simpleType name="percent">
+  <xs:restriction base="xs:decimal">
+    <xs:minInclusive value="0"/>
+    <xs:maxInclusive value="100"/>
+  </xs:restriction>
+</xs:simpleType>
+
+<!-- resist -->
+<xs:complexType name="resist">
+  <xs:attribute name="type" type="damageType" use="required"/>
+  <xs:attribute name="amount" type="intRange"/>
+</xs:complexType>
+
+<!-- slot -->
+<xs:simpleType name="slot">
+  <xs:restriction base="xs:string">
+    <xs:enumeration value="Ring"/>
+    <xs:enumeration value="Head"/>
+    <xs:enumeration value="Cloak"/>
+    <xs:enumeration value="Torso"/>
+    <xs:enumeration value="Legs"/>
+    <xs:enumeration value="Neck"/>
+    <xs:enumeration value="Hands"/>
+    <xs:enumeration value="Feet"/>
+    <xs:enumeration value="LRing"/>
+    <xs:enumeration value="RRing"/>
+  </xs:restriction>
+</xs:simpleType>
+
+<!-- itemDef -->
+<xs:complexType name="itemDef">
+  <xs:sequence>
+    <xs:any processContents="skip" maxOccurs="unbounded"/>
+  </xs:sequence>
+
+  <xs:attribute name="class" type="xs:string" use="required"/>
+  <xs:anyAttribute processContents="skip"/>
+</xs:complexType>
+
 </xs:schema>

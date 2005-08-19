@@ -6,7 +6,8 @@ namespace Chrono
 
 #region XmlTool
 public sealed class XmlTool : Item
-{ public XmlTool(XmlNode node)
+{ public XmlTool() { Class=ItemClass.Tool; }
+  public XmlTool(XmlNode node) : this()
   { XmlItem.Init(this, node);
     Spell = XmlItem.GetSpell(node);
 
@@ -16,14 +17,18 @@ public sealed class XmlTool : Item
       default: throw new NotImplementedException("unhandled spell target");
     }
   }
-  
+
+  public override bool CanStackWith(Item item) { return base.CanStackWith(item) && item.Name==Name; }
+
   public override bool Use(Entity user, Direction dir)
-  { Spell.Cast(user, Status, dir);
+  { user.OnUse(this);
+    Spell.Cast(user, Status, dir);
     return false;
   }
 
   public override bool Use(Entity user, System.Drawing.Point target)
-  { Spell.Cast(user, Status, target);
+  { user.OnUse(this);
+    Spell.Cast(user, Status, target);
     return false;
   }
 
@@ -33,7 +38,8 @@ public sealed class XmlTool : Item
 
 #region XmlChargeTool
 public sealed class XmlChargedTool : Chargeable
-{ public XmlChargedTool(XmlNode node)
+{ public XmlChargedTool() { Class=ItemClass.Tool; }
+  public XmlChargedTool(XmlNode node) : this()
   { XmlItem.Init(this, node);
     Spell = XmlItem.GetSpell(node);
     Charges = Xml.RangeInt(node, "charges");
@@ -45,8 +51,11 @@ public sealed class XmlChargedTool : Chargeable
     }
   }
   
+  public override bool CanStackWith(Item item) { return base.CanStackWith(item) && item.Name==Name; }
+
   public override bool Use(Entity user, Direction dir)
-  { if(Charges>0)
+  { user.OnUse(this);
+    if(Charges>0)
     { Spell.Cast(user, Status, dir);
       Charges--;
       return false;
@@ -55,7 +64,8 @@ public sealed class XmlChargedTool : Chargeable
   }
 
   public override bool Use(Entity user, System.Drawing.Point target)
-  { if(Charges>0)
+  { user.OnUse(this);
+    if(Charges>0)
     { Spell.Cast(user, Status, target);
       Charges--;
       return false;

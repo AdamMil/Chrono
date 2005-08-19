@@ -293,37 +293,32 @@ public class Map : UniqueObject
   { Type[] types = typeof(Item).Assembly.GetTypes();
     ArrayList[] lists = new ArrayList[(int)ShopType.NumTypes];
     for(int i=0; i<lists.Length; i++) lists[i] = new ArrayList();
-    foreach(Type t in types)
-    { if(!t.IsAbstract && t.IsSerializable && t.IsSubclassOf(typeof(Item)))
-      { FieldInfo f = t.GetField("ShopValue", BindingFlags.Public|BindingFlags.Static);
-        if(f==null || (int)f.GetValue(null)<=0) continue;
-        SpawnInfo si = new SpawnInfo(t);
 
-        Item i = (Item)t.GetConstructor(Type.EmptyTypes).Invoke(null);
-        if(i.Class!=ItemClass.Gold) lists[(int)ShopType.General].Add(si);
-
-        switch(i.Class)
-        { case ItemClass.Amulet: case ItemClass.Ring:
-            lists[(int)ShopType.Accessories].Add(si);
-            lists[(int)ShopType.Magic].Add(si);
-            break;
-          case ItemClass.Ammo: case ItemClass.Weapon:
-            lists[(int)ShopType.ArmorWeapons].Add(si);
-            lists[(int)ShopType.Weapons].Add(si);
-            break;
-          case ItemClass.Armor: case ItemClass.Shield:
-            lists[(int)ShopType.Armor].Add(si);
-            lists[(int)ShopType.ArmorWeapons].Add(si);
-            break;
-          case ItemClass.Food: lists[(int)ShopType.Food].Add(si); break;
-          case ItemClass.Scroll: case ItemClass.Spellbook:
-            lists[(int)ShopType.Books].Add(si);
-            lists[(int)ShopType.Magic].Add(si);
-            break;
-          case ItemClass.Wand: case ItemClass.Potion: lists[(int)ShopType.Magic].Add(si); break;
-        }
+    foreach(SpawnInfo si in Global.Items)
+    { if(si.Value<=0) continue;
+      if(si.Class!=ItemClass.Gold) lists[(int)ShopType.General].Add(si);
+      switch(si.Class)
+      { case ItemClass.Amulet: case ItemClass.Ring:
+          lists[(int)ShopType.Accessories].Add(si);
+          lists[(int)ShopType.Magic].Add(si);
+          break;
+        case ItemClass.Ammo: case ItemClass.Weapon:
+          lists[(int)ShopType.ArmorWeapons].Add(si);
+          lists[(int)ShopType.Weapons].Add(si);
+          break;
+        case ItemClass.Armor: case ItemClass.Shield:
+          lists[(int)ShopType.Armor].Add(si);
+          lists[(int)ShopType.ArmorWeapons].Add(si);
+          break;
+        case ItemClass.Food: lists[(int)ShopType.Food].Add(si); break;
+        case ItemClass.Scroll: case ItemClass.Spellbook:
+          lists[(int)ShopType.Books].Add(si);
+          lists[(int)ShopType.Magic].Add(si);
+          break;
+        case ItemClass.Wand: case ItemClass.Potion: lists[(int)ShopType.Magic].Add(si); break;
       }
     }
+
     objSpawns = new SpawnInfo[lists.Length][];
     for(int i=0; i<lists.Length; i++) objSpawns[i] = (SpawnInfo[])lists[i].ToArray(typeof(SpawnInfo));
   }
@@ -375,7 +370,9 @@ public class Map : UniqueObject
 
   public void AddShop(Rectangle rect, ShopType type) { AddShop(rect, type, true); }
   public void AddShop(Rectangle rect, ShopType type, bool stock)
-  { AddShop(rect, type, (Shopkeeper)Entity.Generate(typeof(Shopkeeper), Global.Rand(3), EntityClass.Fighter), stock);
+  { Shopkeeper sk = new Shopkeeper();
+    AI.Make(sk, 2, Race.Human, EntityClass.Fighter);
+    AddShop(rect, type, sk, stock);
   }
   public void AddShop(Rectangle rect, ShopType type, Shopkeeper shopkeeper, bool stock)
   { Shop shop = new Shop(rect, shopkeeper, type);
@@ -901,7 +898,7 @@ public class Map : UniqueObject
     #endregion
     
     foreach(XmlNode npc in root.SelectNodes("npc"))
-    { AI ai = AI.Load(npc);
+    { AI ai = AI.MakeNpc(npc);
       ai.Position = map.FindXmlLocation(npc, links);
       map.Entities.Add(ai);
     }

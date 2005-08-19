@@ -65,14 +65,13 @@ public abstract class Arrow : Ammo
 }
 
 public class BasicArrow : Arrow
-{ public BasicArrow() { name="arrow"; }
+{ public BasicArrow() { name="arrow"; ShopValue=8; }
   
   public static readonly int SpawnChance=300, SpawnMin=4, SpawnMax=12; // 3% chance, 4-12 arrows
-  public static readonly int ShopValue=8;
 }
 
 public class FlamingArrow : Arrow
-{ public FlamingArrow() { name="flaming arrow"; }
+{ public FlamingArrow() { name="flaming arrow"; ShopValue=12; }
 
   public override Damage ModDamage(Damage damage)
   { damage.Heat += (ushort)Global.NdN(1, 4);
@@ -80,12 +79,11 @@ public class FlamingArrow : Arrow
   }
 
   public static readonly int SpawnChance=300, SpawnMin=3, SpawnMax=8; // 1% chance, 3-8 arrows
-  public static readonly int ShopValue=12;
 }
 #endregion
 
 public class PoisonDart : Weapon
-{ public PoisonDart() { wClass=WeaponClass.Thrown; Ranged=true; name="poisoned dart"; Weight=2; }
+{ public PoisonDart() { wClass=WeaponClass.Thrown; Ranged=true; name="poisoned dart"; Weight=2; ShopValue=12; }
 
   public override Damage CalculateDamage(Entity user, Ammo ammo, Entity target)
   { Damage d = new Damage(Global.NdN(1, 3+(int)CompatibleWith(user)) + user.StrBonus/3 + DamageBonus);
@@ -95,12 +93,11 @@ public class PoisonDart : Weapon
 
   public static readonly int SpawnChance=300; // 3% chance
   public static readonly int SpawnMin=3, SpawnMax=10;
-  public static readonly int ShopValue=10;
 }
 
 public class Bow : FiringWeapon
 { public Bow()
-  { name="recurved bow"; AmmoName="arrows"; AllHandWield=true;
+  { name="recurved bow"; AmmoName="arrows"; AllHandWield=true; ShopValue=225;
     Color=Color.LightCyan; Weight=20; Delay=25; wClass=WeaponClass.Bow; Exercises=Attr.Dex; Noise=2;
   }
 
@@ -116,13 +113,12 @@ public class Bow : FiringWeapon
   }
 
   public static readonly int SpawnChance=200; // 2% chance
-  public static readonly int ShopValue=225;
 }
 
 public class ShortSword : Weapon
 { public ShortSword()
   { name="short sword"; Color=Color.Purple; Weight=35; Delay=5;
-    wClass=WeaponClass.ShortBlade; Exercises=Attr.Str; Noise=5;
+    wClass=WeaponClass.ShortBlade; Exercises=Attr.Str; Noise=5; ShopValue=130;
   }
 
   public override Damage CalculateDamage(Entity user, Ammo ammo, Entity target)
@@ -130,7 +126,6 @@ public class ShortSword : Weapon
   }
 
   public static readonly int SpawnChance=400; // 4% chance
-  public static readonly int ShopValue=130;
 }
 
 } // namespace Chrono

@@ -5,14 +5,14 @@
            elementFormDefault="qualified">
 
   <xs:complexType name="group">
-    <xs:attribute name="name" type="xs:id" use="required"/>
+    <xs:attribute name="name" type="xs:ID" use="required"/>
     <xs:attribute name="hostile" type="xs:boolean" default="false"/>
     <xs:attribute name="permanent" type="xs:boolean" default="false"/>
   </xs:complexType>
   
   <xs:complexType name="socialGroups">
     <xs:sequence>
-      <xs:element name="list" type="list" maxOccurs="unbounded"/>
+      <xs:element name="group" type="group" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
   </xs:complexType>
 

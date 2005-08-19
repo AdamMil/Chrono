@@ -3,79 +3,71 @@
            xmlns:xs="http://www.w3.org/2001/XMLSchema"
            targetNamespace="http://www.adammil.net/Chrono/items">
 
-<!-- color -->
-<xs:simpleType name="color">
+<xs:include schemaLocation="common.xsd"/>
+
+<xs:simpleType name="spell">
   <xs:restriction base="xs:string">
-    <xs:enumeration value="Black"/>
-    <xs:enumeration value="Red"/>
-    <xs:enumeration value="Green"/>
-    <xs:enumeration value="Blue"/>
-    <xs:enumeration value="Cyan"/>
-    <xs:enumeration value="Purple"/>
-    <xs:enumeration value="Brown"/>
-    <xs:enumeration value="Grey"/>
-    <xs:enumeration value="DarkGrey"/>
-    <xs:enumeration value="LightRed"/>
-    <xs:enumeration value="LightGreen"/>
-    <xs:enumeration value="LightBlue"/>
-    <xs:enumeration value="LightCyan"/>
-    <xs:enumeration value="Magenta"/>
-    <xs:enumeration value="Yellow"/>
-    <xs:enumeration value="White"/>
-    <xs:enumeration value="Normal"/>
-    <xs:enumeration value="Warning"/>
-    <xs:enumeration value="Dir"/>
+    <xs:enumeration value="ForceBolt"/>
+    <xs:enumeration value="Fire"/>
+    <xs:enumeration value="Teleport"/>
+    <xs:enumeration value="Amnesia"/>
+    <xs:enumeration value="Heal"/>
+    <xs:enumeration value="RemoveScent"/>
   </xs:restriction>
 </xs:simpleType>
-
-<!-- intRange -->
-<xs:simpleType name="intRange">
-  <xs:restriction base="xs:string">
-    <xs:pattern value="\d+((:|d)\d+)?"/>
-  </xs:restriction>
-</xs:simpleType>
-
-<xs:simpleType name="material">
-  <xs:restriction base="xs:string">
-    <xs:enumeration value="Paper"/>
-    <xs:enumeration value="Leather"/>
-    <xs:enumeration value="Wood"/>
-    <xs:enumeration value="Metal"/>
-    <xs:enumeration value="Glass"/>
-  </xs:restriction>
-</xs:simpleType>
-
-<!-- percent -->
-<xs:simpleType name="percent">
-  <xs:restriction base="xs:integer">
-    <xs:minInclusive value="0"/>
-    <xs:maxInclusive value="100"/>
-  </xs:restriction>
-</xs:simpleType>
-
-<!--xs:include schemaLocation="common.xsd"/--> <!-- above definitions should go in common.xsd -->
 
 <xs:complexType name="item">
+  <xs:sequence>
+    <xs:element name="longDesc" type="xs:string" minOccurs="0"/>
+    <xs:element name="resist" type="resist" minOccurs="0" maxOccurs="unbounded"/>
+  </xs:sequence>
+
   <xs:attribute name="name" type="xs:string" use="required"/>
   <xs:attribute name="prefix" type="xs:string"/>
   <xs:attribute name="pluralPrefix" type="xs:string"/>
   <xs:attribute name="pluralSuffix" type="xs:string"/>
   <xs:attribute name="color" type="color"/>
-  <xs:attribute name="weight" type="xs:integer"/>
+  <xs:attribute name="weight" type="nnint"/>
   <xs:attribute name="chance" type="percent" use="required"/>
-  <xs:attribute name="value" type="xs:integer"/>
+  <xs:attribute name="value" type="nnint"/>
   <xs:attribute name="shortDesc" type="xs:string"/>
   <xs:attribute name="longDesc" type="xs:string"/>
   <xs:attribute name="spawn" type="intRange" default="1"/>
 
-  <xs:sequence>
-    <xs:element name="longDesc" type="xs:string" minOccurs="0"/>
-  </xs:sequence>
+  <xs:attribute name="status" default="Random">
+    <xs:simpleType>
+      <xs:restriction base="xs:string">
+        <xs:enumeration value="Blessed"/>
+        <xs:enumeration value="Cursed"/>
+        <xs:enumeration value="Uncursed"/>
+        <xs:enumeration value="Random"/>
+      </xs:restriction>
+    </xs:simpleType>
+  </xs:attribute>
 </xs:complexType>
 
-<xs:complexType name="effectItem">
+<xs:complexType name="spellItem">
   <xs:complexContent>
     <xs:extension base="item">
+      <xs:attribute name="spell" type="spell"/>
+    </xs:extension>
+  </xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="wearableItem">
+  <xs:complexContent>
+    <xs:extension base="item">
+      <xs:attribute name="ac" type="xs:integer"/>
+      <xs:attribute name="dex" type="xs:integer"/>
+      <xs:attribute name="ev" type="xs:integer"/>
+      <xs:attribute name="int" type="xs:integer"/>
+      <xs:attribute name="light" type="xs:integer"/>
+      <xs:attribute name="maxHP" type="xs:integer"/>
+      <xs:attribute name="maxMP" type="xs:integer"/>
+      <xs:attribute name="speed" type="xs:integer"/>
+      <xs:attribute name="stealth" type="xs:integer"/>
+      <xs:attribute name="str" type="xs:integer"/>
+
       <xs:attribute name="effects">
         <xs:simpleType>
           <xs:list>
@@ -92,30 +84,7 @@
           </xs:list>
         </xs:simpleType>
       </xs:attribute>
-    </xs:extension>
-  </xs:complexContent>
-</xs:complexType>
 
-<xs:complexType name="spellItem">
-  <xs:complexContent>
-    <xs:extension base="item">
-      <xs:attribute name="spell">
-        <xs:simpleType>
-          <xs:restriction base="xs:string">
-            <xs:enumeration value="ForceBolt"/>
-            <xs:enumeration value="Fire"/>
-            <xs:enumeration value="Teleport"/>
-            <xs:enumeration value="Amnesia"/>
-          </xs:restriction>
-        </xs:simpleType>
-      </xs:attribute>
-    </xs:extension>
-  </xs:complexContent>
-</xs:complexType>
-
-<xs:complexType name="wearableItem">
-  <xs:complexContent>
-    <xs:extension base="item">
       <xs:attribute name="material" type="material"/>
     </xs:extension>
   </xs:complexContent>
@@ -124,25 +93,7 @@
 <xs:complexType name="armor">
   <xs:complexContent>
     <xs:extension base="wearableItem">
-      <xs:attribute name="ac" type="xs:integer"/>
-      <xs:attribute name="ev" type="xs:integer"/>
-
-      <xs:attribute name="slot" use="required">
-        <xs:simpleType>
-          <xs:restriction base="xs:string">
-            <xs:enumeration value="Ring"/>
-            <xs:enumeration value="Head"/>
-            <xs:enumeration value="Cloak"/>
-            <xs:enumeration value="Torso"/>
-            <xs:enumeration value="Legs"/>
-            <xs:enumeration value="Neck"/>
-            <xs:enumeration value="Hands"/>
-            <xs:enumeration value="Feet"/>
-            <xs:enumeration value="LRing"/>
-            <xs:enumeration value="RRing"/>
-          </xs:restriction>
-        </xs:simpleType>
-      </xs:attribute>
+      <xs:attribute name="slot" use="required" type="slot"/>
     </xs:extension>
   </xs:complexContent>
 </xs:complexType>
@@ -150,7 +101,7 @@
 <xs:complexType name="food">
   <xs:complexContent>
     <xs:extension base="item">
-      <xs:attribute name="decayTime" type="xs:integer"/>
+      <xs:attribute name="decayTime" type="nnint"/>
     </xs:extension>
   </xs:complexContent>
 </xs:complexType>
@@ -163,9 +114,8 @@
 
 <xs:complexType name="ring">
   <xs:complexContent>
-    <xs:extension base="effectItem">
+    <xs:extension base="wearableItem">
       <xs:attribute name="extraHunger" type="xs:integer"/>
-      <xs:attribute name="material" type="material"/>
     </xs:extension>
   </xs:complexContent>
 </xs:complexType>
@@ -181,8 +131,20 @@
 <xs:complexType name="shield">
   <xs:complexContent>
     <xs:extension base="wearableItem">
-      <xs:attribute name="blockChance" type="xs:integer" use="required"/>
-      <xs:attribute name="ev" type="xs:integer"/>
+      <xs:attribute name="blockChance" type="percent" use="required"/>
+    </xs:extension>
+  </xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="spellbook">
+  <xs:complexContent>
+    <xs:extension base="item">
+      <xs:attribute name="reads" type="intRange"/>
+      <xs:attribute name="spells">
+        <xs:simpleType>
+          <xs:list itemType="spell"/>
+        </xs:simpleType>
+      </xs:attribute>
     </xs:extension>
   </xs:complexContent>
 </xs:complexType>
@@ -210,6 +172,7 @@
     <xs:element name="potions" type="xs:string"/>
     <xs:element name="rings" type="xs:string"/>
     <xs:element name="scrolls" type="xs:string"/>
+    <xs:element name="spellbooks" type="xs:string"/>
     <xs:element name="wands" type="xs:string"/>
 
     <xs:choice minOccurs="0" maxOccurs="unbounded">

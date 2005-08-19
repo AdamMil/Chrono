@@ -267,6 +267,11 @@
                     BuildAction = "Content"
                 />
                 <File
+                    RelPath = "data\common.xsx"
+                    DependentUpon = "common.xsd"
+                    BuildAction = "None"
+                />
+                <File
                     RelPath = "data\entities.xml"
                     BuildAction = "Content"
                 />

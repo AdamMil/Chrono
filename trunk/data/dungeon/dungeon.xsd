@@ -3,14 +3,7 @@
            xmlns="http://www.adammil.net/Chrono/dungeon"
            xmlns:xs="http://www.w3.org/2001/XMLSchema">
 
-<!-- intRange -->
-<xs:simpleType name="intRange">
-  <xs:restriction base="xs:string">
-    <xs:pattern value="\d+(:\d+)?"/>
-  </xs:restriction>
-</xs:simpleType>
-
-<!--xs:include schemaLocation="../common.xsd"/--> <!-- above definitions should go in common.xsd -->
+<xs:include schemaLocation="../common.xsd"/>
 
 <!-- levels -->
 <xs:complexType name="levels">

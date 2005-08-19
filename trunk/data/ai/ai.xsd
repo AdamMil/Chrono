@@ -3,17 +3,7 @@
            xmlns:xs="http://www.w3.org/2001/XMLSchema"
            targetNamespace="http://www.adammil.net/Chrono/ai">
 
-<!-- item -->
-<xs:complexType name="item">
-  <xs:sequence>
-    <xs:any processContents="skip" maxOccurs="unbounded"/>
-  </xs:sequence>
-
-  <xs:attribute name="class" type="xs:string" use="required"/>
-  <xs:anyAttribute processContents="skip"/>
-</xs:complexType>
-
-<!--xs:include schemaLocation="../common.xsd"/--> <!-- above definitions should go in common.xsd -->
+<xs:include schemaLocation="../common.xsd"/>
 
 <!-- aiState -->
 <xs:simpleType name="aiState">
@@ -29,6 +19,22 @@
     <xs:enumeration value="Working"/>
   </xs:restriction>
 </xs:simpleType>
+
+<xs:complexType name="give">
+  <xs:complexContent>
+    <xs:extension base="itemDef">
+      <xs:attribute name="spawn">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="yes"/>
+            <xs:enumeration value="no"/>
+            <xs:enumeration value="maybe"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+    </xs:extension>
+  </xs:complexContent>
+</xs:complexType>
 
 <!-- varString
   [prefix:]name
@@ -131,8 +137,8 @@
 
 <!-- giveXP -->
 <xs:complexType name="giveXP">
-  <xs:attribute name="xp" type="xs:integer"/>
-  <xs:attribute name="pool" type="xs:integer"/>
+  <xs:attribute name="xp" type="nnint"/>
+  <xs:attribute name="pool" type="nnint"/>
 </xs:complexType>
 
 <!-- goto -->
@@ -185,7 +191,7 @@
     <xs:element name="decrement" type="varAccess"/>
     <xs:element name="end"   type="empty"/>
     <xs:element name="goto"  type="goto"/>
-    <xs:element name="give"  type="item"/>
+    <xs:element name="give"  type="give"/>
     <xs:element name="giveQuest" type="giveQuest"/>
     <xs:element name="giveXP" type="giveXP"/>
     <xs:element name="if"    type="if"/>
@@ -284,7 +290,7 @@
     <xs:element name="onDeath" minOccurs="0" type="action"/>
   </xs:sequence>
 
-  <xs:attribute name="id" type="xs:id"/>
+  <xs:attribute name="id" type="xs:ID"/>
   <xs:attribute name="defaultState" type="aiState" default="Wandering"/>
 </xs:complexType>
 

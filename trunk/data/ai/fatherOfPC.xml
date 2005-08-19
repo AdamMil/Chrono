@@ -33,7 +33,7 @@
     <text id="AskAgain">Have you reconsidered? This is urgent!</text>
     <text id="WillLook">Yes father, I will look for him.</text>
     <text id="UmmNo">Umm, let me think. No.</text>
-    <text id="WontLook">But I'm just a young {man/woman}! Why don't you go?</text>
+    <text id="WontLook">But I'm just a young {man}! Why don't you go?</text>
     <text id="GaveUp">Nah, that guy's hard to find. I give up.</text>
     <text id="Accept">
       Thank you son. I'd been saving this for your education, but you'll need to equip yourself.

@@ -11,7 +11,7 @@
 
   <room id="pcHouse" width="4:6" height="4:6" required="true"/>
 
-  <npc id="fatherOfPC" ai="fatherOfPC">
+  <npc entity="Pa" id="Pa">
     <location room="pcHouse"/>
   </npc>
 </map:map>

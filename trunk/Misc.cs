@@ -93,48 +93,50 @@ public struct SocialGroup
 #region SpawnInfo
 public struct SpawnInfo
 { public SpawnInfo(Type t)
-  { Item=t;
+  { Item = t;
 
     BindingFlags flags = BindingFlags.FlattenHierarchy|BindingFlags.Static|BindingFlags.Public;
     FieldInfo f = t.GetField("SpawnChance", flags);
-    Chance = (int)Math.Ceiling((float)f.GetValue(null)*100);
+    Chance = f==null ? 0 : (int)f.GetValue(null);
+    Class  = ItemClass.Any; // pacify the compiler
+    Value  = 0;
+    if(Chance==0) Count = new Range();
+    else
+    { f = t.GetField("SpawnMin", flags);
+      int min = f==null ? 1 : (int)f.GetValue(null);
 
-    f = t.GetField("SpawnMin", flags);
-    int min = f==null ? 1 : (int)f.GetValue(null);
+      f = t.GetField("SpawnMax", flags);
+      int max = f==null ? min : (int)f.GetValue(null);
 
-    f = t.GetField("SpawnMax", flags);
-    int max = f==null ? min : (int)f.GetValue(null);
+      Value = 0;
+      Count = new Range(min, max);
 
-    f = t.GetField("ShopValue", flags);
-    Value = f==null ? 0 : (int)f.GetValue(null);
-    
-    Count = new Range(min, max);
+      Item item = MakeItem();
+      Class = item.Class;
+      Value = item.ShopValue;
+    }
   }
 
   public SpawnInfo(XmlNode node)
   { Item   = node;
-    Chance = (int)Math.Ceiling(Xml.FloatValue(node, "chance", 0)*100);
-    Value  = Xml.IntValue(node, "value", 0);
-    Count  = new Range(node, "spawn", 1);
+    Chance = (int)Math.Ceiling(Xml.Float(node, "chance", 0)*100);
+    if(Chance==0)
+    { Value = 0;
+      Class = ItemClass.Any;
+      Count = new Range();
+    }
+    else
+    { Value  = Xml.Int(node, "value", 0);
+      Count  = new Range(node, "spawn", 1);
+      Class  = (ItemClass)Enum.Parse(typeof(ItemClass), node.LocalName, true);
+    }
   }
 
   public Item MakeItem()
   { Item item;
 
     if(Item is Type) item = (Item)((Type)Item).GetConstructor(Type.EmptyTypes).Invoke(null);
-    else
-    { XmlNode node = (XmlNode)Item;
-      switch(node.LocalName)
-      { case "armor": item=new XmlArmor(node); break;
-        case "food": item=new XmlFood(node); break;
-        case "ring": item=new XmlRing(node); break;
-        case "scroll": item=new XmlScroll(node); break;
-        case "shield": item=new XmlShield(node); break;
-        case "tool": item=Xml.IsEmpty(node, "charges") ? new XmlTool(node) : (Item)new XmlChargedTool(node); break;
-        case "wand": item=new XmlWand(node); break;
-        default: throw new NotImplementedException("unknown xml item type: "+node.LocalName);
-      }
-    }
+    else item = Chrono.Item.Make((XmlNode)Item);
 
     item.Count = Count.RandValue();
 
@@ -175,6 +177,7 @@ public struct SpawnInfo
   public object Item;
   public int Chance, Value;
   public Range Count;
+  public ItemClass Class;
 }
 #endregion
 
@@ -250,6 +253,29 @@ public sealed class Global
     vars[name] = value;
   }
 
+  public static XmlNode GetEntity(string name)
+  { // FIXME: escape names that contain single quotes
+    XmlNode ret = entities.SelectSingleNode("//entity[@name='"+name+"']");
+    if(ret==null) throw new ArgumentException("No such entity: "+name);
+    return ret;
+  }
+
+  public static XmlNode GetEntityByID(string id)
+  { XmlNode ret = entities.SelectSingleNode("//entity[@id='"+id+"']");
+    if(ret==null) throw new ArgumentException("No such entity: "+id);
+    return ret;
+  }
+
+  public static XmlNode GetItem(ItemClass itemClass, string name)
+  { return GetItem(itemClass.ToString().ToLower(), name);
+  }
+  public static XmlNode GetItem(string type, string name)
+  { // FIXME: escape names that contain single quotes
+    XmlNode ret = items.SelectSingleNode("//"+type+"[@name='"+name+"']");
+    if(ret==null) throw new ArgumentException("No such item: "+name);
+    return ret;
+  }
+
   public static string GetVar(string name)
   { if(vars.Contains(name)) return (string)vars[name];
     throw new ArgumentException("variable "+name+" not declared");
@@ -257,6 +283,33 @@ public sealed class Global
 
   public static System.IO.Stream LoadData(string path)
   { return System.IO.File.Open("../../data/"+path, System.IO.FileMode.Open, System.IO.FileAccess.Read);
+  }
+
+  public static void LoadNames(string group, out string[] names)
+  { names = split.Split(items.SelectSingleNode("//"+group).InnerText);
+    for(int i=0; i<names.Length; i++)
+    { int j = Rand(names.Length);
+      string t = names[i]; names[i] = names[j]; names[j] = t;
+    }
+  }
+
+  public static void LoadNames(string group, out string[] names, out Color[] colors)
+  { string[] items = split.Split(Global.items.SelectSingleNode("//"+group).InnerText);
+    names  = items;
+    colors = new Color[items.Length];
+
+    for(int i=0; i<items.Length; i++)
+    { string item = items[i];
+      int pos = item.IndexOf('/');
+      colors[i] = (Color)Enum.Parse(typeof(Color), item.Substring(0, pos));
+      names[i]  = item.Substring(pos+1);
+    }
+
+    for(int i=0; i<items.Length; i++)
+    { int j = Rand(names.Length);
+      string n = names[i]; names[i] = names[j]; names[j] = n;
+      Color  c = colors[i]; colors[i] = colors[j]; colors[j] = c;
+    }
   }
 
   public static System.Xml.XmlDocument LoadXml(string path)
@@ -267,7 +320,7 @@ public sealed class Global
     return doc;
   }
 
-  // these only accept cardinal directions (eg, not self, up, down, or invalid)
+  // these only accept planar directions (ie, not self, up, down, or invalid)
   public static Point Move(Point pt, Direction d) { return Move(pt, (int)d); }
   public static Point Move(Point pt, int d)
   { if(d<0) { d=d%8; if(d!=0) d+=8; }
@@ -285,9 +338,9 @@ public sealed class Global
   public static SpawnInfo NextSpawn()
   { int n = Random.Next(10000)+1, total=0;
     while(true)
-    { total += objSpawns[spawnIndex].Chance;
-      if(++spawnIndex==objSpawns.Length) spawnIndex=0;
-      if(total>=n) return objSpawns[spawnIndex==0 ? objSpawns.Length-1 : spawnIndex-1];
+    { total += Items[spawnIndex].Chance;
+      if(++spawnIndex==Items.Length) spawnIndex=0;
+      if(total>=n) return Items[spawnIndex==0 ? Items.Length-1 : spawnIndex-1];
     }
   }
 
@@ -302,17 +355,14 @@ public sealed class Global
   public static int Rand(int max) { return Random.Next(max); }
   public static double RandDouble() { return Random.NextDouble(); }
   
-  public static void Randomize(string[] names)
-  { for(int i=0; i<names.Length; i++)
-    { int j = Rand(names.Length);
-      string t = names[i]; names[i] = names[j]; names[j] = t;
-    }
-  }
-  public static void Randomize(string[] names, Color[] colors)
-  { for(int i=0; i<names.Length; i++)
-    { int j = Rand(names.Length);
-      string n = names[i]; names[i] = names[j]; names[j] = n;
-      Color  c = colors[i]; colors[i] = colors[j]; colors[j] = c;
+  public static void SetObjectValue(object obj, string name, string value)
+  { Type type = obj.GetType();
+    PropertyInfo pi = type.GetProperty(name, BindingFlags.Public|BindingFlags.NonPublic|BindingFlags.Instance|BindingFlags.IgnoreCase);
+    if(pi!=null && pi.CanWrite) pi.SetValue(obj, Global.ChangeType(value, pi.PropertyType), null);
+    else
+    { FieldInfo fi = type.GetField(name, BindingFlags.Public|BindingFlags.NonPublic|BindingFlags.Instance|BindingFlags.IgnoreCase);
+      if(fi==null) throw new ArgumentException("Tried to set nonexistant property "+name+" on "+type);
+      fi.SetValue(obj, Global.ChangeType(value, fi.FieldType));
     }
   }
 
@@ -372,7 +422,11 @@ public sealed class Global
     new Point(0, 1),  new Point(-1, 1), new Point(-1, 0), new Point(-1, -1)
   };
   
-  public static Hashtable ObjHash;
+  public static SpawnInfo[] Items;
+
+  static void LoadEntities()
+  {
+  }
 
   static void LoadItems()
   { ArrayList list = new ArrayList();
@@ -384,11 +438,13 @@ public sealed class Global
       }
 
     foreach(XmlNode node in items.DocumentElement.ChildNodes)
-    { SpawnInfo si = new SpawnInfo(node);
-      if(si.Chance!=0) list.Add(si);
+    { if(node is XmlElement)
+      { SpawnInfo si = new SpawnInfo(node);
+        if(si.Chance!=0) list.Add(si);
+      }
     }
 
-    objSpawns = (SpawnInfo[])list.ToArray(typeof(SpawnInfo));
+    Items = (SpawnInfo[])list.ToArray(typeof(SpawnInfo));
   }
 
   static void LoadSocialGroups()
@@ -401,11 +457,11 @@ public sealed class Global
 
   static readonly XmlDocument entities=LoadXml("entities.xml"), items=LoadXml("items.xml");
   static Hashtable vars=new Hashtable(), namedSocialGroups=new Hashtable();
-  static SpawnInfo[] objSpawns;
   static SocialGroup[] socialGroups;
   static Random Random = new Random();
   static ulong nextID=1;
   static int spawnIndex, numSocials;
+  static System.Text.RegularExpressions.Regex split = new System.Text.RegularExpressions.Regex(@"\s*,\s*");
 }
 #endregion
 

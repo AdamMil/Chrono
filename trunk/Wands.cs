@@ -8,24 +8,16 @@ namespace Chrono
 
 #region Wand
 public abstract class Wand : Chargeable
-{ public Wand()
-  { Class=ItemClass.Wand; Weight=15;
-
-    object i = namemap[GetType().ToString()];
-    if(i==null) { Color = colors[namei]; namemap[GetType().ToString()] = namei++; }
-    else Color = colors[(int)i];
-  }
-  static Wand() { Global.Randomize(names, colors); }
+{ public Wand() { Class=ItemClass.Wand; Weight=15; }
 
   public override string Name { get { return "wand of "+Spell.Name; } }
 
   public override string GetFullName(Entity e, bool forceSingular)
   { string suffix = Identified ? string.Format(" ({0}:{1})", Charges, Recharged) : "";
     if(e==null || e.KnowsAbout(this)) return base.GetFullName(e, forceSingular) + suffix;
-    int i = (int)namemap[GetType().ToString()];
     string status = status = StatusString;
     if(status!="") status += ' ';
-    string rn = status + names[i] + " wand" + suffix;
+    string rn = status + names[NameIndex] + " wand" + suffix;
     if(Title!=null) rn += " named "+Title;
     return rn;
   }
@@ -48,22 +40,16 @@ public abstract class Wand : Chargeable
 
   public Spell Spell;
   public string Effect; // the message shown on the first use
+  public int NameIndex;
 
   protected virtual void Cast(Entity user, Point target, Direction dir)
-  { if(Spell.AutoIdentify && !App.Player.KnowsAbout(this))
-    { if(user==App.Player || App.Player.CanSee(user.Position))
-      { App.Player.AddKnowledge(this);
-        if(Effect!=null) App.IO.Print(Effect);
-      }
-      if(user==App.Player) App.IO.Print("This is {0}.", GetAName(user));
+  { if(Spell.AutoIdentify && !App.Player.KnowsAbout(this) && (user==App.Player || App.Player.CanSee(user)))
+    { App.Player.AddKnowledge(this);
+      if(Effect!=null) App.IO.Print(Effect);
+      App.IO.Print("{0} is {1}.", user==App.Player ? "This" : "That", GetAName(user));
     }
     Spell.Cast(user, Status, target, dir);
   }
-
-  static Hashtable namemap = new Hashtable();
-  static readonly string[] names;
-  static readonly Color[] colors;
-  static int namei;
 }
 #endregion
 

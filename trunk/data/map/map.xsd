@@ -3,22 +3,7 @@
            xmlns="http://www.adammil.net/Chrono/map"
            xmlns:xs="http://www.w3.org/2001/XMLSchema">
 
-<!-- intRange -->
-<xs:simpleType name="intRange">
-  <xs:restriction base="xs:string">
-    <xs:pattern value="\d+((:|d)\d+)?"/>
-  </xs:restriction>
-</xs:simpleType>
-
-<!-- percent -->
-<xs:simpleType name="percent">
-  <xs:restriction base="xs:integer">
-    <xs:minInclusive value="0"/>
-    <xs:maxInclusive value="100"/>
-  </xs:restriction>
-</xs:simpleType>
-
-<!--xs:include schemaLocation="../common.xsd"/--> <!-- above definitions should go in common.xsd -->
+<xs:include schemaLocation="../common.xsd"/>
 
 <!-- direction -->
 <xs:simpleType name="direction">
@@ -126,13 +111,6 @@
   </xs:restriction>
 </xs:simpleType>
 
-<!-- sizeString -->
-<xs:simpleType name="sizeString">
-  <xs:restriction base="xs:string">
-    <xs:pattern value="\d+(-\d+)?|-\d+"/>
-  </xs:restriction>
-</xs:simpleType>
-
 <!-- relTo -->
 <xs:complexType name="relTo">
   <xs:sequence>
@@ -170,8 +148,8 @@
 <xs:complexType name="room">
   <xs:attribute name="id" type="xs:ID"/>
   <xs:attribute name="required" type="xs:boolean"/>
-  <xs:attribute name="width" type="sizeString"/>
-  <xs:attribute name="height" type="sizeString"/>
+  <xs:attribute name="width" type="intRange"/>
+  <xs:attribute name="height" type="intRange"/>
 </xs:complexType>
 
 <!-- link -->
@@ -231,16 +209,17 @@
   <xs:sequence>
     <xs:element name="spawn" type="spawn" maxOccurs="unbounded"/>
   </xs:sequence>
-  <xs:attribute name="min" type="xs:integer"/>
-  <xs:attribute name="max" type="xs:integer"/>
-  <xs:attribute name="start" type="xs:integer"/>
-  <xs:attribute name="rate" type="xs:integer"/>
+  <xs:attribute name="min" type="nnint"/>
+  <xs:attribute name="max" type="nnint"/>
+  <xs:attribute name="start" type="nnint"/>
+  <xs:attribute name="rate" type="nnint"/>
 </xs:complexType>
 
 <!-- npc -->
 <xs:complexType name="npc"
   <xs:sequence>
     <xs:element name="location" type="location" minOccurs="0"/>
+    <xs:element name="give" type="itemDef" minOccurs="0" maxOccurs="unbounded"/>
   </xs:sequence>
   <xs:attribute name="entity" type="xs:string"/>
 </xs:complexType>

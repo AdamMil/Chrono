@@ -183,7 +183,7 @@ public sealed class ConsoleIO : InputOutput
         WriteLine(Color.Normal, "{0} (lv{1}, {2})", selected.Name, selected.Level, selected.Class);
         console.WriteLine();
 
-        string desc = GetString(selected, "Description");
+        string desc = selected.Description;
         if(desc!=null) WriteWrapped(desc, mapW);
         else console.WriteLine("THIS SPELL IS MISSING A DESCRIPTION.");
         console.WriteLine();
@@ -429,7 +429,7 @@ public sealed class ConsoleIO : InputOutput
     System.Collections.ICollection items = entity.Knowledge.Keys;
     string[] arr = new string[items.Count];
     int i=0;
-    foreach(string s in items)
+    foreach(string s in items) // FIXME: this is probably wrong now
       arr[i++] = ((Item)Type.GetType(s).GetConstructor(Type.EmptyTypes).Invoke(null)).GetFullName(null);
     Array.Sort(arr, System.Collections.Comparer.Default);
     for(i=0; i<arr.Length; i++) AddLine(arr[i]);
@@ -503,7 +503,7 @@ public sealed class ConsoleIO : InputOutput
     console.SetCursorPosition(0, 0);
     console.WriteLine("{0} - {1}", item.Char, item.GetInvName(viewer));
     console.WriteLine();
-    string noiseStr=null, shortDesc=GetString(item, "ShortDesc"), longDesc=GetString(item, "LongDesc");
+    string noiseStr=null, shortDesc=item.ShortDesc, longDesc=item.LongDesc;
     if(shortDesc!=null)
     { WriteWrapped(shortDesc, MapWidth);
       console.WriteLine();
@@ -925,7 +925,7 @@ public sealed class ConsoleIO : InputOutput
     console.WriteLine("{0}, Race: {1}", entity.AName, entity.Race);
     console.WriteLine();
 
-    string desc = GetString(entity, "Description");
+    string desc = entity.Description;
     if(desc!=null)
     { WriteWrapped(desc, MapWidth);
       console.WriteLine();
@@ -1348,11 +1348,6 @@ Ctrl-P - see old messages";
 
   static NTConsole.CharInfo CreatureToChar(Entity c, bool visible)
   { return new NTConsole.CharInfo(raceMap[(int)c.Race], visible ? ColorToAttr(c.Color) : NTConsole.Attribute.DarkGrey);
-  }
-
-  static string GetString(object o, string field)
-  { FieldInfo f = o.GetType().GetField(field, BindingFlags.DeclaredOnly|BindingFlags.Public|BindingFlags.Static);
-    return f==null ? null : (string)f.GetValue(null);
   }
 
   static NTConsole.CharInfo ItemToChar(Item item)

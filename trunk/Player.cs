@@ -74,7 +74,7 @@ public class Player : Entity
           if((food.Flags&Food.Flag.Tainted)!=0) prefix += "tainted ";
           Die(prefix+"food");
         }
-        else if(killer is Item) Die(prefix + ((Item)killer).GetAName(this));
+        else if(killer is Item) Die(prefix + ((Item)killer).GetAName(this, true));
         else Die(cause==Death.Poison ? "poison" : "sickness");
         break;
       }
@@ -90,12 +90,6 @@ public class Player : Entity
   { foreach(Quest q in quests) if(q.Name==name) return q;
     if(throwOnError) throw new ArgumentException("no such quest: "+name);
     return null;
-  }
-
-  public override void Generate(int level, EntityClass myClass)
-  { base.Generate(level, myClass);
-    LevelUp(); ExpLevel--; // players start with slightly higher stats
-    ExpPool = (level+1)*25;
   }
 
   public override void OnAttrChange(Attr attribute, int amount, bool fromExercise)
@@ -114,7 +108,7 @@ public class Player : Entity
     App.IO.Print(Color.Green, "You feel {0}!", feel);
   }
 
-  public override void OnDrink(Potion potion) { App.IO.Print("You drink {0}.", potion.GetAName(this)); }
+  public override void OnDrink(Potion potion) { App.IO.Print("You drink {0}.", potion.GetAName(this, true)); }
 
   public override bool OnDrop(Item item)
   { App.IO.Print("You drop {0}.", item.GetAName(this));
@@ -193,6 +187,8 @@ public class Player : Entity
     }
   }
 
+  public override void OnExpLevelChange(int diff) { Title=GetTitle(); }
+
   public override void OnFlagsChanged(Chrono.Entity.Flag oldFlags, Chrono.Entity.Flag newFlags)
   { Flag diff = oldFlags ^ newFlags;
     if((diff&oldFlags&Flag.Sleep)!=0) App.IO.Print("You wake up.");
@@ -200,6 +196,8 @@ public class Player : Entity
       App.IO.Print((newFlags&Flag.Confuse)==0 ? "Your head clears a bit." : "You stumble, confused.");
     if((diff&Flag.Hallucinate)!=0)
       App.IO.Print((newFlags&Flag.Hallucinate)==0 ? "Everything looks SO boring now." : "Whoa, trippy, man!");
+    if((diff&Flag.Levitate)!=0) App.IO.Print((newFlags&Flag.Levitate)==0 ? "You float gently back to the ground."
+                                                                         : "You rise up from the ground.");
     if((diff&(Flag.Invisible|Flag.SeeInvisible))!=0)
     { if((diff&Flag.Invisible)!=0) // invisibility changed
       { if((newFlags&Flag.Invisible)!=0 && (newFlags&Flag.SeeInvisible)==0) App.IO.Print("You vanish from sight.");
@@ -231,7 +229,7 @@ public class Player : Entity
                                     item is Spell ? "The spell" : CanSee(attacker) ? attacker.TheName : "It");
   }
 
-  public override void OnInvoke(Item item) { App.IO.Print("You invoke {0}.", item.GetAName(this)); }
+  public override void OnInvoke(Item item) { App.IO.Print("You invoke {0}.", item.GetAName(this, true)); }
   public override void OnKill(Entity killed) { App.IO.Print("You kill {0}!", killed.theName); }
 
   public override void OnMapChanged()
@@ -287,7 +285,7 @@ public class Player : Entity
       item.Shop.Shopkeeper.PlayerTook(item);
   }
 
-  public override void OnReadScroll(Scroll item) { App.IO.Print("You read {0}.", item.GetAName(this)); }
+  public override void OnReadScroll(Scroll item) { App.IO.Print("You read {0}.", item.GetAName(this, true)); }
   public override void OnRemove(Wearable item) { App.IO.Print("You remove {0}.", item.GetAName(this)); }
   public override void OnSick(string howSick) { App.IO.Print(Color.Dire, "You feel {0}.", howSick); }
 
@@ -295,6 +293,7 @@ public class Player : Entity
   { App.IO.Print(Color.Green, "Your {0} skill went up!", skill.ToString().ToLower());
   }
 
+  public override void OnUse(Item item) { App.IO.Print("You use {0}.", item.GetAName(this, true)); }
   public override void OnUnequip(Wieldable item) { App.IO.Print("You unequip {0}.", item.GetAName(this)); }
   public override void OnWear(Wearable item) { App.IO.Print("You put on {0}.", item.GetAName(this)); }
 
@@ -310,10 +309,30 @@ public class Player : Entity
   }
 
   public static Player Generate(EntityClass myClass, Race race)
-  { if(race==Race.RandomRace) { race = (Race)Global.Rand((int)Race.NumRaces); }
-    Player p = new Player();
-    p.Race = race;
-    p.Generate(0, myClass);
+  { Player p = new Player();
+    if(myClass==EntityClass.Random) myClass = (EntityClass)Global.Rand((int)EntityClass.NumClasses);
+
+    p.Class = myClass;
+    p.Race  = race;
+    p.Title = p.GetTitle();
+    p.ExpPool = 25;
+    p.SetBaseAttr(Attr.Light, 8);
+
+    int[] mods = raceAttrs[(int)race].Mods; // attributes for race
+    for(int i=0; i<mods.Length; i++) p.AlterBaseAttr((Attr)i, mods[i]);
+
+    mods = classAttrs[(int)myClass].Mods;   // attribute modifiers from class
+    for(int i=0; i<mods.Length; i++) p.AlterBaseAttr((Attr)i, mods[i]);
+
+    int points = 8; // allocate extra points randomly
+    while(points>0)
+    { int a = Global.Rand((int)Attr.NumBasics);
+      if(p.GetBaseAttr((Attr)a)<=17 || Global.Coinflip()) { p.AlterBaseAttr((Attr)a, 1); points--; }
+    }
+
+    p.HP=p.MaxHP;
+    p.MP=p.MaxMP;
+
     return p;
   }
 
@@ -1322,10 +1341,52 @@ public class Player : Entity
   { ItemClass.Amulet, ItemClass.Armor, ItemClass.Ring, ItemClass.Shield
   };
 
+  string GetTitle()
+  { string title=string.Empty;
+    ClassLevel[] classes = classTitles[(int)Class];
+    for(int i=0; i<classes.Length; i++)
+    { if(classes[i].Level>ExpLevel) break;
+      title = classes[i].Title;
+    }
+    return title;
+  }
+
+  struct AttrMods
+  { public AttrMods(params int[] mods) { Mods = mods; }
+    public int[] Mods;
+  }
+
+  struct ClassLevel
+  { public ClassLevel(int level, string title) { Level=level; Title=title; }
+    public int Level;
+    public string Title;
+  }
+
   ArrayList quests = new ArrayList();
   [NonSerialized] Input inp;
   [NonSerialized] PathFinder path = new PathFinder();
   HungerLevel oldHungerLevel;
+
+  static readonly AttrMods[] raceAttrs = new AttrMods[(int)Race.NumRaces] // base stats per race
+  { new AttrMods(6, 6, 6), // Human - 18
+    new AttrMods(9, 4, 3), // Orc   - 16
+  };
+  static readonly AttrMods[] classAttrs = new AttrMods[(int)EntityClass.NumPlayable] // stat modifiers per class
+  {                                            // CLASS    - Str+Dex+Int, HP/MP, Speed, AC/EV, Stealth
+    new AttrMods(7, 3, -1, 15, 2, 40, 0, 1),   // Fighter  - 9, 15/2=17, 40, 0/1, 0
+    new AttrMods(-1, 3, 7, 9, 8, 45, 0, 0, 1), // Wizard   - 9, 9/8=17,  45, 0/0, 1
+  };
+
+  // titles per exp level per class
+  static readonly ClassLevel[][] classTitles = new ClassLevel[(int)EntityClass.NumPlayable][]
+  { new ClassLevel[]
+    { new ClassLevel(1, "Whacker"), new ClassLevel(4, "Beater"), new ClassLevel(8, "Grunter"),
+      new ClassLevel(13, "Fighter"), new ClassLevel(19, "Veteran")
+    },
+    new ClassLevel[]
+    { new ClassLevel(1, "Neophyte"),
+    },
+  };
 }
 
 } // namespace Chrono

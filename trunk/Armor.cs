@@ -5,7 +5,7 @@ namespace Chrono
 {
 
 #region Armor
-public class Armor : Wearable
+public abstract class Armor : Wearable
 { public Armor() { Class=ItemClass.Armor; }
   
   public override string GetFullName(Entity e, bool forceSingular)
@@ -23,12 +23,11 @@ public class Armor : Wearable
 
 #region XmlArmor
 public sealed class XmlArmor : Armor
-{ public XmlArmor(XmlNode node)
-  { XmlItem.Init(this, node);
+{ public XmlArmor() { }
 
+  public XmlArmor(XmlNode node)
+  { XmlItem.InitModifying(this, node);
     Slot = XmlItem.GetSlot(node);
-    if(!Xml.IsEmpty(node, "ac")) SetAttr(Attr.AC, baseAC=Xml.IntValue(node, "ac"));
-    if(!Xml.IsEmpty(node, "ev")) SetAttr(Attr.EV, Xml.IntValue(node, "ev"));
   }
 }
 #endregion

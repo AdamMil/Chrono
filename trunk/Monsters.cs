@@ -7,10 +7,12 @@ namespace Chrono
 
 #region Orc
 public class Orc : AI
-{ public Orc() { Race=Race.Orc; Color=Color.Yellow; baseKillExp=10; canOpenDoors=true; }
+{ public Orc()
+  { Race=Race.Orc; Color=Color.Yellow; baseKillExp=10; canOpenDoors=true;
+  }
   
-  public override void Generate(int level, EntityClass myClass)
-  { base.Generate(level, myClass);
+  protected override void OnMake()
+  { base.OnMake();
 
     SetSkill(Skill.Fighting, 1);
 
@@ -24,7 +26,7 @@ public class Orc : AI
     else SetSkill(Skill.UnarmedCombat, 1);
     if(Global.Rand(100)<10) AddItem(Item.Make(ItemClass.Armor, "paper bag"));
     if(Global.Rand(100)<10) AddItem(Item.Make(ItemClass.Scroll, "teleport"));
-    if(Global.Rand(100)<10) AddItem(new HealPotion());
+    if(Global.Rand(100)<10) AddItem(Item.Make(ItemClass.Potion, "heal"));
   }
 }
 #endregion
@@ -36,6 +38,14 @@ public class Townsperson : AI
     { case 0: case 1: case 2: Race=Race.Human; break;
       case 3: Race=Race.Orc; break;
     }
+    
+    SetBaseAttr(Attr.Dex, 2);
+    SetBaseAttr(Attr.Int, 2);
+    SetBaseAttr(Attr.Str, 2);
+    SetBaseAttr(Attr.MaxHP, 10);
+    SetBaseAttr(Attr.MaxMP, 4);
+    SetBaseAttr(Attr.Speed, 45);
+
     IsAdult = Global.Coinflip();
     GotoState(defaultState = Global.OneIn(4) ? AIState.Wandering : AIState.Idle);
 
@@ -49,14 +59,14 @@ public class Townsperson : AI
     canOpenDoors =true;
   }
 
-  public override void Generate(int level, EntityClass myClass)
-  { base.Generate(level, myClass);
+  protected override void OnMake()
+  { base.OnMake();
 
     if(IsAdult)
     { SetSkill(Skill.Fighting, 1);
       SetSkill(Skill.UnarmedCombat, 1);
       
-      Male = baseName!="houseWife" && baseName!="prostitute";
+      Gender = baseName=="houseWife" && baseName=="prostitute" ? Gender.Female : Gender.Male;
 
       switch(baseName)
       { case "hunter":
@@ -114,13 +124,13 @@ public class Townsperson : AI
       }
     }
     else
-    { Male = Global.Coinflip();
-      baseName = Race.ToString().ToLower() + (Male ? " boy" : " girl");
+    { Gender = Global.Coinflip() ? Gender.Male : Gender.Female;
+      baseName = Race.ToString().ToLower() + (Gender==Gender.Male ? " boy" : " girl");
       AlterBaseAttr(Attr.Str, -1);    // children are weak,
       AlterBaseAttr(Attr.Dex, -1);    // clumsy,
       HP = SetBaseAttr(Attr.MaxHP, GetBaseAttr(Attr.MaxHP)/2);  // frail,
       AlterBaseAttr(Attr.Speed, 10);  // and slow
-      if(Male)
+      if(Gender==Gender.Male)
       { SetSkill(Skill.Dagger, 1);
         // TODO: give him a knife
       }
@@ -174,8 +184,7 @@ public class Townsperson : AI
 #region Shopkeeper
 public class Shopkeeper : AI
 { public Shopkeeper()
-  { Race     = Race.Human; // TODO: not always human...
-    baseName = "shopkeeper";
+  { baseName = "shopkeeper";
     alwaysHostile = false;
     canOpenDoors  = true;
     baseKillExp   = 50;
@@ -201,59 +210,6 @@ public class Shopkeeper : AI
   }
 
   public void ClearUnpaidItems(Inventory inv) { ClearUnpaidItems(Shop, inv); }
-
-  public override void Generate(int level, EntityClass myClass)
-  { base.Generate(level, myClass);
-    Male = Global.Rand(100)<80; // 80% chance of being male
-    priceMod = Global.Rand(85, 115) / 100.0;
-
-    // shopkeepers are tough
-    SetSkill(Skill.Armor, 5);
-    SetSkill(Skill.Casting, 5);
-    SetSkill(Skill.Dodge, 2);
-    SetSkill(Skill.Elemental, 4);
-    SetSkill(Skill.Fighting, 5);
-    SetSkill(Skill.MagicResistance, 3);
-    SetSkill(Skill.Telekinesis, 4);
-    SetSkill(Skill.UnarmedCombat, 3);
-    
-    AlterBaseAttr(Attr.AC, 3);
-    AlterBaseAttr(Attr.Dex, 3);
-    AlterBaseAttr(Attr.EV, 2);
-    AlterBaseAttr(Attr.Int, 3);
-    AlterBaseAttr(Attr.Speed, -10);
-    AlterBaseAttr(Attr.Str, 3);
-
-    SetRawFlag(Flag.SeeInvisible, true);
-    SetRawFlag(Flag.TeleportControl, true);
-
-    // TODO: give better armor
-    AddItem(Item.Make(ItemClass.Shield, "buckler"));
-    AddItem(Item.Make(ItemClass.Armor, "paper bag"));
-
-    AddItem(new HealPotion()).Count += 2;
-
-    switch(Global.Rand(4))
-    { case 0:
-        SetSkill(Skill.Axe, 5);
-        // TODO: give an axe
-        break;
-      case 1:
-        SetSkill(Skill.Crossbow, 5);
-        // TODO: give a crossbow
-        break;
-      case 2:
-        SetSkill(Skill.ShortBlade, 5);
-        AddItem(new ShortSword());
-        break;
-      case 3:
-        SetSkill(Skill.MaceFlail, 5);
-        // TODO: give a mace
-        break;
-    }
-    
-    AddItem(new Gold()).Count += Global.Rand(1500, 4000);
-  }
 
   public void GiveCredit(int amount) { credit += amount; }
 
@@ -340,11 +296,7 @@ public class Shopkeeper : AI
     else Say("I'm deducting {0} from your credit.", take);
   }
 
-  public int SellCost(Item item)
-  { if(item.Class==ItemClass.Gold) return item.Count;
-    int baseCost = (int)item.GetType().GetField("ShopValue", BindingFlags.Static|BindingFlags.Public).GetValue(item);
-    return (int)Math.Round(baseCost*item.Count * priceMod);
-  }
+  public int SellCost(Item item) { return (int)Math.Ceiling(item.ShopValue * item.Count * priceMod); }
 
   public override void TalkTo()
   { if(HostileTowards(App.Player))
@@ -459,6 +411,59 @@ public class Shopkeeper : AI
       return true;
     }
     else return base.HandleState(state);
+  }
+
+  protected override void OnMake()
+  { base.OnMake();
+    Gender = Global.Rand(100)<80 ? Gender.Male : Gender.Female; // 80% chance of being male
+    priceMod = Global.Rand(85, 115) / 100.0;
+
+    // shopkeepers are tough
+    SetSkill(Skill.Armor, 5);
+    SetSkill(Skill.Casting, 5);
+    SetSkill(Skill.Dodge, 2);
+    SetSkill(Skill.Elemental, 4);
+    SetSkill(Skill.Fighting, 5);
+    SetSkill(Skill.MagicResistance, 3);
+    SetSkill(Skill.Telekinesis, 4);
+    SetSkill(Skill.UnarmedCombat, 3);
+    
+    AlterBaseAttr(Attr.AC, 3);
+    AlterBaseAttr(Attr.Dex, 3);
+    AlterBaseAttr(Attr.EV, 2);
+    AlterBaseAttr(Attr.Int, 3);
+    AlterBaseAttr(Attr.Speed, -10);
+    AlterBaseAttr(Attr.Str, 3);
+
+    SetRawFlag(Flag.SeeInvisible, true);
+    SetRawFlag(Flag.TeleportControl, true);
+
+    // TODO: give better armor
+    AddItem(Item.Make(ItemClass.Shield, "buckler"));
+    AddItem(Item.Make(ItemClass.Armor, "paper bag"));
+
+    AddItem(Item.Make(ItemClass.Potion, "healing")).Count += 2;
+
+    switch(Global.Rand(4))
+    { case 0:
+        SetSkill(Skill.Axe, 5);
+        // TODO: give an axe
+        break;
+      case 1:
+        SetSkill(Skill.Crossbow, 5);
+        // TODO: give a crossbow
+        break;
+      case 2:
+        SetSkill(Skill.ShortBlade, 5);
+        AddItem(new ShortSword());
+        break;
+      case 3:
+        SetSkill(Skill.MaceFlail, 5);
+        // TODO: give a mace
+        break;
+    }
+    
+    AddItem(new Gold()).Count += Global.Rand(1500, 4000);
   }
 
   protected int credit;

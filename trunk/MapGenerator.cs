@@ -61,8 +61,8 @@ public class RoomyDungeonGenerator : MapGenerator
     if(opts!=null)
     { defaultWidth.R  = Xml.RangeInt(opts, "maxRoomWidth", defaultWidth.R);
       defaultHeight.R = Xml.RangeInt(opts, "maxRoomHeight", defaultHeight.R);
-      minRooms = Xml.IntValue(opts, "minRooms", minRooms);
-      maxRooms = Xml.IntValue(opts, "maxRooms", maxRooms);
+      minRooms = Xml.Int(opts, "minRooms", minRooms);
+      maxRooms = Xml.Int(opts, "maxRooms", maxRooms);
     }
 
     rooms.Clear();
@@ -252,7 +252,7 @@ public class RoomyDungeonGenerator : MapGenerator
 #region MetaCaveGenerator
 public class MetaCaveGenerator : MapGenerator
 { protected override void Generate(Map map, XmlNode root)
-  { int ncircles = Xml.IntValue(Xml.AttrNode(root.SelectSingleNode("generatorOptions"), "circles"), 50);
+  { int ncircles = Xml.Int(Xml.AttrNode(root.SelectSingleNode("generatorOptions"), "circles"), 50);
 
     Point[] centers = new Point[ncircles];
     PathFinder path = new PathFinder();
@@ -327,7 +327,8 @@ public class TownGenerator : MapGenerator
     // FIXME: this could cause problems because of its randomness... (eg, a room may fill up with people and then
     // FreeSpace(Rectangle) may fail, or something similar)
     for(int npeople=size/200; npeople>0; npeople--)
-    { Entity peon = Entity.Generate(typeof(Townsperson), Global.Rand(0, 3), EntityClass.Plain);
+    { Townsperson peon = new Townsperson();
+      AI.Make(peon, Global.Rand(1, 3), peon.Race, EntityClass.Plain);
       peon.Position = map.FreeSpace();
       peon.SocialGroup = map.GroupID;
       map.Entities.Add(peon);

@@ -10,6 +10,7 @@
 <potions>Green/green, Purple/purple, Grey/bubbly, Brown/fizzy</potions>
 <rings>Yellow/gold, Grey/silver, Yellow/brass, DarkGrey/iron</rings>
 <scrolls>READ ME, XGOCL APLFLCH, DROWSSAP, EUREKA!</scrolls>
+<spellbooks/>
 <wands>Yellow/gold, Blue/forked, Grey/lead, Brown/pointy</wands>
 
 <!-- armor -->
@@ -18,16 +19,22 @@
 <!-- food -->
 <food name="hamburger" color="Red" weight="5" chance="2.5" value="10"/>
 
+<!-- potions -->
+<potion name="healing" spell="Heal" chance="2" value="50"/>
+
 <!-- rings -->
 <ring name="invisibility" effects="Invisible" chance="0.5" value="400" extraHunger="2"/>
 <ring name="see invisible" effects="SeeInvisible" chance="0.5" value="250" extraHunger="2"/>
 
 <!-- scrolls -->
-<scroll name="teleport" spell="Teleport" chance="1" value="75"/>
+<scroll name="teleport" spell="Teleport" chance="1" value="75" aiUse="escape:5"/>
 
-<!-- shield -->
+<!-- shields -->
 <shield name="buckler" blockChance="15" weight="40" color="Grey" ev="-1" chance="1" value="125"
   shortDesc="A small, round shield."/>
+
+<!-- spellbooks -->
+<spellbook name="tinker toys" spells="Amnesia ForceBolt Teleport Fire" chance="0.1" value="250"/>
 
 <!-- tools -->
 <tool name="deodorant" prefix="stick of " pluralPrefix="sticks of " weight="2" charges="3d3"

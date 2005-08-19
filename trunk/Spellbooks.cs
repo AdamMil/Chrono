@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Xml;
 
 namespace Chrono
 {
@@ -15,14 +16,15 @@ public abstract class Spellbook : Readable
   public int Reads;
 }
 
-public class FoolsBook : Spellbook
-{ public FoolsBook()
-  { name="tinker toys";
-    Spells = new Spell[] { AmnesiaSpell.Default, ForceBolt.Default, TeleportSpell.Default, FireSpell.Default, };
-  }
+public sealed class XmlSpellbook : Spellbook
+{ public XmlSpellbook(XmlNode node)
+  { XmlItem.Init(this, node);
+    if(!Xml.IsEmpty(node, "reads")) Reads = Xml.RangeInt(node, "reads");
 
-  public static readonly int SpawnChance = 10; // 0.1% chance
-  public static readonly int ShopValue = 250;
+    string[] spells = Xml.List(node, "spells");
+    Spells = new Spell[spells.Length];
+    for(int i=0; i<spells.Length; i++) Spells[i] = Spell.Get(spells[i]);
+  }
 }
 
 } // namespace Chrono

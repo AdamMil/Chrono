@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" ?> 
+<?xml version="1.0" encoding="utf-8" ?> 
 
 <entities:entities
   xmlns:entities="http://www.adammil.net/Chrono/entities"
@@ -45,24 +45,24 @@
 
 <!-- humanoids -->
 <entityGroup name="humanoids">
-  <entity name="hobbit" class="*Melee*" type="Humanoid"
+  <entity name="hobbit" class="*MELEE*" type="Humanoid"
           level="1" ac="2" speed="40" chance="15" str="8:12" dex="10:14" int="7:13" ev="1">
     <attack type="Weapon"/>
   </entity>
 
-  <entity name="wizard" class="*Magic*" type="Humanoid"
+  <entity name="wizard" class="*MAGIC*" type="Humanoid"
           level="2" ac="2" speed="40" chance="10" str="8:12" dex="10:14" int="15:19" ev="1">
     <attack type="Magic"/>
   </entity>
 </entityGroup>
 
 <!-- quest related entities -->
-<entity name="Pa" ai="fatherOfPC" type="Townsperson" race="*Player*" gender="male" IsAdult="true" baseName="clerk">
+<entity name="Pa" ai="fatherOfPC" type="Townsperson" race="Player" IsAdult="true" baseName="clerk">
   <give class="Gold" count="1000"/>
 </entity>
 
-<entity name="Uncle John" ai="uncleJohn" type="Townsperson" gender="male" IsAdult="true" baseName="hunter">
+<entity name="Uncle John" ai="fathersBrother" type="Townsperson" race="Player" IsAdult="true" baseName="hunter">
   <give class="FlamingArrow" count="40"/>
-</charData>
+</entity>
 
 </entities:entities>

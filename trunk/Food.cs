@@ -67,7 +67,7 @@ public abstract class Food : Item
 #endregion
 
 public class FortuneCookie : Food
-{ public FortuneCookie() { name="fortune cookie"; Color=Color.Brown; Weight=1; }
+{ public FortuneCookie() { name="fortune cookie"; Color=Color.Brown; Weight=1; ShopValue=2; }
 
   public override bool Eat(Entity user)
   { if((Flags&Flag.Partial)==0) // use Partial to indicate whether or not it's been opened
@@ -79,11 +79,10 @@ public class FortuneCookie : Food
   }
 
   public static readonly int SpawnChance=50; // 0.5% chance
-  public static readonly int ShopValue=2;
 }
 
 #region Flesh
-public class Flesh : Food
+public sealed class Flesh : Food
 { public Flesh() { }
   public Flesh(Corpse from)
   { Color=from.Color; Weight=2; Prefix="chunk of "; PluralPrefix="chunks of "; PluralSuffix="";
@@ -99,9 +98,11 @@ public class Flesh : Food
 
 #region XmlFood
 public sealed class XmlFood : Food
-{ public XmlFood(XmlNode node)
+{ public XmlFood() { }
+
+  public XmlFood(XmlNode node)
   { XmlItem.Init(this, node);
-    if(!Xml.IsEmpty(node, "decayTime")) DecayTime = Xml.IntValue(node, "decayTime");
+    if(!Xml.IsEmpty(node, "decayTime")) DecayTime = Xml.Int(node, "decayTime");
   }
 }
 #endregion

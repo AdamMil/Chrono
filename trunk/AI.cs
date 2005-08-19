@@ -8,13 +8,14 @@ using System.Xml;
 namespace Chrono
 {
 
-public enum AIState
+public enum AIState : byte
 { Wandering, Idle, Asleep, Patrolling, Guarding, Attacking, Escaping, Working, Following
 };
 
+#region AI
 public abstract class AI : Entity
 { protected AI() { }
-  
+
   public bool IsAlert { get { return state==AIState.Attacking || state==AIState.Following; } }
   public bool IsHostile
   { get { return alwaysHostile || (SocialGroup!=-1 && Global.GetSocialGroup(SocialGroup).Hostile); }
@@ -30,30 +31,6 @@ public abstract class AI : Entity
       if(killer!=App.Player) App.IO.Print("{0} is killed!", TheName);
     }
     Die();
-  }
-
-  public override void Generate(int level, EntityClass myClass)
-  { if(level==0) level=1;
-    base.Generate(level, myClass);
-
-    int si = (int)Race*3;
-    Eyesight = raceSenses[si]; Hearing = raceSenses[si+1]; Smelling = raceSenses[si+2];
-
-    if(--level==0) return;
-
-    Skill[] skills = classSkills[(int)myClass];
-    AddSkills(100*level, skills);
-
-    if(myClass==EntityClass.Fighter) // then do more general skills
-    { skills = new Skill[(int)WeaponClass.NumClasses];
-      for(int i=0; i<skills.Length; i++) skills[i] = (Skill)i; // first N weapon classes are mapped directly to skills
-    }
-    else if(myClass==EntityClass.Wizard)
-    { skills = new Skill[(int)SpellClass.NumClasses];
-      for(int i=0; i<skills.Length; i++) skills[i] = (Skill)i + (int)Skill.MagicSkills;
-    }
-    else skills=null;
-    AddSkills(300*level, skills);
   }
 
   public bool HostileTowards(Entity e)
@@ -74,16 +51,27 @@ public abstract class AI : Entity
     }
   }
 
+  public override void OnExpLevelChange(int diff)
+  { if(App.Player.CanSee(this))
+      App.IO.Print("{0} suddenly looks {1} experienced.", TheName, diff<0 ? "less" : "more");
+  }
+
   public override void OnFlagsChanged(Chrono.Entity.Flag oldFlags, Chrono.Entity.Flag newFlags)
-  { Flag diff = oldFlags ^ newFlags;
-    if((diff&(Flag.Sleep|Flag.Invisible))!=0 && App.Player.CanSee(this))
-    { if((diff&newFlags&Flag.Sleep)!=0) App.IO.Print(TheName+" wakes up.");
-      if((diff&Flag.Invisible)!=0) // invisibility changed
-      { bool seeInvis = (App.Player.Flags&Flag.SeeInvisible)!=0;
-        if((newFlags&Flag.Invisible)!=0 && !seeInvis) App.IO.Print(TheName+" vanishes from sight.");
-        else if((newFlags&Flag.Invisible)==0 && !seeInvis) App.IO.Print(TheName+" reappears!");
-      }
+  { if(!App.Player.CanSee(Position)) return;
+
+    Flag diff = oldFlags ^ newFlags;
+    bool seeInvis = (App.Player.Flags&Flag.SeeInvisible)!=0;
+
+    if((diff&Flag.Invisible)!=0)
+    { if((newFlags&Flag.Invisible)!=0 && !seeInvis) App.IO.Print(TheName+" vanishes from sight.");
+      else if((newFlags&Flag.Invisible)==0 && !seeInvis) App.IO.Print(TheName+" reappears!");
     }
+    else if(!seeInvis && (newFlags&Flag.Invisible)!=0) return;
+
+    if((diff&Flag.Sleep)!=0) App.IO.Print(TheName + ((newFlags&Flag.Sleep)==0 ? " wakes up." : " falls asleep."));
+    if((diff&Flag.Levitate)!=0)
+      App.IO.Print(TheName + ((newFlags&Flag.Levitate)==0 ? " floats back down to the floor."
+                                                          : " floats up from the floor."));
   }
 
   public override void OnHitBy(Entity attacker, object item, Damage damage)
@@ -140,21 +128,27 @@ public abstract class AI : Entity
         if(t.Sound>maxNoise) { maxNoise=t.Sound; noiseDir=(Direction)i; }
       }
   }
+
   public override void OnPickup(Item item, IInventory inv)
   { item.Shop = null;
     Does("picks up", item);
   }
+
   public override void OnReadScroll(Scroll scroll) { Does("reads", scroll); }
   public override void OnRemove(Wearable item) { Does("removes", item); }
+
   public override void OnSick(string howSick)
   { if(App.Player.CanSee(this)) App.IO.Print("{0} looks {1}.", TheName, howSick);
   }
+
   public override void OnSkillUp(Skill skill)
   { if(App.Player.CanSee(this)) App.IO.Print("{0} looks more experienced.", TheName);
   }
+
   public override void OnUnequip(Wieldable item) { Does("unequips", item); }
+  public override void OnUse(Item item) { Does("uses", item); }
   public override void OnWear(Wearable item) { Does("puts on", item); }
-  
+
   public new void Pickup(IInventory inv, Item item)
   { if(items==null) items=new ArrayList();
     items.Add(base.Pickup(inv, item));
@@ -162,7 +156,7 @@ public abstract class AI : Entity
 
   public override void TalkTo()
   { if(canSpeak)
-    { if(ai==null || !ai.TryExecute("onSpeak", this))
+    { if(script==null || !script.TryExecute("onSpeak", this))
         Say(GetQuip(HostileTowards(App.Player) ? Quips.Attacking : Quips.Other));
     }
     else App.IO.Print(TheName+" grunts (you're not sure if it can speak).");
@@ -182,60 +176,354 @@ public abstract class AI : Entity
   }
 
   public byte CorpseChance=30;   // chance of leaving a corpse, 0-100%
-  
-  public static Item CreateItem(XmlNode inode)
-  { Type type = Type.GetType("Chrono."+inode.Attributes["class"].Value);
-    Item item = (Item)type.GetConstructor(Type.EmptyTypes).Invoke(null);
-    foreach(XmlAttribute attr in inode.Attributes)
-      if(attr.Name != "class") SetObjectValue(type, item, attr.Name, attr.Value);
-    return item;
+
+  public static AI Make(AI ent, int level, Race race, EntityClass entClass)
+  { ent.Class = entClass;
+    ent.Race  = race;
+    ent.ExpLevel = level;
+
+    int si = (int)race*3;
+    ent.Eyesight=raceSenses[si]; ent.Hearing=raceSenses[si+1]; ent.Smelling=raceSenses[si+2];
+
+    ent.OnMake();
+
+    ent.HP = ent.MaxHP;
+    ent.MP = ent.MaxMP;
+    return ent;
   }
 
-  public static AI Load(XmlNode npc)
-  { string   ids = Xml.Attr(npc, "id");
-    string datas = Xml.Attr(npc, "data", ids);
-    string   ais = Xml.Attr(npc, "ai");
+  public static AI Make(XmlNode node)
+  { AI ent = null;
+    int level = 1;
+    Race race = Race.Random;
+    EntityClass entClass = EntityClass.Random;
 
-    Script script = LoadScript(datas);
-    XmlNode  data = script.XML.SelectSingleNode("charData");
-    Script     ai = ais==null ? null : LoadScript(ais);
-
-    string av = data.Attributes["type"].Value;
-    Type type = Type.GetType("Chrono."+av);
-    AI      e = (AI)MakeEntity(type);
-
-    e.EntityID = ids;
-    e.ai       = ai;
-
-    EntityClass ec = EntityClass.Random;
-    int level      = Xml.IntValue(data.Attributes["level"], 0);
-    if((av=Xml.Attr(data, "class")) != null) ec = (EntityClass)Enum.Parse(typeof(EntityClass), av);
-    e.Generate(level, ec);
-
-    foreach(XmlAttribute attr in data.Attributes)
-    { string n=attr.Name, v=attr.Value;
-      switch(n)
-      { case "type": case "level": case "class": continue;
-        case "gender": e.Male = v=="male"; break;
-        case "socialGroup": e.SocialGroup=Global.GetSocialGroup(v); break;
-        case "STR": e.SetBaseAttr(Attr.Str, int.Parse(v)); break;
-        case "INT": e.SetBaseAttr(Attr.Int, int.Parse(v)); break;
-        case "DEX": e.SetBaseAttr(Attr.Dex, int.Parse(v)); break;
-        case "EV":  e.SetBaseAttr(Attr.EV,  int.Parse(v)); break;
-        case "AC":  e.SetBaseAttr(Attr.AC,  int.Parse(v)); break;
-        default: SetObjectValue(type, e, n, v); break;
+    for(XmlNode n=node; ; n=Global.GetEntityByID(Xml.Attr(n, "inherit")))
+    { if(!Xml.IsEmpty(n, "type"))
+      { ent = (AI)Type.GetType("Chrono."+Xml.Attr(n, "type")).GetConstructor(Type.EmptyTypes).Invoke(null);
+        if(race==Race.Random) race = ent.Race;
+        if(entClass==EntityClass.Random) entClass = ent.Class;
       }
+      if(!Xml.IsEmpty(n, "class")) entClass = Xml.EntityClass(n, "class");
+      if(!Xml.IsEmpty(n, "level")) level = Xml.Int(n, "level");
+      if(!Xml.IsEmpty(n, "race")) race = Xml.Race(n, "race");
+
+      if(Xml.IsEmpty(n, "inherit")) break;
     }
-    e.GotoState(e.defaultState);
+    if(ent==null) throw new ArgumentException("Entity does not contain a 'type' attribute.");
 
-    foreach(XmlNode item in data.SelectNodes("give")) e.Inv.Add(CreateItem(item));
+    if(entClass==EntityClass.Random) entClass = (EntityClass)Global.Rand((int)EntityClass.NumClasses);
+    if(race==Race.Random) race = (Race)Global.Rand((int)Race.NumRaces);
+    Make(ent, node);
+    Make(ent, level, race, entClass);
+    return ent;
+  }
 
-    if(ai!=null) ai.DoDeclare(e);
+  public static AI MakeNpc(XmlNode npc)
+  { AI e = Make(Global.GetEntity(Xml.Attr(npc, "entity")));
+    e.EntityID = Xml.Attr(npc, "id");
+    foreach(XmlNode item in npc.SelectNodes("give")) e.Inv.Add(Item.ItemDef(item));
     return e;
   }
 
+  #region AIScript
+  protected sealed class AIScript
+  { public AIScript(XmlElement node)
+    { ai=node;
+
+      XmlNode n = node.SelectSingleNode("declare");
+      if(n!=null)
+      { n = n.FirstChild;
+        while(n!=null)
+        { if(n.LocalName=="quest") App.Player.DeclareQuest(n);
+          else if(n.LocalName=="var")
+          { string vname=n.Attributes["name"].Value, type, value=Xml.Attr(n, "value", "");
+            ParseVarName(ref vname, out type);
+
+            if(type=="global") Global.DeclareVar(vname, value);
+            else if(type=="script")
+            { XmlElement var = node.OwnerDocument.CreateElement("var");
+              var.SetAttribute("name", vname);
+              var.SetAttribute("value", value);
+              ai.PrependChild(var);
+            }
+          }
+          else throw new ArgumentException("Unknown declaration: "+n.LocalName);
+          n = n.NextSibling;
+        }
+      }
+    }
+
+    public XmlNode XML { get { return ai; } }
+
+    public void Initialize(AI me)
+    { XmlNodeList vars = ai.SelectNodes("declare/var[starts-with(@name, 'local:')]");
+      if(vars.Count>0)
+      { me.vars = new System.Collections.Specialized.HybridDictionary(vars.Count);
+        foreach(XmlNode var in vars)
+        { string name = var.Attributes["name"].Value;
+          name = name.Substring(name.IndexOf(':')+1);
+          me.vars[name] = Xml.Attr(var, "value", "");
+        }
+      }
+    }
+
+    public bool TryExecute(string nodeName, AI me)
+    { XmlNode node = ai.SelectSingleNode(nodeName);
+      return node!=null && TryActionBlock(node, me);
+    }
+
+    public static AIScript Load(string name)
+    { if(name.IndexOf('/')==-1) name = "ai/"+name;
+      if(name.IndexOf('.')==-1) name += ".xml";
+
+      AIScript script = (AIScript)scripts[name];
+      if(script==null)
+      { XmlDocument doc = Global.LoadXml(name);
+        script = new AIScript(doc.DocumentElement);
+        scripts[name] = script;
+      }
+      return script;
+    }
+
+    string Evaluate(XmlNode expr, AI me)
+    { throw new NotImplementedException("expression evaluation");
+    }
+
+    string GetText(string name, XmlNode local, Entity me)
+    { string selector = "text[@id='"+name+"']";
+      XmlNode node = local==null ? null : local.SelectSingleNode(selector);
+      if(node==null) node = ai.SelectSingleNode(selector);
+      if(node==null) throw new ArgumentException("No such text node: "+name);
+      return repRe.Replace(Xml.BlockToString(node.InnerText), new MatchEvaluator(TextReplacer));
+    }
+
+    string GetVar(string name, AI me)
+    { string type;
+      ParseVarName(ref name, out type);
+
+      if(type=="script") return ai.SelectSingleNode("var[@name='"+name+"']/@value").Value;
+      if(type=="global") return Global.GetVar(name);
+
+      // assuming "local" here
+      if(me==null) throw new InvalidOperationException("Can't use a local variable outside an AI context");
+      if(me.vars.Contains(name)) return (string)me.vars[name];
+      throw new ArgumentException("variable "+name+" not declared");
+    }
+
+    static void ParseVarName(ref string name, out string type)
+    { int pos = name.IndexOf(':');
+      if(pos==-1) type="script";
+      else { type=name.Substring(0, pos); name=name.Substring(pos+1); }
+    }
+
+    void SetVar(string name, string value, AI me)
+    { string type;
+      ParseVarName(ref name, out type);
+      
+      if(type=="script") ai.SelectSingleNode("var[@name='"+name+"']/@value").Value = value;
+      else if(type=="global") Global.SetVar(name, value);
+      else // assuming "local" here
+      { if(me==null) throw new InvalidOperationException("Can't use a local variable outside an AI context");
+        if(me.vars.Contains(name)) me.vars[name]=value;
+        else throw new ArgumentException("variable "+name+" not declared");
+      }
+    }
+
+    string TextReplacer(Match m)
+    { switch(m.Groups[1].Value)
+      { case "name": return App.Player.Name;
+        case "man":
+          switch(App.Player.Gender)
+          { case Gender.Male: return "man";
+            case Gender.Female: return "woman";
+            case Gender.Neither: return "person";
+            default: throw new NotImplementedException("unhandled gender");
+          }
+        case "boy":
+          switch(App.Player.Gender)
+          { case Gender.Male: return "boy";
+            case Gender.Female: return "girl";
+            case Gender.Neither: return "child";
+            default: throw new NotImplementedException("unhandled gender");
+          }
+        default: return m.Value;
+      }
+    }
+    
+    bool TryAction(XmlNode node, AI me)
+    { switch(node.LocalName)
+      { case "else": return false;
+        case "end": dialogOver=true; return false;
+
+        case "give":
+        { string spawn = Xml.Attr(node, "spawn", "maybe");
+          Item item=null;
+          if(me!=null && spawn!="no") item = me.FindItem(node);
+          if(item==null) item = Item.ItemDef(node);
+          bool failed = App.Player.Inv.Add(item)==null;
+          if(failed) App.Player.Map.AddItem(App.Player.Position, item);
+          App.IO.Print("{0} gives you {1}{2}.", me==null ? "A magic fairy" : me.TheName, item.GetAName(App.Player),
+                        failed ? ", but you can't carry "+item.ItThem+", so "+item.ItThey+
+                                " fall"+item.VerbS+" to the ground" : "");
+          return true;
+        }
+        
+        case "giveQuest":
+        { Player.Quest quest = App.Player.GetQuest(Xml.Attr(node, "name"));
+          bool has = quest.Received;
+          quest.StateName = Xml.Attr(node, "state", "during");
+          quest.Received  = true;
+          if(!has) App.IO.Print("You have been given a new quest! ({0})", quest.Title);
+          return true;
+        }
+
+        case "goto": nextDialogNode = node.Attributes["name"].Value; return false;
+
+        case "if": return TryIf(node, me);
+
+        case "joinPlayer":
+          me.SocialGroup  = App.Player.SocialGroup;
+          me.defaultState = AIState.Following;
+          me.GotoState(AIState.Following);
+          return false;
+
+        case "quipGroup":
+        { if(me==null) throw new InvalidOperationException("'quipGroup' not valid outside of an AI context");
+          if(node.ChildNodes.Count>0)
+          { string text = Xml.BlockToString(node.ChildNodes[Global.Rand(node.ChildNodes.Count)].InnerText);
+            me.Say(text);
+            return true;
+          }
+          return false;
+        }
+
+        case "say":
+        { if(me==null) throw new InvalidOperationException("'say' not valid outside of an AI context");
+          string dialog = Xml.Attr(node, "dialog");
+          if(dialog!=null) return TryDialog(ai.SelectSingleNode("dialog[@id='"+dialog+"']"), me);
+          else me.Say(Xml.BlockToString(node.InnerText));
+          return true;
+        }
+
+        case "set":
+        { string name=Xml.Attr(node, "var"), value=Xml.Attr(node, "value");
+          if(value==null) value = Evaluate(node.SelectSingleNode("value"), me);
+          SetVar(name, value, me);
+          return false;
+        }
+
+        default: throw new ArgumentException("unknown action: "+node.LocalName);
+      }
+    }
+
+    bool TryActionBlock(XmlNode node, AI me)
+    { node = node.FirstChild;
+      bool didSomething=false;
+      while(node!=null)
+      { if(TryAction(node, me)) didSomething=true;
+        node = node.NextSibling;
+      }
+      return didSomething;
+    }
+
+    bool TryDialog(XmlNode dialog, AI me)
+    { dialogOver = false;
+      nextDialogNode = "Start";
+      
+      XmlNode node = dialog.SelectSingleNode("onDialog");
+      if(node!=null)
+      { TryActionBlock(node, me);
+        if(dialogOver) return false;
+      }
+
+      do
+      { node = dialog.SelectSingleNode("simpleNode[@name='"+nextDialogNode+"']");
+        if(node!=null)
+        { string[] options = node.Attributes["options"].Value.Split(',');
+          string[] choices = new string[options.Length];
+          for(int i=0; i<options.Length; i++)
+            choices[i] = GetText(options[i].Substring(0, options[i].IndexOf(':')), dialog, me);
+          int choice = App.IO.ConversationChoice(me, GetText(node.Attributes["text"].Value, dialog, me), choices);
+          nextDialogNode = options[choice].Substring(options[choice].IndexOf(':')+1);
+          if(nextDialogNode=="*END*") dialogOver=true;
+        }
+        else
+        { node = dialog.SelectSingleNode("node[@name='"+nextDialogNode+"']");
+          XmlNodeList options = node.SelectNodes("option");
+          string[] choices = new string[options.Count];
+          for(int i=0; i<choices.Length; i++) choices[i] = GetText(options[i].Attributes["text"].Value, dialog, me);
+          int choice = App.IO.ConversationChoice(me, GetText(node.Attributes["text"].Value, dialog, me), choices);
+          TryActionBlock(options[choice], me);
+        }        
+      } while(!dialogOver);
+      App.IO.EndConversation();
+
+      return true;
+    }
+
+    bool TryIf(XmlNode node, AI me)
+    { string av, lhs, rhs;
+      XmlNode child;
+      bool isTrue;
+      
+      if((av=Xml.Attr(node, "var"))            != null)  lhs=GetVar(av, me);
+      else if((av=Xml.Attr(node, "haveQuest")) != null)  lhs=App.Player.GetQuest(av).Received ? "1" : "";
+      else if((av=Xml.Attr(node, "quest"))     != null)  lhs=App.Player.GetQuest(av).StateName;
+      else if((av=Xml.Attr(node, "questDone")) != null)  lhs=App.Player.GetQuest(av).Done ? "1" : "";
+      else if((av=Xml.Attr(node, "questNotDone"))!=null) lhs=App.Player.GetQuest(av).Done ? "" : "1";
+      else if((av=Xml.Attr(node, "questSuccess")) !=null) lhs=App.Player.GetQuest(av).Succeeded ? "1" : "";
+      else if((av=Xml.Attr(node, "questFailed")) !=null) lhs=App.Player.GetQuest(av).Failed ? "1" : "";
+      else if((av=Xml.Attr(node, "lhs")) != null) lhs=av;
+      else if((child=node.SelectSingleNode("lhs")) != null) lhs=Evaluate(child, me);
+      else throw new ArgumentException("conditional: left hand side is not defined");
+
+      if((av=Xml.Attr(node, "rhs")) != null) rhs=av;
+      else if((av=Xml.Attr(node, "var2")) != null) rhs=GetVar(av, me);
+      else if((child=node.SelectSingleNode("rhs")) != null) rhs=Evaluate(child, me);
+      else
+      { isTrue = Xml.Attr(node, "op")=="!" ? !Xml.IsTrue(lhs) : Xml.IsTrue(lhs);
+        goto execute;
+      }
+
+      switch(Xml.Attr(node, "op"))
+      { case "==": isTrue = int.Parse(lhs)==int.Parse(rhs); break;
+        case "!=": isTrue = int.Parse(lhs)!=int.Parse(rhs); break;
+        case "eq": isTrue = lhs==rhs; break;
+        case "ne": isTrue = lhs!=rhs; break;
+        case "<":  isTrue = int.Parse(lhs)< int.Parse(rhs); break;
+        case "<=": isTrue = int.Parse(lhs)<=int.Parse(rhs); break;
+        case ">":  isTrue = int.Parse(lhs)> int.Parse(rhs); break;
+        case ">=": isTrue = int.Parse(lhs)>=int.Parse(rhs); break;
+        default: throw new ArgumentException("invalid operator: "+Xml.Attr(node, "op"));
+      }
+      execute:
+      if(isTrue) return TryActionBlock(node, me);
+      else
+      { node = node.SelectSingleNode("else");
+        return node==null ? false : TryActionBlock(node, me);
+      }
+    }
+    
+    Regex repRe = new Regex(@"{([^}]+)}", RegexOptions.Singleline);
+    XmlElement ai;
+    string nextDialogNode;
+    bool   dialogOver;
+    
+    static readonly Hashtable scripts = new Hashtable();
+  }
+  #endregion
 
   protected enum Combat { None, Melee, Ranged };
+
+  protected AIScript Script
+  { get { return script; }
+    set
+    { if(vars!=null) vars.Clear();
+      script = value;
+      if(script!=null) script.Initialize(this);
+    }
+  }
 
   protected Item AddItem(Item item)
   { if(items==null) items=new ArrayList();
@@ -422,9 +710,18 @@ public abstract class AI : Entity
   protected virtual bool FindEscapeItem(IInventory inv, ref Item item, ref int quality)
   { bool found=false;
     foreach(Item i in inv)
-    { if(quality<5)
-      { if(i is TeleportScroll) { item=i; quality=5; found=true; }
-      }
+    { Spell spell = GetSpell(item);
+      if(spell==null) continue;
+
+      int iq;
+
+      if(spell is TeleportSpell) iq = 5;
+      else continue;
+
+      if(i.KnownCursed) iq -= 4;
+      else if(i.KnownBlessed) iq++;
+
+      if(quality<iq) { item=i; quality=iq; found=true; }
     }
     return found;
   }
@@ -432,7 +729,18 @@ public abstract class AI : Entity
   protected virtual bool FindHealItem(IInventory inv, ref Item item, ref int quality)
   { bool found=false;
     foreach(Item i in inv)
-    { if(i is HealPotion) { item=i; quality=1; found=true; }
+    { Spell spell = GetSpell(item);
+      if(spell==null) continue;
+
+      int iq;
+      if(spell is HealSpell) iq = 3;
+      else continue;
+
+      if(i.KnownCursed) iq -= 4;
+      else if(i.KnownBlessed) iq += 2;
+      else if(i.KnownUncursed) iq++;
+
+      if(quality<iq) { item=i; quality=iq; found=true; }
     }
     return found;
   }
@@ -549,6 +857,22 @@ public abstract class AI : Entity
     score += GetSkill((Skill)w.wClass); // skill with the weapon. first N skills map to weapon classes
 
     return score;
+  }
+
+  protected virtual void OnMake()
+  { Skill[] skills = classSkills[(int)Class];
+    AddSkills(100*ExpLevel, skills);
+
+    if(Class==EntityClass.Fighter) // then do more general skills
+    { skills = new Skill[(int)WeaponClass.NumClasses];
+      for(int i=0; i<skills.Length; i++) skills[i] = (Skill)i; // first N weapon classes are mapped directly to skills
+    }
+    else if(Class==EntityClass.Wizard)
+    { skills = new Skill[(int)SpellClass.NumClasses];
+      for(int i=0; i<skills.Length; i++) skills[i] = (Skill)i + (int)Skill.MagicSkills;
+    }
+    else skills=null;
+    AddSkills(300*ExpLevel, skills);
   }
 
   protected virtual bool PickupItems()
@@ -679,11 +1003,12 @@ public abstract class AI : Entity
     else if(ring.KnownBlessed) score += 2;
     else if(ring.KnownUncursed) score++;
     
-    if(ring is InvisibilityRing) // specific rings
+    // TODO: make this more comprehensive, taking into account attribute mods as well
+    if(ring.GetFlag(Entity.Flag.Invisible))
     { if(Is(Flag.Invisible)) return -10;
       score += 8;
     }
-    else if(ring is SeeInvisibleRing)
+    else if(ring.GetFlag(Entity.Flag.SeeInvisible))
     { if(Is(Flag.SeeInvisible)) return -10;
       score += 3;
     }
@@ -759,7 +1084,7 @@ public abstract class AI : Entity
     return 0;
   }
 
-  protected bool TryOnSpeak() { return ai!=null && ai.TryExecute("onSpeak", this); }
+  protected bool TryOnSpeak() { return script!=null && script.TryExecute("onSpeak", this); }
 
   protected bool TrySmartMove(Direction d) { return TrySmartMove(Global.Move(Position, d)); }
   protected bool TrySmartMove(Point pt)
@@ -796,8 +1121,7 @@ public abstract class AI : Entity
 
   protected virtual int WandScore(Wand wand)
   { if(wand.Charges==0) return 0;
-    if(wand is WandOfFire) return 10;
-    return 0;
+    return SpellScore(wand.Spell);
   }
 
   protected virtual bool Wander()
@@ -829,7 +1153,7 @@ public abstract class AI : Entity
   protected Entity target;        // the entity we're attacking
   protected Wand bestWand;        // the best wand for attacking
   protected ArrayList items;      // items we've pickup up but haven't considered yet
-  protected Script ai;            // our AI script
+  protected AIScript script;      // our AI script
   protected int timeout;          // how long we keep trying the current action
   protected int wakeup;           // how long it takes us to get into attack mode
   protected Direction noiseDir=Direction.Invalid;   // the direction of the last noise we heard
@@ -847,260 +1171,6 @@ public abstract class AI : Entity
   protected bool canSpeak     =true;  // most creatures can speak
   protected bool hasInventory =true;  // true if the creature can pick up and use items
   protected bool shout;               // true if we will shout on our next turn to alert others
-
-  #region Script class
-  protected class Script
-  { public Script(XmlElement node)
-    { ai=node;
-
-      XmlNode n = node.SelectSingleNode("declare");
-      if(n!=null)
-      { n = n.FirstChild;
-        while(n!=null)
-        { if(n.LocalName=="quest") App.Player.DeclareQuest(n);
-          else if(n.LocalName=="var")
-          { string vname=n.Attributes["name"].Value, type, value=Xml.Attr(n, "value", "");
-            ParseVarName(ref vname, out type);
-
-            if(type=="global") Global.DeclareVar(vname, value);
-            else if(type=="script")
-            { XmlElement var = node.OwnerDocument.CreateElement("var");
-              var.SetAttribute("name", vname);
-              var.SetAttribute("value", value);
-              ai.PrependChild(var);
-            }
-          }
-          else throw new ArgumentException("Unknown declaration: "+n.LocalName);
-          n = n.NextSibling;
-        }
-      }
-    }
-
-    public XmlNode XML { get { return ai; } }
-
-    public void DoDeclare(AI me)
-    { XmlNodeList vars = ai.SelectNodes("declare/var[starts-with(@name, 'local:')]");
-      if(vars.Count>0)
-      { me.vars = new System.Collections.Specialized.HybridDictionary(vars.Count);
-        foreach(XmlNode var in vars)
-        { string name = var.Attributes["name"].Value;
-          name = name.Substring(name.IndexOf(':')+1);
-          me.vars[name] = Xml.Attr(var, "value", "");
-        }
-      }
-    }
-
-    public bool TryExecute(string nodeName, AI me)
-    { XmlNode node = ai.SelectSingleNode(nodeName);
-      return node!=null && TryActionBlock(node, me);
-    }
-
-    protected string Evaluate(XmlNode expr, AI me)
-    { throw new NotImplementedException("expression evaluation");
-    }
-
-    protected string GetText(string name, XmlNode local, Entity me)
-    { string selector = "text[@id='"+name+"']";
-      XmlNode node = local==null ? null : local.SelectSingleNode(selector);
-      if(node==null) node = ai.SelectSingleNode(selector);
-      if(node==null) throw new ArgumentException("No such text node: "+name);
-      return repRe.Replace(Xml.BlockToString(node.InnerText), new MatchEvaluator(TextReplacer));
-    }
-
-    protected string GetVar(string name, AI me)
-    { string type;
-      ParseVarName(ref name, out type);
-
-      if(type=="script") return ai.SelectSingleNode("var[@name='"+name+"']/@value").Value;
-      if(type=="global") return Global.GetVar(name);
-
-      // assuming "local" here
-      if(me==null) throw new InvalidOperationException("Can't use a local variable outside an AI context");
-      if(me.vars.Contains(name)) return (string)me.vars[name];
-      throw new ArgumentException("variable "+name+" not declared");
-    }
-
-    protected void SetVar(string name, string value, AI me)
-    { string type;
-      ParseVarName(ref name, out type);
-      
-      if(type=="script") ai.SelectSingleNode("var[@name='"+name+"']/@value").Value = value;
-      else if(type=="global") Global.SetVar(name, value);
-      else // assuming "local" here
-      { if(me==null) throw new InvalidOperationException("Can't use a local variable outside an AI context");
-        if(me.vars.Contains(name)) me.vars[name]=value;
-        else throw new ArgumentException("variable "+name+" not declared");
-      }
-    }
-
-    protected bool TryAction(XmlNode node, AI me)
-    { switch(node.LocalName)
-      { case "else": return false;
-        case "end": dialogOver=true; return false;
-
-        case "give":
-        { string spawn = Xml.Attr(node, "spawn", "maybe");
-          Item item=null;
-          if(me!=null && spawn!="no") item = me.FindItem(node);
-          if(item==null) item = CreateItem(node);
-          bool failed = App.Player.Inv.Add(item)==null;
-          if(failed) App.Player.Map.AddItem(App.Player.Position, item);
-          App.IO.Print("{0} gives you {1}{2}.", me==null ? "A magic fairy" : me.TheName, item.GetAName(App.Player),
-                       failed ? ", but you can't carry "+item.ItThem+", so "+item.ItThey+
-                                " fall"+item.VerbS+" to the ground" : "");
-          return true;
-        }
-        
-        case "giveQuest":
-        { Player.Quest quest = App.Player.GetQuest(Xml.Attr(node, "name"));
-          bool has = quest.Received;
-          quest.StateName = Xml.Attr(node, "state", "during");
-          quest.Received  = true;
-          if(!has) App.IO.Print("You have been given a new quest! ({0})", quest.Title);
-          return true;
-        }
-
-        case "goto": nextDialogNode = node.Attributes["name"].Value; return false;
-
-        case "if": return TryIf(node, me);
-
-        case "joinPlayer":
-          me.SocialGroup  = App.Player.SocialGroup;
-          me.defaultState = AIState.Following;
-          me.GotoState(AIState.Following);
-          return false;
-
-        case "quipGroup":
-        { if(me==null) throw new InvalidOperationException("'quipGroup' not valid outside of an AI context");
-          if(node.ChildNodes.Count>0)
-          { string text = Xml.BlockToString(node.ChildNodes[Global.Rand(node.ChildNodes.Count)].InnerText);
-            me.Say(text);
-            return true;
-          }
-          return false;
-        }
-
-        case "say":
-        { if(me==null) throw new InvalidOperationException("'say' not valid outside of an AI context");
-          string dialog = Xml.Attr(node, "dialog");
-          if(dialog!=null) return TryDialog(ai.SelectSingleNode("dialog[@id='"+dialog+"']"), me);
-          else me.Say(Xml.BlockToString(node.InnerText));
-          return true;
-        }
-
-        case "set":
-        { string name=Xml.Attr(node, "var"), value=Xml.Attr(node, "value");
-          if(value==null) value = Evaluate(node.SelectSingleNode("value"), me);
-          SetVar(name, value, me);
-          return false;
-        }
-
-        default: throw new ArgumentException("unknown action: "+node.LocalName);
-      }
-    }
-
-    protected bool TryActionBlock(XmlNode node, AI me)
-    { node = node.FirstChild;
-      bool didSomething=false;
-      while(node!=null)
-      { if(TryAction(node, me)) didSomething=true;
-        node = node.NextSibling;
-      }
-      return didSomething;
-    }
-
-    protected bool TryDialog(XmlNode dialog, AI me)
-    { dialogOver = false;
-      nextDialogNode = "Start";
-      
-      XmlNode node = dialog.SelectSingleNode("onDialog");
-      if(node!=null)
-      { TryActionBlock(node, me);
-        if(dialogOver) return false;
-      }
-
-      do
-      { node = dialog.SelectSingleNode("simpleNode[@name='"+nextDialogNode+"']");
-        if(node!=null)
-        { string[] options = node.Attributes["options"].Value.Split(',');
-          string[] choices = new string[options.Length];
-          for(int i=0; i<options.Length; i++)
-            choices[i] = GetText(options[i].Substring(0, options[i].IndexOf(':')), dialog, me);
-          int choice = App.IO.ConversationChoice(me, GetText(node.Attributes["text"].Value, dialog, me), choices);
-          nextDialogNode = options[choice].Substring(options[choice].IndexOf(':')+1);
-          if(nextDialogNode=="*END*") dialogOver=true;
-        }
-        else
-        { node = dialog.SelectSingleNode("node[@name='"+nextDialogNode+"']");
-          XmlNodeList options = node.SelectNodes("option");
-          string[] choices = new string[options.Count];
-          for(int i=0; i<choices.Length; i++) choices[i] = GetText(options[i].Attributes["text"].Value, dialog, me);
-          int choice = App.IO.ConversationChoice(me, GetText(node.Attributes["text"].Value, dialog, me), choices);
-          TryActionBlock(options[choice], me);
-        }        
-      } while(!dialogOver);
-      App.IO.EndConversation();
-
-      return true;
-    }
-
-    protected bool TryIf(XmlNode node, AI me)
-    { string av, lhs, rhs;
-      XmlNode child;
-      bool isTrue;
-      
-      if((av=Xml.Attr(node, "var"))            != null)  lhs=GetVar(av, me);
-      else if((av=Xml.Attr(node, "haveQuest")) != null)  lhs=App.Player.GetQuest(av).Received ? "1" : "";
-      else if((av=Xml.Attr(node, "quest"))     != null)  lhs=App.Player.GetQuest(av).StateName;
-      else if((av=Xml.Attr(node, "questDone")) != null)  lhs=App.Player.GetQuest(av).Done ? "1" : "";
-      else if((av=Xml.Attr(node, "questNotDone"))!=null) lhs=App.Player.GetQuest(av).Done ? "" : "1";
-      else if((av=Xml.Attr(node, "questSuccess")) !=null) lhs=App.Player.GetQuest(av).Succeeded ? "1" : "";
-      else if((av=Xml.Attr(node, "questFailed")) !=null) lhs=App.Player.GetQuest(av).Failed ? "1" : "";
-      else if((av=Xml.Attr(node, "lhs")) != null) lhs=av;
-      else if((child=node.SelectSingleNode("lhs")) != null) lhs=Evaluate(child, me);
-      else throw new ArgumentException("conditional: left hand side is not defined");
-
-      if((av=Xml.Attr(node, "rhs")) != null) rhs=av;
-      else if((av=Xml.Attr(node, "var2")) != null) rhs=GetVar(av, me);
-      else if((child=node.SelectSingleNode("rhs")) != null) rhs=Evaluate(child, me);
-      else
-      { isTrue = Xml.Attr(node, "op")=="!" ? !Xml.IsTrue(lhs) : Xml.IsTrue(lhs);
-        goto execute;
-      }
-
-      switch(Xml.Attr(node, "op"))
-      { case "==": isTrue = int.Parse(lhs)==int.Parse(rhs); break;
-        case "!=": isTrue = int.Parse(lhs)!=int.Parse(rhs); break;
-        case "eq": isTrue = lhs==rhs; break;
-        case "ne": isTrue = lhs!=rhs; break;
-        case "<":  isTrue = int.Parse(lhs)< int.Parse(rhs); break;
-        case "<=": isTrue = int.Parse(lhs)<=int.Parse(rhs); break;
-        case ">":  isTrue = int.Parse(lhs)> int.Parse(rhs); break;
-        case ">=": isTrue = int.Parse(lhs)>=int.Parse(rhs); break;
-        default: throw new ArgumentException("invalid operator: "+Xml.Attr(node, "op"));
-      }
-      execute:
-      if(isTrue) return TryActionBlock(node, me);
-      else
-      { node = node.SelectSingleNode("else");
-        return node==null ? false : TryActionBlock(node, me);
-      }
-    }
-    
-    string TextReplacer(Match m)
-    { switch(m.Groups[1].Value)
-      { case "name": return App.Player.Name;
-        case "man/woman": return App.Player.Male ? "man" : "woman";
-        default: return m.Value;
-      }
-    }
-    
-    Regex repRe = new Regex(@"{([^}]+)}", RegexOptions.Singleline);
-    XmlElement ai;
-    string nextDialogNode;
-    bool   dialogOver;
-  }
-  #endregion
 
   void AddSkills(int points, Skill[] skills)
   { if(skills==null) return;
@@ -1132,7 +1202,7 @@ public abstract class AI : Entity
   
   Item FindItem(XmlNode inode)
   { Type type = Type.GetType("Chrono."+inode.Attributes["class"].Value);
-    int count = Xml.IntValue(inode.Attributes["count"], 0);
+    int count = Xml.Int(inode.Attributes["count"], 0);
 
     foreach(Item i in Inv)
       if(i.GetType()==type && i.Count>=count)
@@ -1163,37 +1233,46 @@ public abstract class AI : Entity
   }
 
   System.Collections.Specialized.HybridDictionary vars;
-  
-  static Script LoadScript(string name)
-  { if(name.IndexOf('/')==-1) name = "ai/"+name;
-    if(name.IndexOf('.')==-1) name += ".xml";
 
-    Script script = (Script)scripts[name];
-    if(script==null)
-    { XmlDocument doc = Global.LoadXml(name);
-      script = new Script(doc.DocumentElement);
-      scripts[name] = script;
+  static Spell GetSpell(Item item)
+  { if(item is Scroll) return ((Scroll)item).Spell;
+    else if(item is Wand)
+    { Wand w = (Wand)item;
+      if(w.Charges!=0) return w.Spell;
     }
-    return script;
-  }
-
-  static void ParseVarName(ref string name, out string type)
-  { int pos = name.IndexOf(':');
-    if(pos==-1) type="script";
-    else { type=name.Substring(0, pos); name=name.Substring(pos+1); }
-  }
-
-  static void SetObjectValue(Type type, object obj, string name, string value)
-  { PropertyInfo pi = type.GetProperty(name, BindingFlags.Public|BindingFlags.NonPublic|BindingFlags.Instance|BindingFlags.IgnoreCase);
-    if(pi!=null && pi.CanWrite) pi.SetValue(obj, Global.ChangeType(value, pi.PropertyType), null);
-    else
-    { FieldInfo fi = type.GetField(name, BindingFlags.Public|BindingFlags.NonPublic|BindingFlags.Instance|BindingFlags.IgnoreCase);
-      if(fi==null) throw new ArgumentException("Tried to set nonexistant property "+name+" on "+type);
-      fi.SetValue(obj, Global.ChangeType(value, fi.FieldType));
+    else if(item is XmlTool) return ((XmlTool)item).Spell;
+    else if(item is XmlChargedTool)
+    { XmlChargedTool xc = (XmlChargedTool)item;
+      if(xc.Charges!=0) return xc.Spell;
     }
+    return null;
   }
 
-  static Hashtable scripts = new Hashtable();
+  static void Make(AI ent, XmlNode node)
+  { if(!Xml.IsEmpty(node, "inherit")) Make(ent, Global.GetEntityByID(Xml.Attr(node, "inherit")));
+
+    foreach(XmlAttribute attr in node.Attributes)
+      switch(attr.Name)
+      { case "ai": ent.Script = AIScript.Load(attr.Value); break;
+        case "color": ent.Color = Xml.Color(attr); break;
+        case "corpseChance": ent.CorpseChance = byte.Parse(attr.Value); break;
+        case "name": ent.Name = attr.Value; break;
+        case "socialGroup": ent.SocialGroup = Global.GetSocialGroup(attr.Value); break;
+        case "flies": ent.SetRawFlag(Entity.Flag.Levitate, Xml.IsTrue(attr.Value)); break;
+        case "gender": ent.Gender = Xml.Gender(attr); break;
+
+        case "ac": case "dex": case "ev": case "int": case "light": case "maxHP": case "maxMP":
+        case "speed": case "stealth": case "str": 
+          ent.SetBaseAttr((Attr)Enum.Parse(typeof(Attr), attr.Name, true), Xml.RangeInt(attr.Value));
+          break;
+        
+        case "inherit": case "type": case "race": case "class": case "level": break;
+
+        default: Global.SetObjectValue(ent, attr.Name, attr.Value); break;
+      }
+
+    foreach(XmlNode item in node.SelectNodes("give")) ent.Inv.Add(Item.ItemDef(item));
+  }
 
   static readonly Skill[][] classSkills = new Skill[(int)EntityClass.NumClasses][]
   { new Skill[] { Skill.Fighting, Skill.Armor, Skill.Dodge, Skill.Shields, Skill.MagicResistance }, // Fighter
@@ -1209,5 +1288,6 @@ public abstract class AI : Entity
     90, 85, 75, // Orc
   };
 }
+#endregion
 
 } // namespace Chrono

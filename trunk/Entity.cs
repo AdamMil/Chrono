@@ -18,7 +18,9 @@ public enum CarryStress { Normal, Burdened, Stressed, Overtaxed } // states rela
 
 public struct Damage
 { public Damage(int damage) { Physical=(ushort)damage; Direct=Heat=Cold=Electricity=Poison=0; }
+
   public int Total { get { return Direct+Physical+Heat+Cold+Electricity; } } // doesn't count poison
+
   public void Modify(double mul)
   { Direct = (ushort)Math.Round(Direct*mul);
     Physical = (ushort)Math.Round(Physical*mul);
@@ -27,7 +29,14 @@ public struct Damage
     Electricity = (ushort)Math.Round(Electricity*mul);
     Poison = (ushort)Math.Round(Poison*mul);
   }
+
   public ushort Direct, Physical, Heat, Cold, Electricity, Poison;
+
+  public static Damage FromPoison(ushort amount)
+  { Damage d = new Damage();
+    d.Poison = amount;
+    return d;
+  }
 }
 
 public enum Death { Combat, Falling, Poison, Quit, Starvation, Sickness, Trap } // causes of death
@@ -45,16 +54,13 @@ public struct Effect
   public int  Timeout;
 }
 
-public enum EntityClass
+public enum EntityClass : sbyte
 { Other=-3, // not a monster (boulder or some other entity)
-  Random=-1, Fighter, Wizard, Plain, NumClasses
+  Random=-1, Fighter, Wizard, NumPlayable, Plain=NumPlayable, NumClasses
 }
-
-public enum HungerLevel { Normal, Hungry, Starving, Starved };
-
-public enum Race
-{ RandomRace=-1, Human, Orc, NumRaces
-}
+public enum HungerLevel : byte { Normal, Hungry, Starving, Starved };
+public enum Gender : byte { Male, Female, Neither }
+public enum Race : sbyte { Random=-1, Human, Orc, NumPlayable, NumRaces=NumPlayable }
 
 public enum Skill
 { WeaponSkills,
@@ -79,7 +85,7 @@ public enum Slot // where an item can be worn
 
 public abstract class Entity : UniqueObject
 { [Flags] public enum Flag
-  { None=0, Confuse=1, Hallucinate=2, Sleep=4, Invisible=8, SeeInvisible=16, TeleportControl=32
+  { None=0, Confuse=1, Hallucinate=2, Sleep=4, Invisible=8, SeeInvisible=16, TeleportControl=32, Levitate=64
   }
 
   public Entity() { ExpLevel=1; Smell=Map.MaxScentAdd/2; }
@@ -120,7 +126,12 @@ public abstract class Entity : UniqueObject
 
   public int ExpLevel
   { get { return expLevel; }
-    set { expLevel=value; Title=GetTitle(); }
+    set
+    { if(value!=expLevel)
+      { OnExpLevelChange(value-expLevel);
+        expLevel=value;
+      }
+    }
   }
 
   public Flag Flags { get { return flags; } }
@@ -359,7 +370,7 @@ public abstract class Entity : UniqueObject
   public bool CanRemove(Wearable item) { return !item.Cursed; }
   // true if there's a line of sight to the given creature/tile
   // FIXME: there's a disparity here. if creature==this, LookAt() says we can't see it, but CanSee says we can
-  public bool CanSee(Entity creature) { return this==creature || LookAt(creature) != Direction.Invalid; }
+  public bool CanSee(Entity creature) { return this==creature || LookAt(creature)!=Direction.Invalid; }
   public bool CanSee(Point point) { return Position==point || LookAt(point) != Direction.Invalid; }
   // true if item can be unequipped (not cursed, etc) or hand is empty
   public bool CanUnequip(int hand) { return Hands[hand]==null || !Hands[hand].Cursed; }
@@ -516,32 +527,6 @@ public abstract class Entity : UniqueObject
     return GetGold(amount, acceptLess, Inv);
   }
 
-  // generates an entity, gives it default stats
-  public void Generate() { Generate(0, EntityClass.Random); }
-  public void Generate(int level) { Generate(level, EntityClass.Random); }
-  public virtual void Generate(int level, EntityClass myClass)
-  { if(level==0) level=1; // default
-    if(myClass==EntityClass.Random) myClass = (EntityClass)Global.Rand((int)EntityClass.NumClasses);
-
-    Class = myClass; Title = GetTitle(); SetBaseAttr(Attr.Light, 8);
-
-    int[] mods = raceAttrs[(int)Race].Mods; // attributes for race
-    for(int i=0; i<mods.Length; i++) attr[i] += mods[i];
-
-    mods = classAttrs[(int)myClass].Mods;   // attribute modifiers from class
-    for(int i=0; i<mods.Length; i++) attr[i] += mods[i];
-
-    int points = 8; // allocate extra points randomly
-    while(points>0)
-    { int a = Global.Rand((int)Attr.NumBasics);
-      if(attr[a]<=17 || Global.Coinflip()) { SetBaseAttr((Attr)a, attr[a]+1); points--; }
-    }
-
-    HP = MaxHP; MP = MaxMP;
-
-    while(--level>0) LevelUp();
-  }
-
   public int AlterBaseAttr(Attr attribute, int amount)
   { return SetBaseAttr(attribute, GetBaseAttr(attribute)+amount);
   }
@@ -597,7 +582,8 @@ public abstract class Entity : UniqueObject
   }
 
   public Direction LookAt(Entity creature) // return the direction to a visible creature or Invalid if not visible
-  { if(creature.Is(Flag.Invisible) && !Is(Flag.SeeInvisible)) return Direction.Invalid;
+  { if(Map==null || Map!=creature.Map || creature.Is(Flag.Invisible) && !Is(Flag.SeeInvisible))
+      return Direction.Invalid;
     return LookAt(creature.Position);
   }
   public Direction LookAt(Point pt)
@@ -653,6 +639,7 @@ public abstract class Entity : UniqueObject
   public virtual void OnAttrChange(Attr attribute, int amount, bool fromExercise) { }
   public virtual void OnDrink(Potion potion) { }
   public virtual bool OnDrop(Item item) { return true; }
+  public virtual void OnExpLevelChange(int diff) { }
   public virtual void OnEquip(Wieldable item) { }
   public virtual void OnFlagsChanged(Flag oldFlags, Flag newFlags) { }
   public virtual void OnHit(Entity hit, object item, Damage damage) { }
@@ -681,6 +668,7 @@ public abstract class Entity : UniqueObject
   public virtual void OnSkillUp(Skill skill) { }
   public virtual void OnUnequip(Wieldable item) { }
   public virtual void OnUnequipFail(Wieldable item) { }
+  public virtual void OnUse(Item item) { }
   public virtual void OnWear(Wearable item) { }
 
   // place item in inventory, assumes it's within reach, already removed from other inventory, etc
@@ -1023,7 +1011,7 @@ public abstract class Entity : UniqueObject
   public Wieldable[] Hands = new Wieldable[2]; // our hands (currently just 2, but maybe more in the future)
   public ArrayList Spells;    // spells we've learned (don't modify this collection manually)
   public Hashtable Knowledge; // hash table of known item classes
-  public string Name, Title, EntityID; // All three can be null
+  public string Name, Title, EntityID, Description; // All four can be null
   public Map    Map, Memory;  // the map and our memory of it
   public Point  Position;     // our position within the map
   public int    Timer;        // when timer >= speed, our turn is up
@@ -1032,16 +1020,7 @@ public abstract class Entity : UniqueObject
   public Race   Race;         // our race
   public EntityClass Class;   // our class/job
   public Color  Color=Color.Dire; // our general color
-  public bool   Male = true;
-
-  // generates a creature, creates it and calls the creature's Generate() method. class is Random if not passed
-  public static Entity Generate(Type type) { return Generate(type, 0, EntityClass.Random); }
-  public static Entity Generate(Type type, int level) { return Generate(type, level, EntityClass.Random); }
-  public static Entity Generate(Type type, int level, EntityClass myClass)
-  { Entity creature = MakeEntity(type);
-    creature.Generate(level, myClass);
-    return creature;
-  }
+  public Gender Gender=Gender.Male;
 
   public static bool IsFighter(EntityClass c) // returns true if the class is, in general, a fighting class
   { return c==EntityClass.Fighter;
@@ -1173,7 +1152,7 @@ public abstract class Entity : UniqueObject
 
       // TODO: make this code use a Xml.BlockTo*() function
       foreach(System.Xml.XmlNode list in Global.LoadXml("ai/quips.xml").SelectNodes("//list"))
-      { string[] stypes = list.Attributes["appliesTo"].Value.Split(' ');
+      { string[] stypes = Xml.List(list, "appliesTo");
         int[]     types = new int[stypes.Length];
         int[]   indices = new int[stypes.Length];
 
@@ -1199,17 +1178,6 @@ public abstract class Entity : UniqueObject
     if(arr==null || arr.Length==0) return "MISSING QUIP FOR "+type;
     
     return arr[Global.Rand(arr.Length)].Replace("{NAME}", App.Player.Name);
-  }
-
-  struct AttrMods
-  { public AttrMods(params int[] mods) { Mods = mods; }
-    public int[] Mods;
-  }
-
-  struct ClassLevel
-  { public ClassLevel(int level, string title) { Level=level; Title=title; }
-    public int Level;
-    public string Title;
   }
 
   Gold GetGold(int amount, bool acceptLess, IInventory inv)
@@ -1249,16 +1217,6 @@ public abstract class Entity : UniqueObject
       }
     
     return ret;
-  }
-
-  string GetTitle()
-  { string title=string.Empty;
-    ClassLevel[] classes = classTitles[(int)Class];
-    for(int i=0; i<classes.Length; i++)
-    { if(classes[i].Level>ExpLevel) break;
-      title = classes[i].Title;
-    }
-    return title;
   }
 
   int HowMuchGold(IInventory inv)
@@ -1400,31 +1358,6 @@ public abstract class Entity : UniqueObject
   static int[] vis = new int[128]; // vis point buffer
   static int visPts; // number of points in buffer
 
-  static readonly AttrMods[] raceAttrs = new AttrMods[(int)Race.NumRaces] // base stats per race
-  { new AttrMods(6, 6, 6), // Human - 18
-    new AttrMods(9, 4, 3)  // Orc   - 16
-  };
-  static readonly AttrMods[] classAttrs = new AttrMods[(int)EntityClass.NumClasses] // stat modifiers per class
-  {                                            // CLASS    - Str+Dex+Int, HP/MP, Speed, AC/EV, Stealth
-    new AttrMods(7, 3, -1, 15, 2, 40, 0, 1),   // Fighter  - 9, 15/2=17, 40, 0/1, 0
-    new AttrMods(-1, 3, 7, 9, 8, 45, 0, 0, 1), // Wizard   - 9, 9/8=17,  45, 0/0, 1
-    new AttrMods(1, 1, 1, 10, 4, 45),          // Worker   - 3, 10/4=14, 45, 0/0, 0 (used for farmers, townspeople, etc)
-  };
-
-  // titles per exp level per class
-  static readonly ClassLevel[][] classTitles = new ClassLevel[(int)EntityClass.NumClasses][]
-  { new ClassLevel[]
-    { new ClassLevel(1, "Whacker"), new ClassLevel(4, "Beater"), new ClassLevel(8, "Grunter"),
-      new ClassLevel(13, "Fighter"), new ClassLevel(19, "Veteran")
-    },
-    new ClassLevel[]
-    { new ClassLevel(1, "Neophyte"),
-    },
-    new ClassLevel[]
-    { new ClassLevel(1, "Peon"), new ClassLevel(2, "Worker"), new ClassLevel(3, "Craftsman"),
-    },
-  };
-  
   // quips
   static readonly string[][] quips = new string[(int)Quips.NumTypes][];
 }

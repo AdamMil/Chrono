@@ -84,13 +84,32 @@ public abstract class Spell : UniqueObject
 
   public virtual ICollection TracePath(Entity user, Point pt) { return null; }
 
-  public string Name;
+  public string Name, Description;
   public SpellClass Class;
   public int Difficulty; // 1-18, 1,2=level 1, 3,4=level 2, etc
   public int Memory; // decreased every turn that the spell isn't cast, forgotten at zero. -1 means never forget
   public int Power;  // MP usage
   public int Range;  // the approximate range of the wand, in tiles, if applicable
   public bool AutoIdentify;
+
+  public static Spell Get(string name)
+  { if(spells==null)
+    { spells = new Hashtable();
+
+      Type[] types = Assembly.GetExecutingAssembly().GetTypes();
+      foreach(Type t in types)
+        if(!t.IsAbstract && t.IsSubclassOf(typeof(Spell)))
+        { string sname = t.Name;
+          if(sname.EndsWith("Spell")) sname = sname.Substring(0, sname.Length-5);
+          FieldInfo fi = t.GetField("Default", BindingFlags.Public|BindingFlags.Static);
+          spells[sname] = (Spell)(fi==null ? t.GetConstructor(Type.EmptyTypes).Invoke(null) : fi.GetValue(null));
+        }
+    }
+
+    Spell spell = (Spell)spells[name];
+    if(spell==null) throw new ArgumentException("No such spell: "+name);
+    return spell;
+  }
 
   protected bool TryHit(Entity user, Entity target)
   { int skill = user.GetSkill(Skill);
@@ -123,9 +142,12 @@ public abstract class Spell : UniqueObject
 
   protected static ArrayList path = new ArrayList();
 
+  // TODO: move all these and others into XML too!
   static readonly int[] armorPenalty = new int[]
   { (int)Slot.Feet, 5, (int)Slot.Hands, 10, (int)Slot.Head, 5, (int)Slot.Legs, 10, (int)Slot.Torso, 25
   };
+  
+  static Hashtable spells;
 }
 #endregion
 
@@ -134,9 +156,9 @@ public abstract class BeamSpell : Spell
 { protected BeamSpell() { target=SpellTarget.Tile; Range=10; }
 
   public override void Cast(Entity user, ItemStatus buc, Point tile, Direction dir)
-  { FromStatus = buc;
-    if((dir==Direction.Above || dir==Direction.Below) && !Affect(user, dir)) return;
-    else if(user.Position==tile) Affect(user, user);
+  { itemStatus = buc;
+    if((dir==Direction.Above || dir==Direction.Below) && !Affect(user, buc, dir)) return;
+    else if(user.Position==tile) Affect(user, buc, user);
     else
     { bounces=0; oldPt=user.Position;
       Global.TraceLine(oldPt, tile, Range, false, new LinePoint(ZapPoint), user);
@@ -166,8 +188,8 @@ public abstract class BeamSpell : Spell
     else return Map.IsPassable(user.Map[pt].Type) ? null : (object)pt;
   }
 
-  protected abstract void Affect(Entity user, object obj);
-  protected abstract bool Affect(Entity user, Direction dir); // returns if execution should continue (in Cast)
+  protected abstract void Affect(Entity user, ItemStatus buc, object obj);
+  protected abstract bool Affect(Entity user, ItemStatus buc, Direction dir); // returns if execution should continue (in Cast)
 
   TraceAction TracePoint(Point pt, object context)
   { Entity user = (Entity)context;
@@ -199,11 +221,11 @@ public abstract class BeamSpell : Spell
     else ret=TraceAction.Go;
     oldPt=pt;
     object affected = Hit(user, pt);
-    if(affected!=null) Affect(user, affected);
+    if(affected!=null) Affect(user, itemStatus, affected);
     return ret;
   }
   
-  protected ItemStatus FromStatus;
+  ItemStatus itemStatus;
   Point oldPt;
   int bounces;
 }
@@ -211,9 +233,12 @@ public abstract class BeamSpell : Spell
 
 #region ForceBolt
 public class ForceBolt : BeamSpell
-{ public ForceBolt() { Name="force bolt"; Class=SpellClass.Telekinesis; Difficulty=1; Power=2; }
+{ public ForceBolt()
+  { Name="force bolt"; Class=SpellClass.Telekinesis; Difficulty=1; Power=2;
+    Description="The spell forces stuff. Yeah.";
+  }
 
-  protected override bool Affect(Entity user, Direction dir)
+  protected override bool Affect(Entity user, ItemStatus buc, Direction dir)
   { if(dir==Direction.Above)
     { if(user==App.Player) App.IO.Print("Bits of stone rain down on you as the spell slams into the ceiling.");
       return false;
@@ -222,7 +247,7 @@ public class ForceBolt : BeamSpell
     return false;
   }
 
-  protected override void Affect(Entity user, object obj)
+  protected override void Affect(Entity user, ItemStatus buc, object obj)
   { Entity e = obj as Entity;
     Damage damage = new Damage(Global.NdN(1, 6));
     damage.Direct = 2;
@@ -230,7 +255,6 @@ public class ForceBolt : BeamSpell
   }
 
   public static readonly ForceBolt Default = new ForceBolt();
-  public static readonly string Description = "The spell forces stuff. Yeah.";
 }
 #endregion
 
@@ -238,6 +262,7 @@ public class ForceBolt : BeamSpell
 public class FireSpell : BeamSpell
 { public FireSpell()
   { Name="fire"; Class=SpellClass.Elemental; Difficulty=10; Power=12; AutoIdentify=true;
+    Description = "The fire spell hurls a great bolt of flames.";
   }
 
   protected override object Hit(Entity user, Point pt)
@@ -251,7 +276,7 @@ public class FireSpell : BeamSpell
     }
   }
 
-  protected override bool Affect(Entity user, Direction dir)
+  protected override bool Affect(Entity user, ItemStatus buc, Direction dir)
   { if(dir==Direction.Above)
     { if(user==App.Player) App.IO.Print("The spell bounces back down onto your head!");
       return true;
@@ -267,7 +292,7 @@ public class FireSpell : BeamSpell
     return false;
   }
 
-  protected override void Affect(Entity user, object obj)
+  protected override void Affect(Entity user, ItemStatus buc, object obj)
   { Damage damage = new Damage();
     damage.Heat = (ushort)Global.NdN(4, 10);
     Entity e = obj as Entity;
@@ -307,7 +332,48 @@ public class FireSpell : BeamSpell
   }
 
   public readonly static FireSpell Default = new FireSpell();
-  public readonly static string Description = "The fire spell hurls a great bolt of flames.";
+}
+#endregion
+
+#region Heal
+public sealed class HealSpell : Spell
+{ public HealSpell()
+  { Name="heal"; Class=SpellClass.Transformation; Difficulty=3; Power=5;
+    Description = "This spell will cure the caster of poisons, and rejuvenate him as well.";
+  }
+  
+  public override void Cast(Entity user, ItemStatus buc, Point tile, Direction dir)
+  { Entity e = dir==Direction.Self ? user : user.Map.GetEntity(tile);
+    if(e==null) return;
+
+    if((buc&ItemStatus.Cursed)!=0)
+    { e.DoDamage(this, Death.Sickness, Damage.FromPoison(1));
+      if(user==App.Player) App.IO.Print("Eww, this tastes putrid!"); // FIXME: we don't know it's a potion...
+    }
+    else if(user.MaxHP-user.HP>0)
+    { e.HP += Global.NdN(4, 6) * ((buc&ItemStatus.Blessed)!=0 ? 2 : 1);
+      if(e==App.Player) App.IO.Print("You feel better.");
+      else if(App.Player.CanSee(e)) App.IO.Print("{0} looks better.", e.TheName);
+    }
+    else if(e==App.Player) App.IO.Print("Nothing seems to happen.");
+  }
+}
+#endregion
+
+#region RemoveScent
+public sealed class RemoveScentSpell : Spell
+{ public RemoveScentSpell()
+  { Name="remove scent"; Class=SpellClass.Transformation; Difficulty=2; Power=8;
+    Description = "This spell will make the caster smell as fresh as a rose.";
+  }
+  
+  public override void Cast(Entity user, ItemStatus buc, Point tile, Direction dir)
+  { Entity e = dir==Direction.Self ? user : user.Map.GetEntity(tile);
+    if(e==null) return;
+    e.Smell = (buc&ItemStatus.Cursed)==0 ? 0 : Map.MaxScent;
+    if(e==App.Player) App.IO.Print("You smell much better.");
+  }
+
 }
 #endregion
 
@@ -315,6 +381,7 @@ public class FireSpell : BeamSpell
 public class TeleportSpell : Spell
 { public TeleportSpell()
   { Name="teleport"; Class=SpellClass.Translocation; Difficulty=6; Power=9; AutoIdentify=true;
+    Description = "This spell will teleport the caster to a random location.";
   }
 
   public override void Cast(Entity user, ItemStatus buc, Point tile, Direction dir)
@@ -336,7 +403,6 @@ public class TeleportSpell : Spell
   }
 
   public readonly static TeleportSpell Default = new TeleportSpell();
-  public readonly static string Description = "This spell will teleport the caster to a random location.";
 }
 #endregion
 
@@ -344,6 +410,7 @@ public class TeleportSpell : Spell
 public class AmnesiaSpell : Spell
 { public AmnesiaSpell()
   { Name="amnesia"; Class=SpellClass.Divination; Difficulty=2; Power=2; target=SpellTarget.Self;
+    Description = "This spell scrambles the caster's memory.";
   }
   
   public override void Cast(Entity user, ItemStatus buc, Point tile, Direction dir)
@@ -363,7 +430,6 @@ public class AmnesiaSpell : Spell
   }
 
   public static readonly AmnesiaSpell Default = new AmnesiaSpell();
-  public static readonly string Description = "This spell scrambles the caster's memory.";
 
   Map Wipe(Map good, ItemStatus buc)
   { Map bad = new Map(good.Width, good.Height, TileType.Border, false);
@@ -389,17 +455,20 @@ public class AmnesiaSpell : Spell
 public class IdentifySpell : Spell
 { public IdentifySpell()
   { Name="identify"; Class=SpellClass.Divination; Difficulty=5; Power=3; target=SpellTarget.Item; AutoIdentify=true;
+    Description = "This spell provides the caster full knowledge of an item.";
   }
 
   public override void Cast(Entity user, ItemStatus buc, Item target)
-  { if(user==App.Player)
+  { if(user!=App.Player) return;
+
+    if((buc&ItemStatus.Cursed)!=0 && Global.Coinflip()) App.IO.Print("Nothing seems to happen.");
+    else
     { user.AddKnowledge(target, true);
       App.IO.Print("{0} - {1}", target.Char, target.GetAName(user));
     }
   }
 
   public static readonly IdentifySpell Default = new IdentifySpell();
-  public static readonly string Description = "This spell provides the caster full knowledge of an item.";
 }
 #endregion
 

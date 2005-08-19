@@ -23,7 +23,7 @@ public enum Material : byte { Paper, Leather, HardMaterials, Wood=HardMaterials,
 #endregion
 
 #region Item
-public abstract class Item : UniqueObject, ICloneable
+public abstract class Item : UniqueObject
 { public Item()
   { Prefix=PluralPrefix=string.Empty; PluralSuffix="s"; Count=1; Color=Color.White; Durability=-1;
   }
@@ -79,20 +79,20 @@ public abstract class Item : UniqueObject, ICloneable
     }
   }
 
-  public object Clone() { return Clone(false); }
-  public virtual object Clone(bool force)
-  { Type t = GetType();
-    if(!force && t.GetCustomAttributes(typeof(NoCloneAttribute), true).Length!=0) return this;
-    object o = t.GetConstructor(Type.EmptyTypes).Invoke(null), v;
-    while(t!=null)
-    { foreach(FieldInfo f in t.GetFields(BindingFlags.DeclaredOnly|BindingFlags.Instance|BindingFlags.Public|BindingFlags.NonPublic))
+  public Item Clone() { return Clone(false); }
+  public virtual Item Clone(bool force)
+  { Type type = GetType();
+    if(!force && type.GetCustomAttributes(typeof(NoCloneAttribute), true).Length!=0) return this;
+    Item item = (Item)type.GetConstructor(Type.EmptyTypes).Invoke(null);
+    do
+    { foreach(FieldInfo f in type.GetFields(BindingFlags.DeclaredOnly|BindingFlags.Instance|BindingFlags.Public|BindingFlags.NonPublic))
         if(!f.IsNotSerialized)
-        { v = f.GetValue(this);
-          f.SetValue(o, v!=null && f.FieldType.IsSubclassOf(typeof(Array)) ? ((ICloneable)v).Clone() : v);
+        { object v = f.GetValue(this);
+          f.SetValue(item, v!=null && f.FieldType.IsSubclassOf(typeof(Array)) ? ((ICloneable)v).Clone() : v);
         }
-      t = t.BaseType;
-    }
-    return o;
+      type = type.BaseType;
+    } while(type!=typeof(object));
+    return item;
   }
 
   public virtual bool CanStackWith(Item item)
@@ -158,15 +158,15 @@ public abstract class Item : UniqueObject, ICloneable
 
   public Item Split(int toRemove)
   { if(toRemove>=Count) throw new ArgumentOutOfRangeException("toRemove", toRemove, "is >= than Count");
-    Item newItem = (Item)Clone(true);
+    Item newItem = Clone(true);
     newItem.Count = toRemove;
     Count -= toRemove;
     return newItem;
   }
 
-  public string Title, Prefix, PluralPrefix, PluralSuffix;
+  public string Title, Prefix, PluralPrefix, PluralSuffix, ShortDesc, LongDesc;
   public Shop   Shop;
-  public int Age, Count, Weight; // age in map ticks, number in the stack, weight (5 = approx. 1 pound)
+  public int Age, Count, Weight, ShopValue; // age in map ticks, number in the stack, weight (5 = approx. 1 pound)
   public short Durability;       // 0 - 100 (chance of breaking if thrown), or -1, which uses the default
   public char Char;
   public ItemClass Class;
@@ -174,6 +174,46 @@ public abstract class Item : UniqueObject, ICloneable
   public Color Color;
   public ItemUse Usability;
   public ItemStatus Status;
+
+  public static Item ItemDef(XmlNode node)
+  { Item item = Make(Xml.Attr(node, "class"));
+    foreach(XmlAttribute attr in node.Attributes)
+      switch(attr.Name)
+      { case "class": break;
+        case "value": item.ShopValue = int.Parse(attr.Value); break;
+        default: Global.SetObjectValue(item, attr.Name, attr.Value); break;
+      }
+    return item;
+  }
+
+  public static Item Make(string item)
+  { int pos = item.IndexOf(':');
+    if(pos!=-1) return Make(Global.GetItem(item.Substring(0, pos), item.Substring(pos+1)));
+    else
+    { Type type = Type.GetType("Chrono."+item);
+      if(type==null) throw new ArgumentException("No such type: "+item);
+      return (Item)type.GetConstructor(Type.EmptyTypes).Invoke(null);
+    }
+  }
+
+  public static Item Make(XmlNode node)
+  { switch(node.LocalName)
+    { case "armor": return new XmlArmor(node);
+      case "food": return new XmlFood(node);
+      case "potion": return new XmlPotion(node);
+      case "ring": return new XmlRing(node);
+      case "scroll": return new XmlScroll(node);
+      case "shield": return new XmlShield(node);
+      case "spellbook": return new XmlSpellbook(node);
+      case "tool": return Xml.IsEmpty(node, "charges") ? new XmlTool(node) : (Item)new XmlChargedTool(node);
+      case "wand": return new XmlWand(node);
+      default: throw new NotImplementedException("unknown xml item type: "+node.LocalName);
+    }
+  }
+  
+  public static Item Make(ItemClass itemClass, string name)
+  { return Make(Global.GetItem(itemClass, name));
+  }
 
   protected string name;
 }
@@ -264,14 +304,13 @@ public abstract class Chargeable : Item
 
 #region Gold
 public class Gold : Item
-{ public Gold() { name="gold piece"; Color=Color.Yellow; Class=ItemClass.Gold; }
+{ public Gold() { name="gold piece"; Color=Color.Yellow; Class=ItemClass.Gold; ShopValue=1; }
   public Gold(int count) : this() { Count=count; }
 
   public override bool CanStackWith(Item item) { return item.Class==ItemClass.Gold; }
   
   public static readonly int SpawnChance=200; // 2% chance
   public static readonly int SpawnMin=3, SpawnMax=16; // 3-16 pieces
-  public static readonly int ShopValue=1;
 }
 #endregion
 
@@ -282,23 +321,32 @@ public sealed class XmlItem
     if(!Xml.IsEmpty(node, "prefix")) item.Prefix = Xml.String(node, "prefix");
     if(!Xml.IsEmpty(node, "pluralPrefix")) item.PluralPrefix = Xml.String(node, "pluralPrefix");
     if(!Xml.IsEmpty(node, "pluralSuffix")) item.PluralSuffix = Xml.String(node, "pluralSuffix");
-    // TODO: implement these
-    //if(!Xml.IsEmpty(node, "shortDesc")) item.ShortDesc = Xml.String(node, "shortDesc");
-    //if(!Xml.IsEmpty(node, "longDesc")) item.LongDesc = Xml.String(node, "longDesc");
-    //{ XmlNode child = node.SelectSingleNode("longDesc");
-    //  if(child!=null) item.LongDesc = child.InnerText;
-    //}
+    if(!Xml.IsEmpty(node, "shortDesc")) item.ShortDesc = Xml.String(node, "shortDesc");
+    if(!Xml.IsEmpty(node, "longDesc")) item.LongDesc = Xml.String(node, "longDesc");
+    XmlNode child = node.SelectSingleNode("longDesc");
+    if(child!=null) item.LongDesc = Xml.BlockToString(child.Value);
     if(!Xml.IsEmpty(node, "color")) item.Color = GetColor(node);
-    if(!Xml.IsEmpty(node, "weight")) item.Weight = Xml.IntValue(node, "weight");
+    if(!Xml.IsEmpty(node, "weight")) item.Weight = Xml.Int(node, "weight");
     if(!Xml.IsEmpty(node, "material")) ((Wearable)item).Material = GetMaterial(node);
+    if(!Xml.IsEmpty(node, "value")) item.ShopValue = Xml.Int(node, "value");
   }
-  
+
+  public static void InitModifying(Modifying item, XmlNode node)
+  { Init(item, node);
+    foreach(string attr in attrs)
+      if(!Xml.IsEmpty(node, attr)) item.SetAttr((Attr)Enum.Parse(typeof(Attr), attr, true), Xml.Int(node, attr));
+    if(!Xml.IsEmpty(node, "effect")) item.FlagMods = GetEffect(node);
+  }
+
   public static Color GetColor(XmlNode node)
   { return (Color)Enum.Parse(typeof(Color), Xml.Attr(node, "color"));
   }
 
   public static Entity.Flag GetEffect(XmlNode node)
-  {
+  { string[] effects = Xml.List(node, "effect");
+    Entity.Flag flags = Entity.Flag.None;
+    foreach(string s in effects) flags |= (Entity.Flag)Enum.Parse(typeof(Entity.Flag), s);
+    return flags;
   }
 
   public static Material GetMaterial(XmlNode node)
@@ -309,9 +357,10 @@ public sealed class XmlItem
   { return (Slot)Enum.Parse(typeof(Slot), Xml.Attr(node, "slot"));
   }
 
-  public static Spell GetSpell(XmlNode node)
-  {
-  }
+  public static Spell GetSpell(XmlNode node) { return Spell.Get(Xml.Attr(node, "spell")); }
+
+  static readonly string[] attrs = { "ac", "dex", "ev", "int", "light", "maxHP", "maxMP", "speed", "stealth", "str" };
 }
 #endregion
+
 } // namespace Chrono

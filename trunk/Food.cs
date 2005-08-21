@@ -46,7 +46,7 @@ public abstract class Food : Item
   { base.Think(holder);
     if(DecayTime>0)
     { if(Age>=DecayTime*2)
-      { if(holder==App.Player) App.IO.Print("Your {0} rot{1} away.", GetFullName(holder), VerbS);
+      { if(holder==App.Player) App.IO.Print("Your {0} rot{1} away.", GetFullName(), VerbS);
         return true;
       }
       else if(Age>=DecayTime && (Flags&Flag.Rotten)==0) Rot(holder);
@@ -99,7 +99,6 @@ public sealed class Flesh : Food
 #region XmlFood
 public sealed class XmlFood : Food
 { public XmlFood() { }
-
   public XmlFood(XmlNode node)
   { XmlItem.Init(this, node);
     if(!Xml.IsEmpty(node, "decayTime")) DecayTime = Xml.Int(node, "decayTime");

@@ -25,8 +25,8 @@ public abstract class Weapon : Wieldable
 
   public virtual Compatibility CompatibleWith(Entity user) { return Compatibility.Okay; }
 
-  public override string GetFullName(Entity e, bool forceSingular)
-  { if(!Identified) return base.GetFullName(e, forceSingular);
+  public override string GetFullName(bool forceSingular)
+  { if(!Identified) return base.GetFullName(forceSingular);
     string status = StatusString;
     if(status!="") status += ' ';
     string ret = (!forceSingular && Count>1 ? Count.ToString()+' ' : "") + status +

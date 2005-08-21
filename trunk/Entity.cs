@@ -200,7 +200,7 @@ public abstract class Entity : UniqueObject
     }
   }
 
-  public int Smell // player smelliness 0 - Map.MaxScentAdd
+  public int Smell // player smelliness 0 to Map.MaxScentAdd
   { get { return smell; }
     set { smell = Math.Max(0, Math.Min(value, Map.MaxScentAdd)); }
   }
@@ -250,6 +250,7 @@ public abstract class Entity : UniqueObject
       return Global.AorAn(name)+' ';
     }
   }
+
   public string AName { get { return Global.Cap1(aName); } }
   public string aName { get { return Name==null ? Prefix+BaseName : Name; } }
   public string TheName { get { return Name==null ? "The "+BaseName : Name; } }
@@ -284,13 +285,6 @@ public abstract class Entity : UniqueObject
       }
     }
     else effects[numEffects++] = effect;
-  }
-  
-  public void AddKnowledge(Item item) { AddKnowledge(item, false); }
-  public void AddKnowledge(Item item, bool identify)
-  { if(Knowledge==null) Knowledge = new Hashtable();
-    Knowledge[item.GetType().ToString()] = null;
-    if(identify) item.Status |= ItemStatus.Identified|ItemStatus.KnowCB;
   }
 
   // attack in a direction, can be used for attacking locked doors, etc
@@ -437,7 +431,7 @@ public abstract class Entity : UniqueObject
     Drop(i);
     return i;
   }
-  // spits and drops an item (assumes it's droppable), returns item dropped
+  // splits and drops an item (assumes it's droppable), returns item dropped
   public Item Drop(char c, int count) { return Drop(Inv[c], count); }
   public void Drop(Item item) // drops an item (assumes it's droppable)
   { Inv.Remove(item);
@@ -493,6 +487,7 @@ public abstract class Entity : UniqueObject
       }
     }
   }
+
   public void Exercise(Skill skill) // exercises a skill (not guaranteed)
   { if(!Training(skill) || GetSkill(skill)==10) return; // the maximum skill level is 10
     int points = Math.Min(Global.Rand(11), ExpPool);
@@ -568,8 +563,6 @@ public abstract class Entity : UniqueObject
   public void ItemThink()
   { for(int i=0; i<Inv.Count; i++) if(Inv[i].Think(this)) Inv.RemoveAt(i--);
   }
-
-  public bool KnowsAbout(Item item) { return Knowledge!=null && Knowledge.Contains(item.GetType().ToString()); }
 
   public virtual void LevelDown() { ExpLevel--; } // TODO: make this subtract from stats
   public virtual void LevelUp()
@@ -649,16 +642,17 @@ public abstract class Entity : UniqueObject
   public virtual void OnMapChanged() { } // called when the creature is added to or removed from a map
   public virtual void OnMiss(Entity hit, object item) { }
   public virtual void OnMissBy(Entity attacker, object item) { }
+
   public void OnMove(Link link) { OnMove(link.ToPoint, link.ToSection[link.ToLevel]); }
   public void OnMove(Point newPos) { OnMove(newPos, null); }
   public virtual void OnMove(Point newPos, Map newMap)
   { if(newMap!=null)
-    { if(Memory!=null) Map.SaveMemory(Memory);
-      Map.Entities.Remove(this);
+    { Map.Entities.Remove(this);
       newMap.Entities.Add(this);
     }
     Position=newPos;
   }
+
   public virtual void OnNoise(Entity source, Noise type, int volume) { }
   public virtual void OnPickup(Item item, IInventory from) { }
   public virtual void OnReadScroll(Scroll scroll) { }
@@ -822,7 +816,7 @@ public abstract class Entity : UniqueObject
     if(item.AllHandWield) // unequip all items so we can equip new one
     { for(int i=0; i<Hands.Length; i++)
         if(!CanUnequip(i))
-        { if(this==App.Player) App.IO.Print("You can't unequip your {0}!", Hands[i].GetFullName(this));
+        { if(this==App.Player) App.IO.Print("You can't unequip your {0}!", Hands[i].GetFullName());
           return false;
         }
       for(int i=0; i<Hands.Length; i++) if(Hands[i]!=null) Unequip(i);
@@ -831,7 +825,7 @@ public abstract class Entity : UniqueObject
     { for(int i=0; i<Hands.Length; i++) // unequip all items of the same class - this assumes there will only be one
         if(Hands[i]!=null && Hands[i].Class==item.Class)
         { if(!CanUnequip(i))
-          { if(this==App.Player) App.IO.Print("You can't unequip your {0}!", Hands[i].GetFullName(this));
+          { if(this==App.Player) App.IO.Print("You can't unequip your {0}!", Hands[i].GetFullName());
             return false;
           }
           else { Unequip(i); break; }
@@ -859,8 +853,8 @@ public abstract class Entity : UniqueObject
   { if(Equipped(item))
     { if(item.Cursed)
       { if(this==App.Player)
-        { App.IO.Print("The {0} is stuck to your {1}!",
-                       item.GetFullName(this), item.Class==ItemClass.Shield ? "arm" : "hand");
+        { App.IO.Print("The {0} is stuck to your {1}!", item.GetFullName(),
+                       item.Class==ItemClass.Shield ? "arm" : "hand");
           item.Status |= ItemStatus.KnowCB;
         }
         return false;
@@ -876,7 +870,7 @@ public abstract class Entity : UniqueObject
   { if(Wearing(item))
     { if(item.Cursed)
       { if(this==App.Player)
-        { App.IO.Print("The {0} won't come off!", item.GetFullName(this));
+        { App.IO.Print("The {0} won't come off!", item.GetFullName());
           item.Status |= ItemStatus.KnowCB;
         }
         return false;
@@ -1010,9 +1004,8 @@ public abstract class Entity : UniqueObject
   public int[] Skills = new int[(int)Skill.NumSkills], SkillExp = new int[(int)Skill.NumSkills]; // our skills
   public Wieldable[] Hands = new Wieldable[2]; // our hands (currently just 2, but maybe more in the future)
   public ArrayList Spells;    // spells we've learned (don't modify this collection manually)
-  public Hashtable Knowledge; // hash table of known item classes
   public string Name, Title, EntityID, Description; // All four can be null
-  public Map    Map, Memory;  // the map and our memory of it
+  public Map    Map;  // the map
   public Point  Position;     // our position within the map
   public int    Timer;        // when timer >= speed, our turn is up
   public Flag   BaseFlags;    // our flags, not counting modifiers
@@ -1118,27 +1111,6 @@ public abstract class Entity : UniqueObject
   protected void GiveKillExp(Entity killed)
   { Exp += killed.KillExp;
     ExpPool += Math.Max(Global.NdN(2, killed.baseKillExp)-2, 1); // TODO: this probably needs revision
-  }
-
-  protected void UpdateMemory() // updates Memory using the visible area
-  { if(Memory==null) return;
-    UpdateMemory(VisibleTiles());
-  }
-  protected void UpdateMemory(Point[] vis)
-  { if(Memory==null) return;
-    foreach(Point pt in vis)
-    { Tile tile   = Map[pt];
-      tile.Items  = tile.Items==null || tile.Items.Count==0 ? null : tile.Items.Clone();
-      tile.Node   = Memory[pt].Node;
-      tile.Entity = null;
-      Memory[pt] = tile;
-    }
-    Entity[] creats = VisibleCreatures(vis);
-    foreach(Entity c in creats)
-    { Tile tile = Memory[c.Position];
-      tile.Entity = c;
-      Memory[c.Position] = tile;
-    }
   }
 
   protected string baseName; // if null, the base name is taken from the race

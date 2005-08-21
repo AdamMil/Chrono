@@ -12,6 +12,63 @@ public enum AIState : byte
 { Wandering, Idle, Asleep, Patrolling, Guarding, Attacking, Escaping, Working, Following
 };
 
+public sealed class Attack // sync with entities.xsd
+{ public Attack(XmlNode node)
+  { Name = Xml.Attr(node, "name");
+    if(Name!=null)
+    { ArrayList list = new ArrayList();
+      foreach(XmlNode child in node.ChildNodes)
+        if(child.NodeType==XmlNodeType.Element)
+          list.Add(new Attack(child));
+      Parts = (Attack[])list.ToArray(typeof(Attack));
+    }
+    else
+    { Type = (AttackType)Enum.Parse(typeof(AttackType), Xml.Attr(node, "type"));
+      Damage = (DamageType)Enum.Parse(typeof(DamageType), Xml.Attr(node, "damage", "Physical"));
+      Amount = new Range(node.Attributes["amount"]);
+    }
+
+    Chance = (byte)Xml.Int(node, "chance");
+  }
+
+  public string Name;
+  public Attack[] Parts;
+
+  public Range Amount;
+  public AttackType Type;
+  public DamageType Damage;
+  public byte Chance; // 0-100%
+}
+
+public enum AttackType : byte // sync with entities.xsd
+{ Bite, Breath, Explosion, Gaze, Kick, Spell, Spit, Sting, Touch, Weapon
+}
+
+public struct Conference // sync with entities.xsd
+{ public Conference(XmlNode node)
+  { Type = (DamageType)Enum.Parse(typeof(DamageType), Xml.Attr(node, "type"));
+    Chance = (byte)Xml.Int(node, "chance", 100);
+  }
+
+  public DamageType Type;
+  public byte Chance; // 0-100%
+}
+
+public enum DamageType : byte // sync with common.xsd
+{ Acid, Cold, Direct, DrainDex, DrainInt, DrainStr, Electricity, Fire, Magic, Physical, Poison, Slow,
+  Stun, Paralyse, Petrify, Teleport, StealGold, StealItem, Blind
+}
+
+public struct Resistance // sync with common.xsd
+{ public Resistance(XmlNode node)
+  { Type = (DamageType)Enum.Parse(typeof(DamageType), Xml.Attr(node, "type"));
+    Amount = new Range(node.Attributes["amount"], 100);
+  }
+
+  public Range Amount; // 0-100%
+  public DamageType Type;
+}
+
 #region AI
 public abstract class AI : Entity
 { protected AI() { }
@@ -42,7 +99,7 @@ public abstract class AI : Entity
 
   public override void OnEquip(Wieldable item)
   { if(App.Player.CanSee(this))
-    { App.IO.Print("{0} equips {1}.", TheName, item.GetAName(App.Player));
+    { App.IO.Print("{0} equips {1}.", TheName, item.GetAName());
       if(item.Cursed)
       { App.IO.Print("The {0} welds itself to {1}'s {2}!", item.Name, TheName,
                      item.Class==ItemClass.Shield ? "arm" : "hand");
@@ -175,6 +232,7 @@ public abstract class AI : Entity
     noiseDir=scentDir=Direction.Invalid; maxNoise=0;
   }
 
+  public int EntityIndex; // index into global entity type array
   public byte CorpseChance=30;   // chance of leaving a corpse, 0-100%
 
   public static AI Make(AI ent, int level, Race race, EntityClass entClass)
@@ -363,7 +421,7 @@ public abstract class AI : Entity
           if(item==null) item = Item.ItemDef(node);
           bool failed = App.Player.Inv.Add(item)==null;
           if(failed) App.Player.Map.AddItem(App.Player.Position, item);
-          App.IO.Print("{0} gives you {1}{2}.", me==null ? "A magic fairy" : me.TheName, item.GetAName(App.Player),
+          App.IO.Print("{0} gives you {1}{2}.", me==null ? "A magic fairy" : me.TheName, item.GetAName(),
                         failed ? ", but you can't carry "+item.ItThem+", so "+item.ItThey+
                                 " fall"+item.VerbS+" to the ground" : "");
           return true;
@@ -582,7 +640,7 @@ public abstract class AI : Entity
       { if(bestWand!=null && bestWand.Spell.Range>=dist) // use a wand if possible
         { bool discard = bestWand.Charges==0;
           if(print) App.IO.Print("{0} zaps {1}!", App.Player.CanSee(this) ? TheName : "Something",
-                                 bestWand.GetAName(App.Player, true));
+                                 bestWand.GetAName(true));
           if(bestWand.Zap(this, target.Position)) { Inv.Remove(bestWand); bestWand=null; }
           else if(discard) bestWand=null;
           return true;
@@ -610,7 +668,7 @@ public abstract class AI : Entity
         Weapon w = Weapon;
         Ammo   a = SelectAmmo(w);
         if(a!=null || w!=null && w.wClass==WeaponClass.Thrown)
-        { if(print) App.IO.Print("{0} attacks with {1}.", TheName, w.GetAName(App.Player, true));
+        { if(print) App.IO.Print("{0} attacks with {1}.", TheName, w.GetAName(true));
           Attack(w, a, target.Position); return true;
         }
       }
@@ -662,7 +720,7 @@ public abstract class AI : Entity
   }
 
   protected void Does(string verb, Item item)
-  { if(App.Player.CanSee(this)) App.IO.Print("{0} {1} {2}.", TheName, verb, item.GetAName(App.Player, true));
+  { if(App.Player.CanSee(this)) App.IO.Print("{0} {1} {2}.", TheName, verb, item.GetAName(true));
   }
 
   protected virtual bool Escape()
@@ -904,7 +962,8 @@ public abstract class AI : Entity
 
   protected bool PrepareMelee() { return PrepareMelee(false); }
   protected virtual bool PrepareMelee(bool forceEval)
-  { Item item=null;
+  { if(!Global.Entities[EntityIndex].HasWeaponAttack) return false;
+    Item item=null;
     int quality=0;
     Weapon w = Weapon;
     if(forceEval || w==null || w.Ranged)
@@ -919,7 +978,8 @@ public abstract class AI : Entity
 
   protected bool PrepareRanged() { return PrepareRanged(false); }
   protected virtual bool PrepareRanged(bool forceEval)
-  { Item item=null;
+  { if(!Global.Entities[EntityIndex].HasWeaponAttack) return false;
+    Item item=null;
     int quality=0;
     Weapon w = Weapon;
     if(forceEval || w==null || !w.Ranged)
@@ -1168,7 +1228,7 @@ public abstract class AI : Entity
   protected byte Eyesight, Hearing, Smelling; // effectiveness of these senses, 0-100%
   protected bool alwaysHostile=true;  // true if we should attack the player's party regardless of social group considerations
   protected bool canOpenDoors =false; // most creatures can't open doors (by default)
-  protected bool canSpeak     =true;  // most creatures can speak
+  protected bool canSpeak     =false; // most creatures can't speak
   protected bool hasInventory =true;  // true if the creature can pick up and use items
   protected bool shout;               // true if we will shout on our next turn to alert others
 
@@ -1199,7 +1259,7 @@ public abstract class AI : Entity
       }
     while(points>0);
   }
-  
+
   Item FindItem(XmlNode inode)
   { Type type = Type.GetType("Chrono."+inode.Attributes["class"].Value);
     int count = Xml.Int(inode.Attributes["count"], 0);

@@ -17,7 +17,8 @@ public abstract class Spellbook : Readable
 }
 
 public sealed class XmlSpellbook : Spellbook
-{ public XmlSpellbook(XmlNode node)
+{ public XmlSpellbook() { }
+  public XmlSpellbook(XmlNode node)
   { XmlItem.Init(this, node);
     if(!Xml.IsEmpty(node, "reads")) Reads = Xml.RangeInt(node, "reads");
 

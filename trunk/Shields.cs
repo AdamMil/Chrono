@@ -7,8 +7,8 @@ namespace Chrono
 public abstract class Shield : Wieldable
 { public Shield() { Class=ItemClass.Shield; }
 
-  public override string GetFullName(Entity e, bool forceSingular)
-  { if(!Identified) return base.GetFullName(e, forceSingular);
+  public override string GetFullName(bool forceSingular)
+  { if(!Identified) return base.GetFullName(forceSingular);
     string status = StatusString;
     if(status!="") status += ' ';
     string ret = status + (AC<0 ? "" : "+") + AC + ' ' + Name;

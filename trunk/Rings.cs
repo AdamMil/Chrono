@@ -13,9 +13,9 @@ public abstract class Ring : Wearable
     Durability=95; ExtraHunger=1;
   }
 
-  public override string GetFullName(Entity e, bool forceSingular)
-  { if(e==null || e.KnowsAbout(this)) return base.GetFullName(e, forceSingular);
-    string rn = names[NameIndex] + " ring";
+  public override string GetFullName(bool forceSingular)
+  { if(App.Player.KnowsAbout(this)) return base.GetFullName(forceSingular);
+    string rn = Global.RingNames[NameIndex] + " ring";
     if(Title!=null) rn += " named "+Title;
     return rn;
   }
@@ -32,7 +32,8 @@ public abstract class Ring : Wearable
 
 #region XmlRing
 public sealed class XmlRing : Ring
-{ public XmlRing(XmlNode node)
+{ public XmlRing() { }
+  public XmlRing(XmlNode node)
   { XmlItem.InitModifying(this, node);
     if(!Xml.IsEmpty(node, "extraHunger")) ExtraHunger = Xml.Int(node, "extraHunger");
   }

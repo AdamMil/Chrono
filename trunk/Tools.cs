@@ -4,10 +4,18 @@ using System.Xml;
 namespace Chrono
 {
 
+public abstract class Tool : Item
+{ public Tool() { Class=ItemClass.Tool; }
+}
+
+public abstract class ChargedTool : Chargeable
+{ public ChargedTool() { Class=ItemClass.Tool; }
+}
+
 #region XmlTool
-public sealed class XmlTool : Item
-{ public XmlTool() { Class=ItemClass.Tool; }
-  public XmlTool(XmlNode node) : this()
+public sealed class XmlTool : Tool
+{ public XmlTool() { }
+  public XmlTool(XmlNode node)
   { XmlItem.Init(this, node);
     Spell = XmlItem.GetSpell(node);
 
@@ -37,9 +45,9 @@ public sealed class XmlTool : Item
 #endregion
 
 #region XmlChargeTool
-public sealed class XmlChargedTool : Chargeable
-{ public XmlChargedTool() { Class=ItemClass.Tool; }
-  public XmlChargedTool(XmlNode node) : this()
+public sealed class XmlChargedTool : ChargedTool
+{ public XmlChargedTool() { }
+  public XmlChargedTool(XmlNode node)
   { XmlItem.Init(this, node);
     Spell = XmlItem.GetSpell(node);
     Charges = Xml.RangeInt(node, "charges");

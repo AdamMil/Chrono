@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Diagnostics;
 using System.Xml;
 
 namespace Chrono
@@ -19,9 +20,9 @@ public abstract class Scroll : Readable
   { return base.CanStackWith(item) && ((Scroll)item).Name==Name;
   }
 
-  public override string GetFullName(Entity e, bool forceSingular)
-  { if(e==null || e.KnowsAbout(this)) return base.GetFullName(e, forceSingular);
-    string rn = names[NameIndex];
+  public override string GetFullName(bool forceSingular)
+  { if(App.Player.KnowsAbout(this)) return base.GetFullName(forceSingular);
+    string rn = Global.ScrollNames[NameIndex];
     rn = (!forceSingular && Count>1 ? Count+" scrolls" : "scroll") + " labeled "+rn;
     if(Title!=null) rn += " named "+Title;
     return rn;
@@ -38,7 +39,7 @@ public abstract class Scroll : Readable
   protected void AutoIdentify()
   { if(Spell.AutoIdentify && !App.Player.KnowsAbout(this))
     { App.Player.AddKnowledge(this);
-      App.IO.Print("This is {0}.", GetAName(App.Player));
+      App.IO.Print("This is {0}.", GetAName());
     }
   }
 
@@ -46,13 +47,15 @@ public abstract class Scroll : Readable
   { switch(Spell.GetSpellTarget(user))
     { case SpellTarget.Self: Spell.Cast(user, Status, user.Position, Direction.Self); break;
       case SpellTarget.Item:
-        MenuItem[] items = App.IO.ChooseItem(Prompt==null ? "Cast on which item?" : Prompt,
-                                             user, MenuFlag.None, ItemClass.Any);
+        Debug.Assert(user==App.Player);
+        MenuItem[] items = App.IO.ChooseItem(Prompt==null ? "Cast on which item?" : Prompt, App.Player,
+                                             MenuFlag.None, ItemClass.Any);
         if(items.Length==0) return false;
         else Spell.Cast(user, Status, items[0].Item);
         break;
       case SpellTarget.Tile:
-        RangeTarget rt = App.IO.ChooseTarget(user, Spell, true);
+        Debug.Assert(user==App.Player);
+        RangeTarget rt = App.IO.ChooseTarget(App.Player, Spell, true);
         if(rt.Dir!=Direction.Invalid || rt.Point.X!=-1) Spell.Cast(user, Status, rt);
         else return false;
         break;
@@ -84,7 +87,8 @@ public class IdentifyScroll : Scroll
 
 #region XmlScroll
 public sealed class XmlScroll : Scroll
-{ public XmlScroll(XmlNode node)
+{ public XmlScroll() { }
+  public XmlScroll(XmlNode node)
   { XmlItem.Init(this, node);
     Spell = XmlItem.GetSpell(node);
     if(!Xml.IsEmpty(node, "prompt")) Prompt = Xml.String(node, "prompt");

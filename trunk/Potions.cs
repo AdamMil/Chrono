@@ -19,21 +19,22 @@ public abstract class Potion : Item
 
   public abstract void Drink(Entity user);
 
-  public override string GetFullName(Entity e, bool forceSingular)
-  { if(e==null || e.KnowsAbout(this)) return base.GetFullName(e, forceSingular);
-    string rn = !forceSingular && Count>1 ? Count.ToString() + ' ' + names[NameIndex] + " potions"
-                                          : names[NameIndex] + " potion";
+  public override string GetFullName(bool forceSingular)
+  { if(App.Player.KnowsAbout(this)) return base.GetFullName(forceSingular);
+    string rn = !forceSingular && Count>1 ? Count.ToString() + ' ' + Global.PotionNames[NameIndex] + " potions"
+                                          : Global.PotionNames[NameIndex] + " potion";
     if(Title!=null) rn += " named "+Title;
     return rn;
   }
-  
+
   public int NameIndex;
 }
 #endregion
 
 #region XmlPotion
 public sealed class XmlPotion : Potion
-{ public XmlPotion(XmlNode node)
+{ public XmlPotion() { }
+  public XmlPotion(XmlNode node)
   { XmlItem.Init(this, node);
     Spell = XmlItem.GetSpell(node);
   }

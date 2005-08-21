@@ -12,12 +12,12 @@ public abstract class Wand : Chargeable
 
   public override string Name { get { return "wand of "+Spell.Name; } }
 
-  public override string GetFullName(Entity e, bool forceSingular)
+  public override string GetFullName(bool forceSingular)
   { string suffix = Identified ? string.Format(" ({0}:{1})", Charges, Recharged) : "";
-    if(e==null || e.KnowsAbout(this)) return base.GetFullName(e, forceSingular) + suffix;
+    if(App.Player.KnowsAbout(this)) return base.GetFullName(forceSingular) + suffix;
     string status = status = StatusString;
     if(status!="") status += ' ';
-    string rn = status + names[NameIndex] + " wand" + suffix;
+    string rn = status + Global.WandNames[NameIndex] + " wand" + suffix;
     if(Title!=null) rn += " named "+Title;
     return rn;
   }
@@ -46,7 +46,7 @@ public abstract class Wand : Chargeable
   { if(Spell.AutoIdentify && !App.Player.KnowsAbout(this) && (user==App.Player || App.Player.CanSee(user)))
     { App.Player.AddKnowledge(this);
       if(Effect!=null) App.IO.Print(Effect);
-      App.IO.Print("{0} is {1}.", user==App.Player ? "This" : "That", GetAName(user));
+      App.IO.Print("{0} is {1}.", user==App.Player ? "This" : "That", GetAName());
     }
     Spell.Cast(user, Status, target, dir);
   }
@@ -55,7 +55,8 @@ public abstract class Wand : Chargeable
 
 #region XmlWand
 public sealed class XmlWand : Wand
-{ public XmlWand(XmlNode node)
+{ public XmlWand() { }
+  public XmlWand(XmlNode node)
   { XmlItem.Init(this, node);
     Spell = XmlItem.GetSpell(node);
     Charges = Xml.RangeInt(node, "charges");

@@ -92,36 +92,34 @@ public abstract class InputOutput
   }
   public abstract Direction ChooseDirection(string prompt, bool allowSelf, bool allowVertical);
 
-  public MenuItem[] ChooseItem(string prompt, Entity entity, MenuFlag flags, params ItemClass[] classes)
-  { return ChooseItem(prompt, entity, entity.Inv, flags, classes);
+  public MenuItem[] ChooseItem(string prompt, Player player, MenuFlag flags, params ItemClass[] classes)
+  { return ChooseItem(prompt, player.Inv, flags, classes);
   }
-  public abstract MenuItem[] ChooseItem(string prompt, Entity entity, IKeyedInventory items, MenuFlag flags,
+  public abstract MenuItem[] ChooseItem(string prompt, IKeyedInventory items, MenuFlag flags,
                                         params ItemClass[] classes);
-  public abstract Spell ChooseSpell(Entity viewer);
-  public abstract Spell ChooseSpell(Entity reader, Spellbook book);
-  public RangeTarget ChooseTarget(Entity viewer, bool allowDir) { return ChooseTarget(viewer, null, allowDir); }
-  public abstract RangeTarget ChooseTarget(Entity viewer, Spell spell, bool allowDir);
+  public abstract Spell ChooseSpell(Player player);
+  public abstract Spell ChooseSpell(Player reader, Spellbook book);
+  public RangeTarget ChooseTarget(Player viewer, bool allowDir) { return ChooseTarget(viewer, null, allowDir); }
+  public abstract RangeTarget ChooseTarget(Player viewer, Spell spell, bool allowDir);
 
   public void DisplayInventory(Entity entity) { DisplayInventory(entity, ItemClass.Any); }
   public abstract void DisplayInventory(Entity entity, params ItemClass[] classes);
-  public abstract void DisplayKnowledge(Entity entity);
-  public abstract void DisplayTileItems(Entity entity, IInventory items);
-  public abstract SD.Point DisplayMap(Entity viewer);
+  public abstract void DisplayKnowledge(Player entity);
+  public abstract void DisplayTileItems(IInventory items);
+  public abstract SD.Point DisplayMap(Player viewer);
 
-  public abstract void ExamineItem(Entity viewer, Item item);
-  public abstract void ExamineTile(Entity viewer, SD.Point pos);
+  public abstract void ExamineItem(Player viewer, Item item);
+  public abstract void ExamineTile(Player viewer, SD.Point pos);
 
   public abstract Input GetNextInput();
 
-  public abstract void ManageSkills(Entity player);
+  public abstract void ManageSkills(Player player);
 
-  public MenuItem[] Menu(Entity entity, IInventory items, MenuFlag flags)
-  { return Menu(entity, items, flags, ItemClass.Any);
+  public MenuItem[] Menu(IInventory items, MenuFlag flags)
+  { return Menu(items, flags, ItemClass.Any);
   }
-  public abstract MenuItem[] Menu(Entity entity, System.Collections.ICollection items, MenuFlag flags,
-                                  params ItemClass[] classes);
-  public MenuItem[] Menu(MenuItem[] items, MenuFlag flags) { return Menu(null, items, flags); }
-  public abstract MenuItem[] Menu(Entity entity, MenuItem[] items, MenuFlag flags);
+  public abstract MenuItem[] Menu(System.Collections.ICollection items, MenuFlag flags, params ItemClass[] classes);
+  public abstract MenuItem[] Menu(MenuItem[] items, MenuFlag flags);
 
   public void Print(string format, params object[] parms) { Print(Color.Normal, format, parms); }
   public void Print(Color color, string format, params object[] parms) { Print(color, String.Format(format, parms)); }

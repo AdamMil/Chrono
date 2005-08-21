@@ -18,11 +18,10 @@
   <xs:restriction base="xs:string">
     <xs:enumeration value="Bite"/>
     <xs:enumeration value="Breath"/>
-    <xs:enumeration value="Claw"/>
     <xs:enumeration value="Explosion"/>
     <xs:enumeration value="Gaze"/>
     <xs:enumeration value="Kick"/>
-    <xs:enumeration value="Magic"/>
+    <xs:enumeration value="Spell"/>
     <xs:enumeration value="Spit"/>
     <xs:enumeration value="Sting"/>
     <xs:enumeration value="Touch"/>

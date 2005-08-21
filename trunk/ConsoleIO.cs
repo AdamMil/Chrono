@@ -78,7 +78,7 @@ public sealed class ConsoleIO : InputOutput
     return d;
   }
 
-  public override MenuItem[] ChooseItem(string prompt, Entity entity, IKeyedInventory items, MenuFlag flags,
+  public override MenuItem[] ChooseItem(string prompt, IKeyedInventory items, MenuFlag flags,
                                         params ItemClass[] classes)
   { string chars = items.CharString(classes);
     if((flags&MenuFlag.AllowNothing)!=0) chars = "-"+chars;
@@ -109,21 +109,21 @@ public sealed class ConsoleIO : InputOutput
       if(char.IsLetter(c) && num>items[c].Count) { AddLine("You don't have that many!", true); continue; }
       TextInput = false;
       if(c=='-') return new MenuItem[1] { new MenuItem(null, 0) };
-      if(c=='?') return Menu(entity, items, flags, classes);
-      if(c=='*') return Menu(entity, items, flags, ItemClass.Any);
+      if(c=='?') return Menu(items, flags, classes);
+      if(c=='*') return Menu(items, flags, ItemClass.Any);
       return new MenuItem[1] { new MenuItem(items[c], num==-1 ? items[c].Count : num) };
     }
   }
 
-  public override Spell ChooseSpell(Entity viewer)
+  public override Spell ChooseSpell(Player player)
   { string chars="";
     char c='a';
-    for(int i=0; i<viewer.Spells.Count; i++) chars += c++;
+    for(int i=0; i<player.Spells.Count; i++) chars += c++;
     chars += '?';
 
     c = CharChoice("Cast which spell?", chars);
     if(c==0) return null;
-    if(c!='?') return (Spell)viewer.Spells[c-'a'];
+    if(c!='?') return (Spell)player.Spells[c-'a'];
 
     ClearScreen();
     console.SetCursorPosition(0, 0);
@@ -131,8 +131,8 @@ public sealed class ConsoleIO : InputOutput
     console.WriteLine();
 
     c='a';
-    foreach(Spell s in viewer.Spells)
-      WriteLine(Color.Normal, "{0} - {1} ({2}%)", c++, s.Name.PadRight(34), s.CastChance(viewer));
+    foreach(Spell s in player.Spells)
+      WriteLine(Color.Normal, "{0} - {1} ({2}%)", c++, s.Name.PadRight(34), s.CastChance(player));
     WriteLine(Color.Normal, "Choose spell by character.");
       
     Spell selected;
@@ -140,20 +140,20 @@ public sealed class ConsoleIO : InputOutput
     { c=ReadChar();
       if(rec.Key.VirtualKey==NTConsole.Key.Escape || c=='\r' || c=='\n') { selected=null; break; }
       int index = c-'a';
-      if(index>=0 && index<viewer.Spells.Count) { selected = (Spell)viewer.Spells[index]; break; }
+      if(index>=0 && index<player.Spells.Count) { selected = (Spell)player.Spells[index]; break; }
     }
     RestoreScreen();
     return selected;
   }
 
-  public override Spell ChooseSpell(Entity reader, Spellbook book)
+  public override Spell ChooseSpell(Player reader, Spellbook book)
   { Spell selected=null;
     bool clear=true;
     while(true)
     { if(clear)
       { ClearScreen();
         console.SetCursorPosition(0, 0);
-        WriteLine(Color.Normal, "The "+book.GetFullName(reader));
+        WriteLine(Color.Normal, "The "+book.GetFullName());
         console.WriteLine();
         clear=false;
       }
@@ -215,7 +215,7 @@ public sealed class ConsoleIO : InputOutput
     return selected;
   }
 
-  public override RangeTarget ChooseTarget(Entity viewer, Spell spell, bool allowDir)
+  public override RangeTarget ChooseTarget(Player viewer, Spell spell, bool allowDir)
   { ClearLines();
     Point[] vpts = viewer.VisibleTiles();
     Entity[] mons = viewer.VisibleCreatures(vpts);
@@ -367,7 +367,7 @@ public sealed class ConsoleIO : InputOutput
           PutString(NTConsole.Attribute.White, 0, yi, head.ToString());
         }
         else
-        { PutString(0, yi, "{0} - {1}", menu[mc].Char, menu[mc].Item.GetInvName(entity));
+        { PutString(0, yi, "{0} - {1}", menu[mc].Char, menu[mc].Item.GetInvName());
           mc++;
         }
       }
@@ -401,10 +401,10 @@ public sealed class ConsoleIO : InputOutput
     RestoreScreen();
   }
 
-  public override void DisplayTileItems(Entity entity, IInventory items) { DisplayTileItems(entity, items, true); }
-  public void DisplayTileItems(Entity entity, IInventory items, bool visible)
+  public override void DisplayTileItems(IInventory items) { DisplayTileItems(items, true); }
+  public void DisplayTileItems(IInventory items, bool visible)
   { if(items==null || items.Count==0) return;
-    if(items.Count==1) AddLine((visible ? "You see here: " : "You saw here: ")+items[0].GetAName(entity));
+    if(items.Count==1) AddLine((visible ? "You see here: " : "You saw here: ")+items[0].GetAName());
     else
     { int nitems=items.Count+1, space=LineSpace-uncleared-2;
       bool other=false;
@@ -412,32 +412,32 @@ public sealed class ConsoleIO : InputOutput
       { nitems = space;
         if(nitems<=1) AddLine("There are several items here.");
         else if(nitems==2)
-        { AddLine((visible ? "You see here: " : "You saw here: ")+items[0].GetAName(entity)); other=true;
+        { AddLine((visible ? "You see here: " : "You saw here: ")+items[0].GetAName()); other=true;
         }
       }
       if(nitems<=space || nitems>2)
       { AddLine("You see here:"); nitems--;
         if(nitems<items.Count) { other=true; nitems--; }
-        for(int i=0; i<nitems; i++) AddLine(items[i].GetAName(entity));
+        for(int i=0; i<nitems; i++) AddLine(items[i].GetAName());
       }
       if(other) AddLine(visible ? "There are other items here as well." : "There were other items there as well.");
     }
   }
 
-  public override void DisplayKnowledge(Entity entity)
+  public override void DisplayKnowledge(Player entity)
   { ClearLines();
     System.Collections.ICollection items = entity.Knowledge.Keys;
     string[] arr = new string[items.Count];
     int i=0;
     foreach(string s in items) // FIXME: this is probably wrong now
-      arr[i++] = ((Item)Type.GetType(s).GetConstructor(Type.EmptyTypes).Invoke(null)).GetFullName(null);
+      arr[i++] = ((Item)Type.GetType(s).GetConstructor(Type.EmptyTypes).Invoke(null)).GetFullName();
     Array.Sort(arr, System.Collections.Comparer.Default);
     for(i=0; i<arr.Length; i++) AddLine(arr[i]);
     DisplayMessages(true);
     RestoreLines();
   }
 
-  public override Point DisplayMap(Entity viewer)
+  public override Point DisplayMap(Player viewer)
   { ClearScreen();
     ClearLines();
     SetCursorToPlayer();
@@ -498,10 +498,10 @@ public sealed class ConsoleIO : InputOutput
 
   public override void EndConversation() { RestoreScreen(); }
 
-  public override void ExamineItem(Entity viewer, Item item)
+  public override void ExamineItem(Player viewer, Item item)
   { ClearScreen();
     console.SetCursorPosition(0, 0);
-    console.WriteLine("{0} - {1}", item.Char, item.GetInvName(viewer));
+    console.WriteLine("{0} - {1}", item.Char, item.GetInvName());
     console.WriteLine();
     string noiseStr=null, shortDesc=item.ShortDesc, longDesc=item.LongDesc;
     if(shortDesc!=null)
@@ -587,11 +587,11 @@ public sealed class ConsoleIO : InputOutput
     RestoreScreen();
   }
 
-  public override void ExamineTile(Entity viewer, Point pos)
+  public override void ExamineTile(Player viewer, Point pos)
   { DescribeTile(viewer, pos, viewer.VisibleTiles());
   }
 
-  public override void ManageSkills(Entity player)
+  public override void ManageSkills(Player player)
   { ClearScreen();
     console.SetCursorPosition(0, 0);
     console.WriteLine("You have {0} points of unallocated experience.", player.ExpPool);
@@ -622,13 +622,12 @@ public sealed class ConsoleIO : InputOutput
     RestoreScreen();
   }
 
-  public override MenuItem[] Menu(Entity entity, System.Collections.ICollection items, MenuFlag flags,
-                                  params ItemClass[] classes)
+  public override MenuItem[] Menu(System.Collections.ICollection items, MenuFlag flags, params ItemClass[] classes)
   { SetupMenu(items, flags, classes);
-    return Menu(entity, menu, flags);
+    return Menu(menu, flags);
   }
   
-  public override MenuItem[] Menu(Entity entity, MenuItem[] items, MenuFlag flags)
+  public override MenuItem[] Menu(MenuItem[] items, MenuFlag flags)
   { MenuItem[] ret;
     bool reletter=(flags&MenuFlag.Reletter)!=0, allownum=(flags&MenuFlag.AllowNum)!=0;
     int cs=0, width=Math.Min(MapWidth, console.Width);
@@ -647,7 +646,7 @@ public sealed class ConsoleIO : InputOutput
         }
         else
         { if(reletter) items[mc].Char=c;
-          DrawMenuItem(entity, yi, items[mc++], flags);
+          DrawMenuItem(yi, items[mc++], flags);
           if(++c>'z') c='A';
         }
       }
@@ -678,9 +677,9 @@ public sealed class ConsoleIO : InputOutput
                 goto redraw;*/
                 goto done;
               }
-              else if(i>=cs && i<cs+mc)                   // if it's onscreen
-              { DrawMenuItem(entity, y, items[i], flags); // draw it
-                console.SetCursorPosition(16, yi);        // and restore the cursor, 16 == length of "Enter selection:"
+              else if(i>=cs && i<cs+mc)            // if it's onscreen
+              { DrawMenuItem(y, items[i], flags);  // draw it
+                console.SetCursorPosition(16, yi); // and restore the cursor, 16 == length of "Enter selection:"
               }
               break;
             }
@@ -936,8 +935,8 @@ public sealed class ConsoleIO : InputOutput
     RestoreScreen();
   }
 
-  void DescribeTile(Entity viewer, Point pos, Point[] vpts) { DescribeTile(viewer, pos, vpts, true); }
-  void DescribeTile(Entity viewer, Point pos, Point[] vpts, bool clearLines)
+  void DescribeTile(Player viewer, Point pos, Point[] vpts) { DescribeTile(viewer, pos, vpts, true); }
+  void DescribeTile(Player viewer, Point pos, Point[] vpts, bool clearLines)
   { bool visible=false;
     for(int i=0; i<vpts.Length; i++) if(vpts[i]==pos) { visible=true; break; }
     if(clearLines) { lines.Clear(); uncleared=0; }
@@ -976,7 +975,7 @@ public sealed class ConsoleIO : InputOutput
           }
       }
     }
-    if(viewer.Map.HasItems(pos)) DisplayTileItems(viewer, map[pos].Items, visible);
+    if(viewer.Map.HasItems(pos)) DisplayTileItems(map[pos].Items, visible);
     DrawLines();
     uncleared = 0;
   }
@@ -1083,12 +1082,12 @@ Ctrl-P - see old messages";
     SetCursorToPlayer();
   }
 
-  void DrawMenuItem(Entity e, int y, MenuItem item, MenuFlag flags)
+  void DrawMenuItem(int y, MenuItem item, MenuFlag flags)
   { PutString(0, y, "[{0}] {1} - {2}",
               (flags&MenuFlag.AllowNum)==0 ?
                 item.Count==0 ? "-" : "+" :
                 item.Count==0 ? " - " : item.Count==item.Item.Count ? " + " : item.Count.ToString("d3"),
-              item.Char, item.Text!=null ? item.Text : item.Item.GetInvName(e));
+              item.Char, item.Text!=null ? item.Text : item.Item.GetInvName());
   }
 
   int LineHeight(string line) { return WordWrap(line); }
@@ -1164,7 +1163,7 @@ Ctrl-P - see old messages";
 
     seeInvisible = viewer.Is(Entity.Flag.SeeInvisible);
 
-    Map map = viewer.Memory==null ? viewer.Map : viewer.Memory;
+    Map map = viewer==App.Player && App.Player.Memory!=null ? App.Player.Memory : viewer.Map;
     if(map==viewer.Map)
     { for(int i=0,y=rect.Top; y<rect.Bottom; y++)
         for(int x=rect.Left; x<rect.Right; i++,x++)
@@ -1240,7 +1239,7 @@ Ctrl-P - see old messages";
       if(player.Hands[i]!=null)
       { Item item = player.Hands[i];
         x += Write(item.Class==ItemClass.Weapon ? Color.LightCyan : Color.LightGreen, "{0}:{1} ",
-                   item.Char, item.GetFullName(null));
+                   item.Char, item.GetFullName());
       }
     while(x++<width) console.WriteChar(' ');
   }

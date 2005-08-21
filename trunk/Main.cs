@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.IO;
-using ICSharpCode.SharpZipLib.GZip;
 
 namespace Chrono
 {

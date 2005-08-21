@@ -8,8 +8,8 @@ namespace Chrono
 public abstract class Armor : Wearable
 { public Armor() { Class=ItemClass.Armor; }
   
-  public override string GetFullName(Entity e, bool forceSingular)
-  { if(!Identified) return base.GetFullName(e, forceSingular);
+  public override string GetFullName(bool forceSingular)
+  { if(!Identified) return base.GetFullName(forceSingular);
     string status = StatusString;
     if(status!="") status += ' ';
     string ret = status + (AC<baseAC ? "" : "+") + (AC-baseAC) + ' ' + Name;

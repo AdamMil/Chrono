@@ -108,10 +108,10 @@ public abstract class Item : UniqueObject
   public void Curse() { Status = Status&~ItemStatus.Blessed|ItemStatus.Cursed; }
   public void Uncurse() { Status &= ~(ItemStatus.Blessed|ItemStatus.Cursed); }
 
-  public string GetAName(Entity e) { return Global.WithAorAn(GetFullName(e, false)); }
-  public string GetAName(Entity e, bool forceSingluar) { return Global.WithAorAn(GetFullName(e, forceSingluar)); }
-  public string GetFullName(Entity e) { return GetFullName(e, false); }
-  public virtual string GetFullName(Entity e, bool forceSingular)
+  public string GetAName() { return Global.WithAorAn(GetFullName(false)); }
+  public string GetAName(bool forceSingluar) { return Global.WithAorAn(GetFullName(forceSingluar)); }
+  public string GetFullName() { return GetFullName(false); }
+  public virtual string GetFullName(bool forceSingular)
   { string status = StatusString;
     if(status!="") status += ' ';
     string ret = !forceSingular && Count>1 ? Count.ToString()+' '+status+PluralPrefix+Name+PluralSuffix
@@ -119,12 +119,12 @@ public abstract class Item : UniqueObject
     if(Title!=null) ret += " named "+Title;
     return ret;
   }
-  public virtual string GetInvName(Entity e)
-  { string s = Global.WithAorAn(GetFullName(e));
+  public virtual string GetInvName()
+  { string s = Global.WithAorAn(GetFullName());
     if(Shop!=null) s += " (unpaid)";
     return s;
   }
-  public string GetThatName(Entity e) { return ThatThose + ' ' + GetFullName(e); }
+  public string GetThatName() { return ThatThose + ' ' + GetFullName(); }
 
   public byte GetNoise(Entity e) { return (byte)Math.Max(Math.Min(Noise*15-e.Stealth*8, 255), 0); }
 
@@ -257,11 +257,11 @@ public abstract class Modifying : Item
 public abstract class Wearable : Modifying
 { public Wearable() { Slot=Slot.Invalid; }
 
-  public override string GetInvName(Entity e)
+  public override string GetInvName()
   { string ret = "";
     if(worn)       ret += (ret!="" ? ", " : "(") + "worn";
     if(Shop!=null) ret += (ret!="" ? ", " : "(") + "unpaid";
-    return GetAName(e) + (ret!="" ? ' '+ret+')' : "");
+    return GetAName() + (ret!="" ? ' '+ret+')' : "");
   }
 
   public override void OnMap() { worn = false; }
@@ -276,11 +276,11 @@ public abstract class Wearable : Modifying
 public abstract class Wieldable : Modifying
 { protected Wieldable() { }
 
-  public override string GetInvName(Entity e)
+  public override string GetInvName()
   { string ret = "";
     if(equipped)   ret += (ret!="" ? ", " : "(") + "equipped";
     if(Shop!=null) ret += (ret!="" ? ", " : "(") + "unpaid";
-    return GetAName(e) + (ret!="" ? ' '+ret+')' : "");
+    return GetAName() + (ret!="" ? ' '+ret+')' : "");
   }
 
   public virtual void OnEquip  (Entity equipper) { equipped=true;  }
@@ -335,7 +335,7 @@ public sealed class XmlItem
   { Init(item, node);
     foreach(string attr in attrs)
       if(!Xml.IsEmpty(node, attr)) item.SetAttr((Attr)Enum.Parse(typeof(Attr), attr, true), Xml.Int(node, attr));
-    if(!Xml.IsEmpty(node, "effect")) item.FlagMods = GetEffect(node);
+    if(!Xml.IsEmpty(node, "effects")) item.FlagMods = GetEffect(node);
   }
 
   public static Color GetColor(XmlNode node)
@@ -343,7 +343,7 @@ public sealed class XmlItem
   }
 
   public static Entity.Flag GetEffect(XmlNode node)
-  { string[] effects = Xml.List(node, "effect");
+  { string[] effects = Xml.List(node, "effects");
     Entity.Flag flags = Entity.Flag.None;
     foreach(string s in effects) flags |= (Entity.Flag)Enum.Parse(typeof(Entity.Flag), s);
     return flags;

@@ -52,7 +52,7 @@
 
   <entity name="wizard" class="*MAGIC*" type="Humanoid"
           level="2" ac="2" speed="40" chance="10" str="8:12" dex="10:14" int="15:19" ev="1">
-    <attack type="Magic"/>
+    <attack type="Spell"/>
   </entity>
 </entityGroup>
 

@@ -272,7 +272,7 @@ public class Shopkeeper : AI
 
   public void PlayerTook(Item item)
   { if(item.Class!=ItemClass.Gold)
-      Say("{0} cost{1} {2} gold.", Global.Cap1(item.GetThatName(App.Player)), item.VerbS, SellCost(item));
+      Say("{0} cost{1} {2} gold.", Global.Cap1(item.GetThatName()), item.VerbS, SellCost(item));
   }
 
   public void PlayerUsed(Item item, bool standardMessage)
@@ -292,7 +292,7 @@ public class Shopkeeper : AI
 
     if(cost>0)
       Say("{0}! {1}ou owe me {2} gold for {3}!", yell,
-          (take>0 ? "I'm deducting "+take+" from your credit and y" : "Y"), cost, item.GetThatName(App.Player));
+          (take>0 ? "I'm deducting "+take+" from your credit and y" : "Y"), cost, item.GetThatName());
     else Say("I'm deducting {0} from your credit.", take);
   }
 
@@ -332,10 +332,10 @@ public class Shopkeeper : AI
       foreach(Item item in list)
       { int cost = SellCost(item);
         if(cost>playerGold)
-        { App.IO.Print("You owe {0} gold for {1}, but you can't afford it.", cost, item.GetAName(App.Player));
+        { App.IO.Print("You owe {0} gold for {1}, but you can't afford it.", cost, item.GetAName());
           freeToGo = false;
         }
-        else if(App.IO.YesNo(string.Format("You owe {0} gold for {1}. Pay?", cost, item.GetAName(App.Player)), true))
+        else if(App.IO.YesNo(string.Format("You owe {0} gold for {1}. Pay?", cost, item.GetAName()), true))
         { Inv.Add(App.Player.GetGold(cost, false));
           playerGold -= cost;
           item.Shop   = null;

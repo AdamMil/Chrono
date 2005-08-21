@@ -323,7 +323,7 @@ public class FireSpell : BeamSpell
   { if(i.Class==ItemClass.Scroll || i.Class==ItemClass.Potion || i.Class==ItemClass.Spellbook)
     { if(print)
         App.IO.Print(i.Class==ItemClass.Potion ? "{0} heat{1} up and burst{1}!" : "{0} burn{1} up!",
-                     (inv==App.Player.Inv ? "Your "+i.GetFullName(App.Player) : Global.Cap1(i.GetAName(App.Player))),
+                     (inv==App.Player.Inv ? "Your "+i.GetFullName() : Global.Cap1(i.GetAName())),
                      i.VerbS);
       inv.Remove(i);
       return true;
@@ -414,18 +414,16 @@ public class AmnesiaSpell : Spell
   }
   
   public override void Cast(Entity user, ItemStatus buc, Point tile, Direction dir)
-  { if(user.Memory!=null)
-    { user.Memory = Wipe(user.Memory, buc);
-      if(user==App.Player)
-      { if((buc&ItemStatus.Cursed)!=0)
-        { int index = user.Map.Index;
-          if(index>0 && user.Map.Section[index-1].Memory!=null)
-            user.Map.Section[index-1].Memory = Wipe(user.Map.Section[index-1].Memory, buc);
-          if(index<user.Map.Section.Count-1 && user.Map.Section[index+1].Memory!=null)
-            user.Map.Section[index+1].Memory = Wipe(user.Map.Section[index+1].Memory, buc);
-        }
-        App.IO.Print("You feel your mind being twisted!");
+  { if(user==App.Player && App.Player.Memory!=null)
+    { App.Player.Memory = Wipe(App.Player.Memory, buc);
+      if((buc&ItemStatus.Cursed)!=0)
+      { int index = user.Map.Index;
+        if(index>0 && user.Map.Section[index-1].Memory!=null)
+          user.Map.Section[index-1].Memory = Wipe(user.Map.Section[index-1].Memory, buc);
+        if(index<user.Map.Section.Count-1 && user.Map.Section[index+1].Memory!=null)
+          user.Map.Section[index+1].Memory = Wipe(user.Map.Section[index+1].Memory, buc);
       }
+      App.IO.Print("You feel your mind being twisted!");
     }
   }
 
@@ -463,8 +461,8 @@ public class IdentifySpell : Spell
 
     if((buc&ItemStatus.Cursed)!=0 && Global.Coinflip()) App.IO.Print("Nothing seems to happen.");
     else
-    { user.AddKnowledge(target, true);
-      App.IO.Print("{0} - {1}", target.Char, target.GetAName(user));
+    { App.Player.AddKnowledge(target, true);
+      App.IO.Print("{0} - {1}", target.Char, target.GetAName());
     }
   }
 

@@ -294,7 +294,7 @@ public class Map : UniqueObject
     ArrayList[] lists = new ArrayList[(int)ShopType.NumTypes];
     for(int i=0; i<lists.Length; i++) lists[i] = new ArrayList();
 
-    foreach(SpawnInfo si in Global.Items)
+    foreach(ItemInfo si in Global.Items)
     { if(si.Value<=0) continue;
       if(si.Class!=ItemClass.Gold) lists[(int)ShopType.General].Add(si);
       switch(si.Class)
@@ -319,8 +319,8 @@ public class Map : UniqueObject
       }
     }
 
-    objSpawns = new SpawnInfo[lists.Length][];
-    for(int i=0; i<lists.Length; i++) objSpawns[i] = (SpawnInfo[])lists[i].ToArray(typeof(SpawnInfo));
+    objSpawns = new ItemInfo[lists.Length][];
+    for(int i=0; i<lists.Length; i++) objSpawns[i] = (ItemInfo[])lists[i].ToArray(typeof(ItemInfo));
   }
 
   public EntityCollection Entities { get { return entities; } }
@@ -617,7 +617,7 @@ public class Map : UniqueObject
     for(int y=area.Y; y<area.Bottom; y++)
       for(int x=area.X; x<area.Right; x++)
         if(!HasItems(x, y))
-        { SpawnInfo[] arr = objSpawns[(int)shop.Type];
+        { ItemInfo[] arr = objSpawns[(int)shop.Type];
           AddItem(x, y, arr[Global.Rand(arr.Length)].MakeItem()).Shop=shop;
           return true;
         }
@@ -1033,7 +1033,7 @@ public class Map : UniqueObject
 
   static ushort[] scentbuf;
   static Point[] soundStack;
-  static SpawnInfo[][] objSpawns;
+  static ItemInfo[][] objSpawns;
 
   [Flags]
   enum TileFlag : byte { None=0, Passable=1, Wall=2, Door=4, Dangerous=8, Link=16 }

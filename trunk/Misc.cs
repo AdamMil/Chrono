@@ -30,13 +30,85 @@ public struct TraceResult
 public delegate TraceAction LinePoint(Point point, object context);
 
 public class UniqueObject
-{ public UniqueObject() { ID=Global.NextID; }
+{ public UniqueObject() { ID=nextID++; }
   public ulong ID;
+
+  static ulong nextID=1;
 }
+
+#region EntityGroup
+public sealed class EntityGroup
+{ public EntityGroup(XmlNode node)
+  { ArrayList list = new ArrayList();
+    if(node.LocalName=="spawns")
+    { foreach(XmlNode child in node.ChildNodes)
+        if(child.NodeType==XmlNodeType.Element)
+          list.Add(new Member(child.Attributes["group"]!=null ? Global.GetEntityGroup(Xml.Attr(child, "group"))
+                                                              : (object)Global.GetEntity(Xml.Attr(child, "entity")),
+                              Xml.Float(child, "chance")));
+    }
+    else    
+      foreach(XmlNode child in node.ChildNodes)
+        if(child.NodeType==XmlNodeType.Element)
+          switch(child.LocalName)
+          { case "entity":
+              if(child.Attributes["name"]!=null) list.Add(new Member(Global.GetEntity(Xml.Attr(child, "name"))));
+              break;
+            case "ref":
+              list.Add(new Member(Global.GetEntity(Xml.Attr(child, "name")), Xml.Float(child, "chance")));
+              break;
+            case "group":
+              list.Add(new Member(Global.GetEntityGroup(Xml.Attr(child, "name")), Xml.Float(child, "chance")));
+              break;
+          }
+    
+    string name = Xml.Attr(node, "name");
+
+    Members = (Member[])list.ToArray(typeof(Member));
+    if(Members.Length==0) throw new ArgumentException("EntityGroup "+name+" contains no members!");
+
+    float chance=0;
+    int count=0;
+    for(int i=0; i<Members.Length; i++) if(Members[i].Chance!=0) { chance+=Members[i].Chance; count++; }
+    if(chance>1)
+      throw new ArgumentException("EntityGroup "+name+"'s chances add up to more than 100%");
+    if(count!=Members.Length)
+    { chance = (1-chance)/(Members.Length-count);
+      for(int i=0; i<Members.Length; i++) if(Members[i].Chance==0) Members[i].Chance=chance;
+    }
+    else if(chance<1)
+    { chance = 1/chance;
+      for(int i=0; i<Members.Length; i++) Members[i].Chance *= chance;
+    }
+  }
+
+  public EntityInfo NextEntity()
+  { float num = (float)Global.RandDouble();
+
+    do
+    { num -= Members[index].Chance;
+      if(++index==Members.Length) index=0;
+    } while(num>0);
+
+    object obj = Members[(index==0 ? Members.Length : index) - 1].Ref;
+    return obj is EntityInfo ? (EntityInfo)obj : ((EntityGroup)obj).NextEntity();
+  }
+
+  struct Member
+  { public Member(EntityInfo ei) { Ref=ei; Chance=ei.Chance/100; }
+    public Member(object oref, float chance) { Ref=oref; Chance=chance/100; }
+    public object Ref;
+    public float Chance; // 0-1
+  }
+
+  Member[] Members;
+  int index;
+}
+#endregion
 
 #region EntityInfo
 public sealed class EntityInfo
-{ public EntityInfo(XmlNode node, Hashtable idcache)
+{ public EntityInfo(XmlNode node, XmlDocument doc, Hashtable idcache)
   { EntityNode = node;
     Attributes = new SortedList();
     
@@ -45,25 +117,36 @@ public sealed class EntityInfo
     while(node.Attributes["inherit"]!=null)
     { string bid = Xml.Attr(node, "inherit");
       node = (XmlNode)idcache[bid];
-      if(node==null) idcache[bid] = node = Global.GetEntityByID(bid);
+      if(node==null)
+      { node = doc.SelectSingleNode("//entity[@id='"+bid+"']");
+        if(node==null) throw new ArgumentException("No such entity: "+bid);
+        idcache[bid] = node;
+      }
       stack.Push(node);
     }
     
+    Difficulty = 1;
+    MaxSpawn   = 120;
+    SpawnSize  = new Range(1);
+
     ArrayList attacks=new ArrayList(), resists=new ArrayList(), confers=new ArrayList(), items=new ArrayList();
     do
     { node = (XmlNode)stack.Pop();
       foreach(XmlAttribute attr in node.Attributes)
         switch(attr.Name)
         { case "chance": Chance = Xml.Float(attr); break;
+          case "class": Attributes[attr.Name] = Xml.EntityClass(attr.Value); break;
           case "color": Attributes[attr.Name] = Xml.Color(attr); break;
-          case "corpseChance": case "maxSpawn":
+          case "corpseChance":
             Attributes[attr.Name] = int.Parse(attr.Value);
             break;
-          case "flies": Attributes[attr.Name] = Xml.IsTrue(attr.Value); break;
+          case "flies": case "isBaseName": Attributes[attr.Name] = Xml.IsTrue(attr.Value); break;
           case "id": case "inherit": break;
           case "level": Difficulty = int.Parse(attr.Value); break;
+          case "maxSpawn": MaxSpawn = int.Parse(attr.Value); break;
+          case "spawnSize": SpawnSize = new Range(attr); break;
           case "str": case "int": case "dex": case "ev": case "ac": case "light": case "speed":
-          case "maxHP": case "maxMP": case "spawnSize":
+          case "maxHP": case "maxMP":
             Attributes[attr.Name] = new Range(attr);
             break;
           default: Attributes[attr.Name] = attr.Value; break;
@@ -72,7 +155,13 @@ public sealed class EntityInfo
       foreach(XmlNode child in node.ChildNodes)
         if(child.NodeType==XmlNodeType.Element)
           switch(child.LocalName)
-          { case "attack": case "specialAttack": attacks.Add(new Attack(child)); break;
+          { case "attack": case "specialAttack":
+            { Attack a = new Attack(child);
+              if(a.Type==AttackType.Weapon) HasWeaponAttack=true;
+              else if(a.Type==AttackType.Spell) HasSpellAttack=true;
+              else attacks.Add(a);
+              break;
+            }
             case "resist": resists.Add(new Resistance(child)); break;
             case "confer": confers.Add(new Conference(child)); break;
             case "give": items.Add(child); break;
@@ -85,22 +174,18 @@ public sealed class EntityInfo
     Confers = (Conference[])confers.ToArray(typeof(Conference));
     
     string name = (string)Attributes["name"];
-    int chance=0, count=0;
-    foreach(Attack a in Attacks)
-    { if(a.Parts!=null)
-        foreach(Attack p in a.Parts)
-        { if(p.Type==AttackType.Weapon) HasWeaponAttack=true;
-          else if(p.Type==AttackType.Spell) HasSpellAttack=true;
-        }
-      else if(a.Type==AttackType.Weapon) HasWeaponAttack=true;
-      else if(a.Type==AttackType.Spell) HasSpellAttack=true;
-      if(a.Chance!=0) { chance += a.Chance; count++; }
-    }
-    if(chance>100) throw new ArgumentException("Entity "+name+"'s attack chances add up to more than 100%");
+    float chance=0;
+    int count=0;
+    foreach(Attack a in Attacks) if(a.Chance!=0) { chance += a.Chance; count++; }
+    if(chance>1) throw new ArgumentException("Entity "+name+"'s attack chances add up to more than 100%");
 
     if(count!=Attacks.Length)
-    { chance = (int)Math.Round((double)(100-chance)/(Attacks.Length-count));
+    { chance = (1-chance)/(Attacks.Length-count);
       foreach(Attack a in Attacks) if(a.Chance==0) a.Chance = (byte)chance;
+    }
+    else if(chance<1)
+    { chance = 1/chance;
+      foreach(Attack a in Attacks) a.Chance *= chance;
     }
   }
 
@@ -110,8 +195,9 @@ public sealed class EntityInfo
   public Attack[] Attacks;
   public Resistance[] Resists;
   public Conference[] Confers;
+  public Range SpawnSize;
   public float Chance;
-  public int Difficulty, Index;
+  public int Difficulty, Index, MaxSpawn; // TODO: enforce MaxSpawn
   public bool HasWeaponAttack, HasSpellAttack, HasUnarmedAttack;
 }
 #endregion
@@ -141,8 +227,8 @@ public sealed class ItemInfo
   { Item   = node;
     Chance = (int)Math.Ceiling(Xml.Float(node, "chance", 0)*100);
     if(Chance!=0)
-    { Value  = Xml.Int(node, "value", 0);
-      Count  = new Range(node, "spawn", 1);
+    { Count  = new Range(node, "spawn", 1);
+      Value  = Xml.Int(node, "value", 0);
       Class  = (ItemClass)Enum.Parse(typeof(ItemClass), node.LocalName, true);
     }
   }
@@ -273,17 +359,18 @@ public sealed class Global
 { private Global() { }
 
   static Global()
-  { LoadNames("potions", out PotionNames, out PotionColors);
-    LoadNames("rings", out RingNames, out RingColors);
-    LoadNames("scrolls", out ScrollNames);
-    LoadNames("wands", out WandNames, out WandColors);
+  { LoadSocialGroups();
 
-    LoadSocialGroups();
-    LoadItems();
-    LoadEntities();
+    XmlDocument doc = LoadXml("items.xml");
+    LoadNames(doc, "potions", out PotionNames, out PotionColors);
+    LoadNames(doc, "rings", out RingNames, out RingColors);
+    LoadNames(doc, "scrolls", out ScrollNames);
+    LoadNames(doc, "wands", out WandNames, out WandColors);
+    LoadItems(doc);
+
+    doc = LoadXml("entities.xml");
+    LoadEntities(doc);
   }
-
-  public static ulong NextID { get { return nextID++; } }
 
   #region Social groups
   public static void AddToSocialGroup(int id, Entity e)
@@ -345,27 +432,27 @@ public sealed class Global
     vars[name] = value;
   }
 
-  public static XmlNode GetEntity(string name)
-  { // FIXME: escape names that contain single quotes
-    XmlNode ret = entities.SelectSingleNode("//entity[@name='"+name+"']");
-    if(ret==null) throw new ArgumentException("No such entity: "+name);
-    return ret;
+  public static EntityInfo GetEntity(int index) { return (EntityInfo)Entities.GetByIndex(index); }
+
+  public static EntityInfo GetEntity(string name)
+  { EntityInfo ei = (EntityInfo)Entities[name];
+    if(ei==null) throw new ArgumentException("No such entity: "+name);
+    return ei;
+  }
+  
+  public static EntityGroup GetEntityGroup(string name)
+  { EntityGroup eg = (EntityGroup)entityGroups[name];
+    if(eg==null) throw new ArgumentException("No such entity group: "+name);
+    return eg;
   }
 
-  public static XmlNode GetEntityByID(string id)
-  { XmlNode ret = entities.SelectSingleNode("//entity[@id='"+id+"']");
-    if(ret==null) throw new ArgumentException("No such entity: "+id);
-    return ret;
-  }
-
-  public static XmlNode GetItem(ItemClass itemClass, string name)
+  public static ItemInfo GetItem(ItemClass itemClass, string name)
   { return GetItem(itemClass.ToString().ToLower(), name);
   }
-  public static XmlNode GetItem(string type, string name)
-  { // FIXME: escape names that contain single quotes
-    XmlNode ret = items.SelectSingleNode("//"+type+"[@name='"+name+"']");
-    if(ret==null) throw new ArgumentException("No such item: "+name);
-    return ret;
+  public static ItemInfo GetItem(string type, string name)
+  { ItemInfo ii = (ItemInfo)Items[type+"/"+name];
+    if(ii==null) throw new ArgumentException("No such item: "+name);
+    return ii;
   }
 
   public static string GetVar(string name)
@@ -400,13 +487,15 @@ public sealed class Global
     return val;
   }
 
-  public static ItemInfo NextSpawn()
-  { int n = Random.Next(10000)+1, total=0;
-    while(true)
-    { total += Items[spawnIndex].Chance;
-      if(++spawnIndex==Items.Length) spawnIndex=0;
-      if(total>=n) return Items[spawnIndex==0 ? Items.Length-1 : spawnIndex-1];
-    }
+  public static ItemInfo NextItemSpawn()
+  { int n = Random.Next(10000)+1;
+    ItemInfo ii;
+    do
+    { ii = (ItemInfo)Items.GetByIndex(spawnIndex);
+      n -= ii.Chance;
+      if(++spawnIndex==Items.Count) spawnIndex=0;
+    } while(n>0);
+    return ii;
   }
 
   public static Direction PointToDir(Point off)
@@ -487,45 +576,47 @@ public sealed class Global
     new Point(0, 1),  new Point(-1, 1), new Point(-1, 0), new Point(-1, -1)
   };
   
-  public static ItemInfo[] Items;
-  public static EntityInfo[] Entities;
+  public static SortedList Entities=new SortedList(), Items=new SortedList();
   public static string[] PotionNames, RingNames, ScrollNames, WandNames;
   public static Color[] PotionColors, RingColors, WandColors;
 
-  static void LoadEntities()
-  { ArrayList list = new ArrayList();
-    Hashtable cache = new Hashtable();
-    foreach(XmlNode node in entities.SelectNodes("//entity[@name]"))
-      list.Add(new EntityInfo(node, cache));
-    Entities = (EntityInfo[])list.ToArray(typeof(EntityInfo));
-    for(int i=0; i<Entities.Length; i++) Entities[i].Index = i;
+  static void LoadEntities(XmlDocument doc)
+  { Hashtable cache = new Hashtable();
+    int index = 0;
+    foreach(XmlNode node in doc.SelectNodes("//entity[@name]"))
+    { EntityInfo ei = new EntityInfo(node, doc, cache);
+      ei.Index = index++;
+      Entities[(string)ei.Attributes["name"]] = ei;
+    }
+
+    foreach(XmlNode node in doc.SelectNodes("//entityGroup"))
+    { EntityGroup eg = new EntityGroup(node);
+      entityGroups[Xml.Attr(node, "name")] = eg;
+    }
   }
 
-  static void LoadItems()
-  { ArrayList list = new ArrayList();
-    Type[] types = Assembly.GetExecutingAssembly().GetTypes(); // build a table of items and their spawn chances
+  static void LoadItems(XmlDocument doc)
+  { Type[] types = Assembly.GetExecutingAssembly().GetTypes();
     int poti=0, ringi=0, scrolli=0, wandi=0;
 
     foreach(Type t in types)
       if(!t.IsAbstract && t.IsSubclassOf(typeof(Item)))
-      { ItemInfo si = new ItemInfo(t);
-        if(si.Chance!=0) list.Add(si);
+      { ItemInfo ii = new ItemInfo(t);
+        if(ii.Chance!=0) Items["builtin/"+t.Name] = ii;
       }
 
-    foreach(XmlNode node in items.DocumentElement.ChildNodes)
+    foreach(XmlNode node in doc.DocumentElement.ChildNodes)
       if(node.NodeType==XmlNodeType.Element)
-      { ItemInfo si = new ItemInfo(node);
-        if(si.Chance!=0) list.Add(si);
+      { ItemInfo ii = new ItemInfo(node);
+        if(ii.Chance!=0) Items[ii.Class.ToString().ToLower()+"/"+Xml.Attr(node, "name")] = ii;
       }
 
-    Items = (ItemInfo[])list.ToArray(typeof(ItemInfo));
-
-    for(int i=0; i<Items.Length; i++)
-      switch(Items[i].Class)
-      { case ItemClass.Potion: Items[i].RandomIndex=poti++; break;
-        case ItemClass.Ring:   Items[i].RandomIndex=ringi++; break;
-        case ItemClass.Scroll: Items[i].RandomIndex=scrolli++; break;
-        case ItemClass.Wand:   Items[i].RandomIndex=wandi++; break;
+    foreach(ItemInfo ii in Items.Values)
+      switch(ii.Class)
+      { case ItemClass.Potion: ii.RandomIndex=poti++; break;
+        case ItemClass.Ring:   ii.RandomIndex=ringi++; break;
+        case ItemClass.Scroll: ii.RandomIndex=scrolli++; break;
+        case ItemClass.Wand:   ii.RandomIndex=wandi++; break;
       }
 
     if(poti>PotionNames.Length) throw new ApplicationException("Not enough potion names. Need "+poti.ToString());
@@ -534,16 +625,16 @@ public sealed class Global
     if(wandi>WandNames.Length) throw new ApplicationException("Not enough wand names. Need "+wandi.ToString());
   }
 
-  static void LoadNames(string group, out string[] names)
-  { names = split.Split(items.SelectSingleNode("//"+group).InnerText);
+  static void LoadNames(XmlDocument doc, string group, out string[] names)
+  { names = split.Split(doc.SelectSingleNode("//"+group).InnerText);
     for(int i=0; i<names.Length; i++)
     { int j = Rand(names.Length);
       string t = names[i]; names[i] = names[j]; names[j] = t;
     }
   }
 
-  static void LoadNames(string group, out string[] names, out Color[] colors)
-  { string[] items = split.Split(Global.items.SelectSingleNode("//"+group).InnerText);
+  static void LoadNames(XmlDocument doc, string group, out string[] names, out Color[] colors)
+  { string[] items = split.Split(doc.SelectSingleNode("//"+group).InnerText);
     names  = items;
     colors = new Color[items.Length];
 
@@ -569,11 +660,9 @@ public sealed class Global
         NewSocialGroup(Xml.IsTrue(group.Attributes["hostile"]), Xml.IsTrue(group.Attributes["permanent"]));
   }
 
-  static readonly XmlDocument entities=LoadXml("entities.xml"), items=LoadXml("items.xml");
-  static Hashtable vars=new Hashtable(), namedSocialGroups=new Hashtable();
+  static Hashtable vars=new Hashtable(), namedSocialGroups=new Hashtable(), entityGroups=new Hashtable();
   static SocialGroup[] socialGroups;
   static Random Random = new Random();
-  static ulong nextID=1;
   static int spawnIndex, numSocials;
   static System.Text.RegularExpressions.Regex split = new System.Text.RegularExpressions.Regex(@"\s*,\s*");
 }

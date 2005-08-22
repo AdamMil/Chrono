@@ -188,12 +188,8 @@ public abstract class Item : UniqueObject
 
   public static Item Make(string item)
   { int pos = item.IndexOf(':');
-    if(pos!=-1) return Make(Global.GetItem(item.Substring(0, pos), item.Substring(pos+1)));
-    else
-    { Type type = Type.GetType("Chrono."+item);
-      if(type==null) throw new ArgumentException("No such type: "+item);
-      return (Item)type.GetConstructor(Type.EmptyTypes).Invoke(null);
-    }
+    return (pos==-1 ? Global.GetItem("builtin", item)
+                    : Global.GetItem(item.Substring(0, pos), item.Substring(pos+1))).MakeItem();
   }
 
   public static Item Make(XmlNode node)
@@ -211,9 +207,7 @@ public abstract class Item : UniqueObject
     }
   }
   
-  public static Item Make(ItemClass itemClass, string name)
-  { return Make(Global.GetItem(itemClass, name));
-  }
+  public static Item Make(ItemClass itemClass, string name) { return Global.GetItem(itemClass, name).MakeItem(); }
 
   protected string name;
 }

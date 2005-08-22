@@ -8,7 +8,7 @@ namespace Chrono
 
 public enum SpellClass // remember to add these to the Skill enum as well
 { Summoning, Enchantment, Telekinesis, Translocation, Transformation, Divination, Channeling, Necromancy, Elemental,
-  Poison,
+  Poison, Restorative,
 
   NumClasses
 }
@@ -16,9 +16,7 @@ public enum SpellTarget { Self, Item, Tile };
 
 #region Spell
 public abstract class Spell : UniqueObject
-{ public Spell() { ID=Global.NextID; }
-
-  public void Cast(Entity user) { Cast(user, ItemStatus.None, user.Position, Direction.Self); }
+{ public void Cast(Entity user) { Cast(user, ItemStatus.None, user.Position, Direction.Self); }
   public void Cast(Entity user, ItemStatus buc) { Cast(user, buc, user.Position, Direction.Self); }
   public void Cast(Entity user, Direction dir) { Cast(user, ItemStatus.None, new RangeTarget(dir)); }
   public void Cast(Entity user, ItemStatus buc, Direction dir) { Cast(user, buc, new RangeTarget(dir)); }
@@ -338,7 +336,7 @@ public class FireSpell : BeamSpell
 #region Heal
 public sealed class HealSpell : Spell
 { public HealSpell()
-  { Name="heal"; Class=SpellClass.Transformation; Difficulty=3; Power=5;
+  { Name="heal"; Class=SpellClass.Restorative; Difficulty=3; Power=5;
     Description = "This spell will cure the caster of poisons, and rejuvenate him as well.";
   }
   
@@ -363,7 +361,7 @@ public sealed class HealSpell : Spell
 #region RemoveScent
 public sealed class RemoveScentSpell : Spell
 { public RemoveScentSpell()
-  { Name="remove scent"; Class=SpellClass.Transformation; Difficulty=2; Power=8;
+  { Name="remove scent"; Class=SpellClass.Restorative; Difficulty=2; Power=8;
     Description = "This spell will make the caster smell as fresh as a rose.";
   }
   

@@ -56,6 +56,7 @@
   <xs:attribute name="corpseChance" type="percent"/>
   <xs:attribute name="id" type="xs:string"/>
   <xs:attribute name="inherit" type="xs:IDREF"/>
+  <xs:attribute name="isBaseName" type="xs:boolean"/>
   <xs:attribute name="level" type="intRange"/>
   <xs:attribute name="flies" type="xs:boolean" default="false"/>
   <xs:attribute name="maxSpawn" type="nnint" default="120"/>
@@ -135,13 +136,13 @@
     <xs:element name="ref">
       <xs:complexType>
         <xs:attribute name="name" type="xs:string"/>
-        <xs:attribute name="idref" type="xs:IDREF"/>
+        <xs:attribute name="chance" type="percent"/>
       </xs:complexType>
     </xs:element>
     <xs:element name="group">
       <xs:complexType>
         <xs:attribute name="name" type="xs:string"/>
-        <xs:attribute name="idref" type="xs:IDREF"/>
+        <xs:attribute name="chance" type="percent"/>
       </xs:complexType>
     </xs:element>
   </xs:choice>

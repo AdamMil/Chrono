@@ -7,12 +7,13 @@
 
 <!-- ants -->
 <entityGroup name="ants">
-  <entity id="_ant" type="Bug" spawnSize="2:5" ac="3" str="14:18" int="4:6" dex="8:12" gender="neither"/>
-  <entity name="giant ant" inherit="_ant" chance="40" color="Brown" level="1">
+  <entity id="_ant" type="Bug" spawnSize="1:3" ac="3" str="14:18" int="4:6" dex="8:12" gender="Neither" maxHP="8:12"/>
+
+  <entity name="giant ant" spawnSize="2:5" inherit="_ant" chance="40" color="Brown" level="1">
     <attack amount="1d4" type="Bite"/>
   </entity>
 
-  <entity name="soldier ant" inherit="_ant" ac="4" chance="16" level="3">
+  <entity name="soldier ant" inherit="_ant" ac="4" chance="16" level="3" color="Blue">
     <attack amount="2d4" type="Bite" chance="67"/>
     <attack amount="3:4" type="Sting" damage="DrainStr"/>
   </entity>
@@ -27,7 +28,8 @@
 
 <!-- bees -->
 <entityGroup name="bees">
-  <entity id="_bee" type="Bug" spawnSize="3:8" ev="5" str="8:12" int="4:6" dex="10:14" flies="true" gender="female">
+  <entity id="_bee" type="Bug" spawnSize="3:8" ev="5" str="8:12" int="4:6" dex="10:14" flies="true" gender="Female"
+          maxHP="10:14">
     <resist type="Poison"/>
     <confer type="Poison" chance="40"/>
   </entity>
@@ -45,23 +47,24 @@
 
 <!-- humanoids -->
 <entityGroup name="humanoids">
-  <entity name="hobbit" class="*MELEE*" type="Humanoid"
-          level="1" ac="2" speed="40" chance="15" str="8:12" dex="10:14" int="7:13" ev="1">
+  <entity name="hobbit" class="Melee" type="Humanoid"
+          level="1" ac="2" speed="40" chance="15" str="8:12" dex="10:14" int="7:13" ev="1" maxHP="25">
     <attack type="Weapon"/>
   </entity>
 
-  <entity name="wizard" class="*MAGIC*" type="Humanoid"
-          level="2" ac="2" speed="40" chance="10" str="8:12" dex="10:14" int="15:19" ev="1">
+  <entity name="wizard" class="Magic" type="Humanoid"
+          level="2" ac="2" speed="40" chance="10" str="8:12" dex="10:14" int="15:19" ev="1" maxHP="15" maxMP="20">
     <attack type="Spell"/>
   </entity>
 </entityGroup>
 
 <!-- quest related entities -->
-<entity name="Pa" ai="fatherOfPC" type="Townsperson" race="Player" IsAdult="true" baseName="clerk">
+<entity name="Pa" ai="fatherOfPC" type="Townsperson" race="Player" IsAdult="true" baseName="clerk" isBaseName="false">
   <give class="Gold" count="1000"/>
 </entity>
 
-<entity name="Uncle John" ai="fathersBrother" type="Townsperson" race="Player" IsAdult="true" baseName="hunter">
+<entity name="Uncle John" ai="fathersBrother" type="Townsperson" race="Player" IsAdult="true" baseName="hunter"
+        isBaseName="false">
   <give class="FlamingArrow" count="40"/>
 </entity>
 

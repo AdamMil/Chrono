@@ -90,7 +90,9 @@ public class Xml
   public static EntityClass EntityClass(XmlNode node, string attr) { return EntityClass(node.Attributes[attr].Value); }
   public static EntityClass EntityClass(XmlAttribute attr) { return EntityClass(attr.Value); }
   public static EntityClass EntityClass(string entClass)
-  { return (EntityClass)Enum.Parse(typeof(EntityClass), entClass);
+  { if(entClass=="Melee") return Chrono.EntityClass.Fighter;
+    else if(entClass=="Magic") return Chrono.EntityClass.Wizard;
+    else return (EntityClass)Enum.Parse(typeof(EntityClass), entClass);
   }
 
   public static float Float(XmlAttribute attr) { return Float(attr, 0); }

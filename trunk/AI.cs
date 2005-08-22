@@ -14,9 +14,9 @@ public enum AIState : byte
 
 public sealed class Attack // sync with entities.xsd
 { public Attack(XmlNode node)
-  { Name = Xml.Attr(node, "name");
-    if(Name!=null)
-    { ArrayList list = new ArrayList();
+  { if(node.LocalName=="specialAttack")
+    { Name = Xml.Attr(node, "name");
+      ArrayList list = new ArrayList();
       foreach(XmlNode child in node.ChildNodes)
         if(child.NodeType==XmlNodeType.Element)
           list.Add(new Attack(child));
@@ -28,7 +28,26 @@ public sealed class Attack // sync with entities.xsd
       Amount = new Range(node.Attributes["amount"]);
     }
 
-    Chance = (byte)Xml.Int(node, "chance");
+    Chance = Xml.Int(node, "chance")/100f;
+  }
+
+  public Damage GetDamage()
+  { Damage d = new Damage();
+    if(Parts!=null) foreach(Attack a in Parts) d.Add(a.GetDamage());
+    else
+    { ushort amount = (ushort)Amount.RandValue();
+      switch(Damage)
+      { case DamageType.Cold: d.Cold=amount; break;
+        case DamageType.Direct: d.Direct=amount; break;
+        case DamageType.Electricity: d.Electricity=amount; break;
+        case DamageType.Fire: d.Heat=amount; break;
+        case DamageType.Physical: d.Physical=amount; break;
+        case DamageType.Poison: d.Poison=amount; break;
+        default: throw new NotImplementedException("unhandled damage type: "+Damage);
+      }
+    }
+    
+    return d;
   }
 
   public string Name;
@@ -37,7 +56,7 @@ public sealed class Attack // sync with entities.xsd
   public Range Amount;
   public AttackType Type;
   public DamageType Damage;
-  public byte Chance; // 0-100%
+  public float Chance; // 0-1
 }
 
 public enum AttackType : byte // sync with entities.xsd
@@ -236,44 +255,58 @@ public abstract class AI : Entity
   public byte CorpseChance=30;   // chance of leaving a corpse, 0-100%
 
   public static AI Make(AI ent, int level, Race race, EntityClass entClass)
-  { ent.Class = entClass;
-    ent.Race  = race;
-    ent.ExpLevel = level;
+  { ent.Class = entClass==EntityClass.Random ? (EntityClass)Global.Rand((int)EntityClass.NumClasses) : entClass;
+    ent.Race  = race==Race.Random ? (Race)Global.Rand((int)Race.NumRaces) : race;
 
     int si = (int)race*3;
     ent.Eyesight=raceSenses[si]; ent.Hearing=raceSenses[si+1]; ent.Smelling=raceSenses[si+2];
 
     ent.OnMake();
+    while(--level!=0) ent.LevelUp();
 
     ent.HP = ent.MaxHP;
     ent.MP = ent.MaxMP;
+
     return ent;
   }
 
-  public static AI Make(XmlNode node)
-  { AI ent = null;
-    int level = 1;
-    Race race = Race.Random;
-    EntityClass entClass = EntityClass.Random;
+  public static AI Make(EntityInfo ei)
+  { AI ent = (AI)Type.GetType("Chrono."+(string)ei.Attributes["type"]).GetConstructor(Type.EmptyTypes).Invoke(null);
 
-    for(XmlNode n=node; ; n=Global.GetEntityByID(Xml.Attr(n, "inherit")))
-    { if(!Xml.IsEmpty(n, "type"))
-      { ent = (AI)Type.GetType("Chrono."+Xml.Attr(n, "type")).GetConstructor(Type.EmptyTypes).Invoke(null);
-        if(race==Race.Random) race = ent.Race;
-        if(entClass==EntityClass.Random) entClass = ent.Class;
+    ent.EntityIndex = ei.Index;
+    ent.SetBaseAttr(Attr.Light, 8);
+    ent.SetBaseAttr(Attr.Speed, 50);
+
+    foreach(DictionaryEntry de in ei.Attributes)
+      switch((string)de.Key)
+      { case "ai": ent.Script = AIScript.Load((string)de.Value); break;
+        case "color": ent.Color = (Color)de.Value; break;
+        case "corpseChance": ent.CorpseChance = (byte)(int)de.Value; break;
+        case "name":
+        { object o = ei.Attributes["isBaseName"];
+          if(o==null || (bool)o==true) ent.baseName = (string)de.Value;
+          else ent.Name = (string)de.Value;
+          break;
+        }
+        case "socialGroup": ent.SocialGroup = Global.GetSocialGroup((string)de.Value); break;
+        case "flies": ent.SetRawFlag(Entity.Flag.Levitate, (bool)de.Value); break;
+        case "gender": ent.Gender = Xml.Gender((string)de.Value); break;
+        case "race": ent.Race = Xml.Race((string)de.Value); break;
+        case "class": ent.Class = (EntityClass)de.Value; break;
+
+        case "ac": case "dex": case "ev": case "int": case "light": case "maxHP": case "maxMP":
+        case "speed": case "stealth": case "str": 
+          ent.SetBaseAttr((Attr)Enum.Parse(typeof(Attr), (string)de.Key, true), ((Range)de.Value).RandValue());
+          break;
+
+        case "inherit": case "isBaseName": case "type": case "level": break;
+
+        default: Global.SetObjectValue(ent, (string)de.Key, (string)de.Value); break;
       }
-      if(!Xml.IsEmpty(n, "class")) entClass = Xml.EntityClass(n, "class");
-      if(!Xml.IsEmpty(n, "level")) level = Xml.Int(n, "level");
-      if(!Xml.IsEmpty(n, "race")) race = Xml.Race(n, "race");
 
-      if(Xml.IsEmpty(n, "inherit")) break;
-    }
-    if(ent==null) throw new ArgumentException("Entity does not contain a 'type' attribute.");
+    foreach(XmlNode node in ei.InitialItems) ent.Inv.Add(Item.ItemDef(node));
 
-    if(entClass==EntityClass.Random) entClass = (EntityClass)Global.Rand((int)EntityClass.NumClasses);
-    if(race==Race.Random) race = (Race)Global.Rand((int)Race.NumRaces);
-    Make(ent, node);
-    Make(ent, level, race, entClass);
+    Make(ent, ei.Difficulty, ent.Race, ent.Class);
     return ent;
   }
 
@@ -700,6 +733,17 @@ public abstract class AI : Entity
     return false;
   }
 
+  protected new void Attack(Weapon weapon, Ammo ammo, Direction dir)
+  { if(weapon==null)
+    { Attack a = RandomAttack();
+      if(a!=null)
+      { Attack(a.GetDamage(), dir);
+        return;
+      }
+    }
+    base.Attack(weapon, ammo, dir);
+  }
+
   protected virtual void Die()
   { attacker=target=null; // FIXME: remove this after we revamp saving/loading
     if(Global.Rand(100)<CorpseChance) Map.AddItem(Position, new Corpse(this));
@@ -962,7 +1006,7 @@ public abstract class AI : Entity
 
   protected bool PrepareMelee() { return PrepareMelee(false); }
   protected virtual bool PrepareMelee(bool forceEval)
-  { if(!Global.Entities[EntityIndex].HasWeaponAttack) return false;
+  { if(!Global.GetEntity(EntityIndex).HasWeaponAttack) return false;
     Item item=null;
     int quality=0;
     Weapon w = Weapon;
@@ -978,7 +1022,7 @@ public abstract class AI : Entity
 
   protected bool PrepareRanged() { return PrepareRanged(false); }
   protected virtual bool PrepareRanged(bool forceEval)
-  { if(!Global.Entities[EntityIndex].HasWeaponAttack) return false;
+  { if(!Global.GetEntity(EntityIndex).HasWeaponAttack) return false;
     Item item=null;
     int quality=0;
     Weapon w = Weapon;
@@ -1032,6 +1076,19 @@ public abstract class AI : Entity
     for(i=0; i<items.Count; i++) if(ProcessItem((Item)items[i])) { processed=true; i++; break; }
     items.RemoveRange(0, i);
     return processed;
+  }
+
+  protected Attack RandomAttack()
+  { Attack[] attacks = Global.GetEntity(EntityIndex).Attacks;
+    if(attacks.Length==0) return null;
+
+    float num = (float)Global.RandDouble();
+    do
+    { num -= attacks[attackIndex].Chance;
+      if(++attackIndex==attacks.Length) attackIndex=0;
+    } while(num>0);
+
+    return attacks[(attackIndex==0 ? attacks.Length : attackIndex) - 1];
   }
 
   protected virtual int RangedScore(Weapon w)
@@ -1216,6 +1273,7 @@ public abstract class AI : Entity
   protected AIScript script;      // our AI script
   protected int timeout;          // how long we keep trying the current action
   protected int wakeup;           // how long it takes us to get into attack mode
+  protected int attackIndex;      // index into our attack array (used for the selection of the next random attack)
   protected Direction noiseDir=Direction.Invalid;   // the direction of the last noise we heard
   protected Direction sightDir=Direction.Invalid;   // the direction we saw the enemy in
   protected Direction scentDir=Direction.Invalid;   // the direction in which we smell the enemy
@@ -1282,8 +1340,8 @@ public abstract class AI : Entity
         if(usedSight || prevDir==nd || Global.Rand(100)<(usedHit?85:usedSound?75:50))
           Attack(Weapon, null, lastDir=nd);
         else if(!usedSight && prevDir!=nd && Map.GetEntity(Global.Move(Position, prevDir))==null)
-        { Attack(Weapon, null, prevDir);
-          if(App.Player.CanSee(this)) App.IO.Print(TheName+" attacks empty space.");
+        { if(App.Player.CanSee(this)) App.IO.Print(TheName+" attacks empty space.");
+          Attack(Weapon, null, prevDir);
         }
         timeout = attackTimeout; // we attacked something, so our vigor is renewed!
         return true; // but our turn is up
@@ -1306,32 +1364,6 @@ public abstract class AI : Entity
       if(xc.Charges!=0) return xc.Spell;
     }
     return null;
-  }
-
-  static void Make(AI ent, XmlNode node)
-  { if(!Xml.IsEmpty(node, "inherit")) Make(ent, Global.GetEntityByID(Xml.Attr(node, "inherit")));
-
-    foreach(XmlAttribute attr in node.Attributes)
-      switch(attr.Name)
-      { case "ai": ent.Script = AIScript.Load(attr.Value); break;
-        case "color": ent.Color = Xml.Color(attr); break;
-        case "corpseChance": ent.CorpseChance = byte.Parse(attr.Value); break;
-        case "name": ent.Name = attr.Value; break;
-        case "socialGroup": ent.SocialGroup = Global.GetSocialGroup(attr.Value); break;
-        case "flies": ent.SetRawFlag(Entity.Flag.Levitate, Xml.IsTrue(attr.Value)); break;
-        case "gender": ent.Gender = Xml.Gender(attr); break;
-
-        case "ac": case "dex": case "ev": case "int": case "light": case "maxHP": case "maxMP":
-        case "speed": case "stealth": case "str": 
-          ent.SetBaseAttr((Attr)Enum.Parse(typeof(Attr), attr.Name, true), Xml.RangeInt(attr.Value));
-          break;
-        
-        case "inherit": case "type": case "race": case "class": case "level": break;
-
-        default: Global.SetObjectValue(ent, attr.Name, attr.Value); break;
-      }
-
-    foreach(XmlNode item in node.SelectNodes("give")) ent.Inv.Add(Item.ItemDef(item));
   }
 
   static readonly Skill[][] classSkills = new Skill[(int)EntityClass.NumClasses][]

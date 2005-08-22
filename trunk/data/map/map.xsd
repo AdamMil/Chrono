@@ -167,7 +167,7 @@
 <xs:complexType name="map">
   <xs:sequence>
     <xs:element name="generatorOptions" type="generatorOptions" minOccurs="0"/>
-    <xs:element name="spawn" type="spawn"/>
+    <xs:element name="spawns" type="spawns" minOccurs="0"/>
     <xs:element name="room" type="room" minOccurs="0" maxOccurs="unbounded"/>
     <xs:element name="link" type="link" minOccurs="0" maxOccurs="unbounded"/>
     <xs:element name="npc" type="npc" minOccurs="0" maxOccurs="unbounded"/>
@@ -199,7 +199,7 @@
 
 <!-- spawn -->
 <xs:complexType name="spawn">
-  <xs:attribute name="entity" type="xs:string"/>
+  <xs:attribute name="ref" type="xs:string"/>
   <xs:attribute name="group" type="xs:string"/>
   <xs:attribute name="chance" type="percent"/>
 </xs:complexType>
@@ -209,14 +209,13 @@
   <xs:sequence>
     <xs:element name="spawn" type="spawn" maxOccurs="unbounded"/>
   </xs:sequence>
-  <xs:attribute name="min" type="nnint"/>
   <xs:attribute name="max" type="nnint"/>
   <xs:attribute name="start" type="nnint"/>
   <xs:attribute name="rate" type="nnint"/>
 </xs:complexType>
 
 <!-- npc -->
-<xs:complexType name="npc"
+<xs:complexType name="npc">
   <xs:sequence>
     <xs:element name="location" type="location" minOccurs="0"/>
     <xs:element name="give" type="itemDef" minOccurs="0" maxOccurs="unbounded"/>

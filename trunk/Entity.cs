@@ -21,7 +21,18 @@ public struct Damage
 
   public int Total { get { return Direct+Physical+Heat+Cold+Electricity; } } // doesn't count poison
 
-  public void Modify(double mul)
+  public ushort Direct, Physical, Heat, Cold, Electricity, Poison;
+
+  public void Add(Damage d)
+  { Direct += d.Direct;
+    Physical += d.Physical;
+    Heat += d.Heat;
+    Cold += d.Cold;
+    Electricity += d.Electricity;
+    Poison += d.Poison;
+  }
+
+  public void Multiply(double mul)
   { Direct = (ushort)Math.Round(Direct*mul);
     Physical = (ushort)Math.Round(Physical*mul);
     Heat = (ushort)Math.Round(Heat*mul);
@@ -29,8 +40,6 @@ public struct Damage
     Electricity = (ushort)Math.Round(Electricity*mul);
     Poison = (ushort)Math.Round(Poison*mul);
   }
-
-  public ushort Direct, Physical, Heat, Cold, Electricity, Poison;
 
   public static Damage FromPoison(ushort amount)
   { Damage d = new Damage();
@@ -897,8 +906,8 @@ public abstract class Entity : UniqueObject
 
   public bool TrySpellDamage(Spell spell, Point point, Damage damage) // 'damage' is base damage (no modifiers)
   { int skill = GetSkill(spell.Skill);
-    if(skill==0) damage.Modify(0.5);
-    else damage.Modify(SkillModifier(skill));
+    if(skill==0) damage.Multiply(0.5);
+    else damage.Multiply(SkillModifier(skill));
 
     Entity e = Map.GetEntity(point);
     if(e!=null)

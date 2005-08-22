@@ -25,9 +25,9 @@
 
   <!-- dungeons -->
   <section id="gtownDungeon" name="Grass Town Dungeon">
-    <levels depth="1" map="gtownDungeonBottom"/>
     <levels depth="4:6" map="gtownDungeonRoomy"/>
     <levels depth="1:2" map="gtownDungeonCave"/>
     <levels depth="2:3" map="gtownDungeonRoomy"/>
+    <levels depth="1" map="gtownDungeonBottom"/>
   </section>
 </dg:dungeon>

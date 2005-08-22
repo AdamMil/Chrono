@@ -955,22 +955,23 @@ public sealed class ConsoleIO : InputOutput
       if(w!=null) AddLine(string.Format(prefix+" wielding {1} {2}.", "It", Global.AorAn(w.Name), w.Name));
 
       if(e!=viewer)
-      { int healthpct = e.HP*100/e.MaxHP;
-        if(healthpct>=90) AddLine("It looks healthy.");
-        else if(healthpct>=75) AddLine("It looks slightly wounded.");
-        else if(healthpct>=50) AddLine("It looks wounded.");
-        else if(healthpct>=25) AddLine("It looks heavily wounded.");
-        else AddLine("It looks almost dead.");
+      { string name = e.Name==null ? "It" : e.Name;
+        int healthpct = e.HP*100/e.MaxHP;
+        if(healthpct>=90) AddLine(name+" looks healthy.");
+        else if(healthpct>=75) AddLine(name+" looks slightly wounded.");
+        else if(healthpct>=50) AddLine(name+" looks wounded.");
+        else if(healthpct>=25) AddLine(name+" looks heavily wounded.");
+        else AddLine(name+" looks almost dead.");
 
         if(e is AI)
           switch(((AI)e).State)
-          { case AIState.Asleep: AddLine("It appears to be asleep."); break;
-            case AIState.Attacking: AddLine("It looks angry!"); break;
-            case AIState.Escaping: AddLine("It looks frightened."); break;
-            case AIState.Guarding: AddLine("It looks alert."); break;
-            case AIState.Following: AddLine("It appears to be following you."); break;
-            case AIState.Idle: case AIState.Patrolling: case AIState.Wandering: AddLine("It looks bored."); break;
-            case AIState.Working: AddLine("It's busy working."); break;
+          { case AIState.Asleep: AddLine(name+" appears to be asleep."); break;
+            case AIState.Attacking: AddLine(name+" looks angry!"); break;
+            case AIState.Escaping: AddLine(name+" looks frightened."); break;
+            case AIState.Guarding: AddLine(name+" looks alert."); break;
+            case AIState.Following: AddLine(name+" appears to be following you."); break;
+            case AIState.Idle: case AIState.Patrolling: case AIState.Wandering: AddLine(name+" looks bored."); break;
+            case AIState.Working: AddLine(name+"'s busy working."); break;
             default: AddLine("UNKNOWN AI STATE"); break;
           }
       }

@@ -224,7 +224,7 @@ public sealed class PathFinder // FIXME: having this latch onto the .Node bits o
 public class Map : UniqueObject
 { // maximum scent on a tile, maximum scent add on a single call (maximum entity smelliness), maximum sound on a tile
   public const int MaxScent=1200, MaxScentAdd=800, MaxSound=255;
-  
+
   [Flags] public enum Space
   { None=0, Items=1, Entities=2, Links=4, All=Items|Entities|Links,
     NoItems=All&~Items, NoEntities=All&~Entities, NoLinks=All&~Links
@@ -294,7 +294,7 @@ public class Map : UniqueObject
     ArrayList[] lists = new ArrayList[(int)ShopType.NumTypes];
     for(int i=0; i<lists.Length; i++) lists[i] = new ArrayList();
 
-    foreach(ItemInfo si in Global.Items)
+    foreach(ItemInfo si in Global.Items.Values)
     { if(si.Value<=0) continue;
       if(si.Class!=ItemClass.Gold) lists[(int)ShopType.General].Add(si);
       switch(si.Class)
@@ -371,7 +371,7 @@ public class Map : UniqueObject
   public void AddShop(Rectangle rect, ShopType type) { AddShop(rect, type, true); }
   public void AddShop(Rectangle rect, ShopType type, bool stock)
   { Shopkeeper sk = new Shopkeeper();
-    AI.Make(sk, 2, Race.Human, EntityClass.Fighter);
+    AI.Make(sk, 8, Race.Human, EntityClass.Fighter);
     AddShop(rect, type, sk, stock);
   }
   public void AddShop(Rectangle rect, ShopType type, Shopkeeper shopkeeper, bool stock)
@@ -667,6 +667,22 @@ public class Map : UniqueObject
     if(--thinking==0) removedEntities.Clear();
   }
 
+  public void Spawn(EntityInfo ei)
+  { int count = ei.SpawnSize.RandValue();
+    Point pos = FreeSpace();
+
+    for(int i=0; i<count; i++)
+    { AI ai = AI.Make(ei);
+      ai.Position = i==0 ? pos : FreeSpaceNear(pos);
+      Entities.Add(ai);
+    }
+  }
+
+  public Map Memory;
+  public Dungeon.Section Section;
+  public int Index, GroupID=-1, SpawnMax=40, SpawnRate=10;
+  public EntityGroup Spawns;
+
   #region SpreadScent
   public unsafe void SpreadScent()
   { if(IsOverworld || width==1 || height==1) return;
@@ -896,20 +912,25 @@ public class Map : UniqueObject
       if(av!=null) links[av] = li;
     }
     #endregion
-    
+
+    node = root.SelectSingleNode("spawns");
+    if(node!=null)
+    { if(!Xml.IsEmpty("max")) map.SpawnMax = Xml.Int(node, "min");
+      if(!Xml.IsEmpty("rate")) map.SpawnRate = Xml.Int(node, "rate");
+      int spawnStart = Xml.IsEmpty(node, "start") ? 15 : Xml.Int(node, "start");
+      map.Spawns = new EntityGroup(node);
+      while(map.numCreatures<spawnStart) map.Spawn(map.Spawns.NextEntity());
+    }
+
     foreach(XmlNode npc in root.SelectNodes("npc"))
     { AI ai = AI.MakeNpc(npc);
       ai.Position = map.FindXmlLocation(npc, links);
       map.Entities.Add(ai);
     }
-    
+
     map.OnInit();
     return map;
   }
-
-  public Map Memory;
-  public Dungeon.Section Section;
-  public int Index, GroupID=-1;
 
   protected int Age { get { return age; } }
   protected int NumCreatures { get { return numCreatures; } }
@@ -922,6 +943,8 @@ public class Map : UniqueObject
         if(items!=null) for(int i=0; i<items.Count; i++) if(items[i].Think(null)) items.RemoveAt(i--);
       }
     age++;
+
+    if(Spawns!=null && numCreatures<SpawnMax && (age%SpawnRate)==0) Spawn(Spawns.NextEntity());
   }
 
   class EntityComparer : IComparer

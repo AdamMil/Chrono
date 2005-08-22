@@ -26,7 +26,7 @@ public class Orc : AI
     else SetSkill(Skill.UnarmedCombat, 1);
     if(Global.Rand(100)<10) AddItem(Item.Make(ItemClass.Armor, "paper bag"));
     if(Global.Rand(100)<10) AddItem(Item.Make(ItemClass.Scroll, "teleport"));
-    if(Global.Rand(100)<10) AddItem(Item.Make(ItemClass.Potion, "heal"));
+    if(Global.Rand(100)<10) AddItem(Item.Make(ItemClass.Potion, "healing"));
   }
 }
 #endregion
@@ -205,8 +205,7 @@ public class Shopkeeper : AI
   public int BuyCost(Item item)
   { if(item.Class==ItemClass.Gold) return item.Count;
     if(!Shop.Accepts(item)) return 0;
-    int baseCost = (int)item.GetType().GetField("ShopValue", BindingFlags.Static|BindingFlags.Public).GetValue(item);
-    return (int)Math.Round(baseCost*item.Count / (priceMod*2));
+    return (int)Math.Round(item.ShopValue*item.Count / (priceMod*2));
   }
 
   public void ClearUnpaidItems(Inventory inv) { ClearUnpaidItems(Shop, inv); }
@@ -432,7 +431,7 @@ public class Shopkeeper : AI
     AlterBaseAttr(Attr.Dex, 3);
     AlterBaseAttr(Attr.EV, 2);
     AlterBaseAttr(Attr.Int, 3);
-    AlterBaseAttr(Attr.Speed, -10);
+    AlterBaseAttr(Attr.Speed, 20);
     AlterBaseAttr(Attr.Str, 3);
 
     SetRawFlag(Flag.SeeInvisible, true);
@@ -478,5 +477,13 @@ public class Shopkeeper : AI
   }
 }
 #endregion
+
+public class Humanoid : Orc
+{ public Humanoid() { Race=Race.Human; Color=Color.Grey; }
+}
+
+public class Bug : Orc
+{ public Bug() { Color=Color.LightCyan; }
+}
 
 } // namespace Chrono

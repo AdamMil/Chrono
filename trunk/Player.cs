@@ -263,7 +263,7 @@ public class Player : Entity
   }
   
   public override void OnMove(Point newPos, Map newMap)
-  { if(Memory!=null) Map.SaveMemory(Memory);
+  { if(newMap!=null && Memory!=null) Map.SaveMemory(Memory);
 
     Shop oldShop=Map.GetShop(Position);
     if(oldShop==null)

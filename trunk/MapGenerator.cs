@@ -1,7 +1,9 @@
 using System;
 using System.Collections;
-using System.Drawing;
 using System.Xml;
+using Point=System.Drawing.Point;
+using Rectangle=System.Drawing.Rectangle;
+using Size=System.Drawing.Size;
 
 namespace Chrono
 {
@@ -101,7 +103,7 @@ public class RoomyDungeonGenerator : MapGenerator
   void AddStairs(bool down)
   { Point point = map.RandomTile(TileType.RoomFloor);
     map.SetType(point, down ? TileType.DownStairs : TileType.UpStairs);
-    map.AddLink(new Link(point, down, map.Section, map.Index + (down ? 1 : -1)));
+    map.AddLink(new Link(point, map.Section, map.Index + (down ? 1 : -1)));
   }
 
   bool FindRoom(XmlNode room, out Rectangle area)
@@ -212,15 +214,15 @@ public class RoomyDungeonGenerator : MapGenerator
   }
 
   bool CanDig(int x, int y)
-  { if(map.IsPassable(x, y)) return true;
+  { if(map.IsUsuallyPassable(x, y)) return true;
     return !map.IsWall(x, y) || !IsWallJunction(x, y) && !HasAdjacentDoor(x, y, true);
   }
 
   void Dig(int x, int y)
-  { if(map.IsPassable(x, y) || map.IsDoor(x, y)) return;
+  { if(map.IsUsuallyPassable(x, y) || map.IsDoor(x, y)) return;
     if(map.IsWall(x, y))
     { map.SetType(x, y, TileType.ClosedDoor);
-      if(Rand.Next(100)<8) map.SetFlag(x, y, Tile.Flag.Locked, true);
+      if(Rand.Next(100)<8) map.SetFlag(x, y, TileFlag.Locked, true);
     }
     else map.SetType(x, y, TileType.Corridor);
   }
@@ -282,7 +284,7 @@ public class MetaCaveGenerator : MapGenerator
       Point up=AddStairs(map, false);
       if(map.Index<map.Section.Depth-1)
       { Point down=AddStairs(map, true);
-        if(!path.Plan(map, up, down) || path.GetPathFrom(up).Cost>=1000)
+        if(!path.Plan(map, up, down) || path.GetPathNode(up).Cost>=PathFinder.BadPathCost)
         { map.ClearLinks();
           map.Fill(TileType.SolidRock);
           continue;
@@ -295,7 +297,7 @@ public class MetaCaveGenerator : MapGenerator
   Point AddStairs(Map map, bool down)
   { Point point = map.RandomTile(TileType.RoomFloor);
     map.SetType(point, down ? TileType.DownStairs : TileType.UpStairs);
-    map.AddLink(new Link(point, down, map.Section, map.Index + (down ? 1 : -1)));
+    map.AddLink(new Link(point, map.Section, map.Index + (down ? 1 : -1)));
     return point;
   }
 }
@@ -307,7 +309,6 @@ public class TownGenerator : MapGenerator
 
   protected override void Generate(Map map, XmlNode root)
   { this.map = map;
-    if(map.GroupID==-1) map.GroupID = Global.NewSocialGroup(false, true);
 
     map.Fill(TileType.Grass);
     int size = map.Width*map.Height;
@@ -317,20 +318,21 @@ public class TownGenerator : MapGenerator
       if(!AddRoom(room)) throw new UnableToGenerateException("Couldn't add required rooms.");
     foreach(XmlNode room in root.SelectNodes("room[@required!='true']")) if(!AddRoom(room)) break;
 
-    AddShop(ShopType.General);
-    AddShop(ShopType.Food);
-    AddShop(ShopType.ArmorWeapons);
-    AddShop(ShopType.Magic);
+    AddShop(ShopType.Get("General"));
+    AddShop(ShopType.Get("Food"));
+    AddShop(ShopType.Get("ArmorWeapons"));
+    AddShop(ShopType.Get("Magic"));
 
     while(AddRandomRoom());
     
     // FIXME: this could cause problems because of its randomness... (eg, a room may fill up with people and then
     // FreeSpace(Rectangle) may fail, or something similar)
+    int entityIndex = Global.GetEntityIndex("builtin/Townsperson");
     for(int npeople=size/200; npeople>0; npeople--)
-    { Townsperson peon = new Townsperson();
-      AI.Make(peon, Global.Rand(1, 3), peon.Race, EntityClass.Plain);
-      peon.Position = map.FreeSpace();
-      peon.SocialGroup = map.GroupID;
+    { Entity peon = new Entity(entityIndex);
+      peon.XL  = Global.Rand(1, 3);
+      peon.Pos = map.FreeSpace();
+      // TODO: peon.SocialGroup = map.GroupID;
       map.Entities.Add(peon);
     }
   }
@@ -349,9 +351,10 @@ public class TownGenerator : MapGenerator
 
   bool AddRandomRoom()
   { Rectangle rect;
-    if(Rand.Next(8)==7) // 1 in 8 buildings are shops
-    { if(!DigRoom(5, 10, out rect)) return false;
-      map.AddShop(rect, (ShopType)Rand.Next((int)ShopType.NumTypes));
+    if(Rand.Next(12)==11) // 1 in 12 buildings are shops
+    { if(!DigRoom(4, 10, out rect)) return false;
+      Shop temp = new Shop(rect, null, null);
+      map.AddShop(rect, ShopType.GetRandom(temp.ItemArea.Width*temp.ItemArea.Height));
     }
     else
     { if(!DigRoom(5, 12, out rect)) return false;
@@ -362,7 +365,7 @@ public class TownGenerator : MapGenerator
 
   void AddShop(ShopType type)
   { Rectangle rect;
-    if(!DigRoom(5, 10, out rect)) throw new UnableToGenerateException("Couldn't add enough shops");
+    if(!DigRoom(4, 10, out rect)) throw new UnableToGenerateException("Couldn't add enough shops");
     map.AddShop(rect, type);
   }
 
@@ -412,7 +415,7 @@ public class TownGenerator : MapGenerator
     Point start = new Point(map.Width/2, map.Height/2);
     if(rect.Contains(start)) start = new Point();
     Point pt = Global.TraceLine(start, new Point(rect.X+rect.Width/2, rect.Y+rect.Height/2), -1, true,
-                                new LinePoint(DoorTrace), rect).Point;
+                                new TracePoint(DoorTrace), rect).End;
     if(pt.X==rect.X || pt.X==rect.Right-1)
     { if(pt.Y==rect.Y) pt.Y++;
       else if(pt.Y==rect.Bottom-1) pt.Y--;

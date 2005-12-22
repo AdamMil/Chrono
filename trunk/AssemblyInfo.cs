@@ -10,6 +10,6 @@ using System.Security.Permissions;
 [assembly: AssemblyConfiguration("Release")]
 #endif
 [assembly: AssemblyProduct("Chrono")]
-[assembly: AssemblyCopyright("Copyright 2004 Adam Milazzo")]
+[assembly: AssemblyCopyright("Copyright 2005 Adam Milazzo")]
 
 [assembly: AssemblyVersion("0.05.*")]

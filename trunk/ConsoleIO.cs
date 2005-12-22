@@ -1,8 +1,8 @@
 using System;
-using System.Drawing;
-using System.Reflection;
+using System.Collections;
 using GameLib.Collections;
-using Chrono;
+using Point=System.Drawing.Point;
+using Rectangle=System.Drawing.Rectangle;
 
 namespace Chrono
 {
@@ -16,51 +16,50 @@ public sealed class ConsoleIO : InputOutput
     console.SetCursorVisibility(true, 20);
   }
 
-  public override int ScrollBack
-  { get { return maxLines; }
-    set
-    { if(value<0) throw new ArgumentOutOfRangeException("ScrollBack", value, "cannot be negative");
-      maxLines = Math.Max(value, 30);
-    }
+  struct Line
+  { public Line(Color color, string text) { Color=color; Text=text; }
+    public Color Color;
+    public string Text;
   }
 
-  public override void Alert(Color color, string message) { AddLine(color, message); }
-
   public override string Ask(Color color, string prompt, bool allowEmpty, string rebuke)
-  { string sprompt = prompt+' ';
-    bool doRebuke=false;
+  { prompt += " ";
     TextInput = true;
+    if(rebuke==null) rebuke = "Please enter something!";
     while(true)
-    { if(doRebuke) AddLine(color, rebuke);
-      AddLine(color, sprompt, true);
-      SetCursorAtEOBL();
+    { AddLine(color, prompt, true);
+      MoveCursorToEOBL();
       string answer = console.ReadLine();
-      AppendToBL(answer);
-      if(answer!="" || allowEmpty) { TextInput = false; return answer; }
-      doRebuke = true;
+      if(answer!="" || allowEmpty)
+      { AppendToBL(answer);
+        TextInput = false;
+        return answer;
+      }
+      AddLine(color, rebuke);
     }
   }
 
   public override char CharChoice(Color color, string prompt, string chars, char defaultChar, bool caseInsensitive,
                                   string rebuke)
-  { string sprompt = prompt + (chars!=null ? " [" + chars + "] " : " ");
-    bool doRebuke  = false;
+  { prompt += (chars!=null ? " [" + chars + "] " : " ");
     TextInput = true;
     if(caseInsensitive) chars = chars.ToLower();
     if(rebuke==null) rebuke = "Invalid selection!";
     while(true)
-    { if(doRebuke) AddLine(color, rebuke);
-      AddLine(color, sprompt, true);
-      SetCursorAtEOBL();
-      char c = ReadChar(true);
+    { AddLine(color, prompt, true);
+      MoveCursorToEOBL();
+
+      char c = ReadChar();
       if(c=='\r' || c=='\n' || rec.Key.VirtualKey==NTConsole.Key.Escape) c = defaultChar;
-      else AppendToBL(c);
+      else if(IsPrintable(c)) Echo(c);
+
       int index = chars==null ? -1 : chars.IndexOf(caseInsensitive ? char.ToLower(c) : c);
       if(chars==null || c==defaultChar || index!=-1)
       { TextInput = false;
         return index==-1 ? c : chars[index];
       }
-      doRebuke = true;
+
+      AddLine(color, rebuke);
     }
   }
 
@@ -72,327 +71,124 @@ public sealed class ConsoleIO : InputOutput
       if(allowVertical) prompt += "<>";
       prompt += "]:";
     }
-    else prompt += ':';
+    else prompt += ":";
     Direction d = CharToDirection(CharChoice(prompt, null), allowSelf, allowVertical);
     if(d==Direction.Invalid) Print("That's an odd direction!");
     return d;
   }
 
-  public override MenuItem[] ChooseItem(string prompt, IKeyedInventory items, MenuFlag flags,
-                                        params ItemClass[] classes)
-  { string chars = items.CharString(classes);
-    if((flags&MenuFlag.AllowNothing)!=0) chars = "-"+chars;
-    bool any = Array.IndexOf(classes, ItemClass.Any)!=-1;
-    if(any && chars.Length==0) return new MenuItem[0];
-    if(chars.Length>0) chars += '?';
-    if(!any || chars.Length==0) chars += '*';
+  public override MenuItem[] ChooseItem(string prompt, IKeyedInventory items, MenuFlag flags, params ItemType[] types)
+  { bool any  = types.Length==(int)ItemType.NumTypes || Array.IndexOf(types, ItemType.Any) != -1;
+    bool none = (flags&MenuFlag.AllowNothing) != 0;
+    string chars = items.CharString(types);
+    if(any && !none && chars.Length==0) return new MenuItem[0];
 
-    string sprompt = prompt + " [" + chars + "] ";
-    bool doRebuke  = false;
+    if(chars.Length!=0 || !any) // if we have '?' or '*'
+    { prompt += " [";
+      if(none) prompt += "-";
+      prompt = prompt + chars + " or ";
+      if(chars.Length!=0) { chars += "?"; prompt += "?"; } // if there are items, allow them to be selected with a menu
+      if(!any) { chars += "*"; prompt += "*"; } // if we allow the selection of "no item", add the character for that
+      if(none) chars += "-";
+    }
+    else prompt = prompt + " [" + chars;
+
+    prompt += "] ";
+
     TextInput = true;
     while(true)
-    { int num=-1;
-      if(doRebuke) AddLine("Invalid selection!");
-      AddLine(sprompt, true);
-      SetCursorAtEOBL();
-      char c = ReadChar(true);
-      if(c=='\r' || c=='\n' || rec.Key.VirtualKey==NTConsole.Key.Escape) return new MenuItem[0];
-      else AppendToBL(c);
-      if(char.IsDigit(c) && (flags&MenuFlag.AllowNum)!=0)
-      { num = c-'0';
-        while(char.IsDigit(c=ReadChar(true)) || c=='\b')
-        { if(c=='\b') num /= 10;
-          else num = c-'0' + num*10;
+    { int count = -1;
+
+      AddLine(prompt, true);
+      MoveCursorToEOBL();
+      char c = ReadChar();
+      if(c=='\r' || c=='\n' || rec.Key.VirtualKey==NTConsole.Key.Escape) return new MenuItem[0]; // abort
+      else if(IsPrintable(c)) Echo(c);
+
+      if(char.IsDigit(c) && (flags&MenuFlag.AllowNum)!=0) // a count of items is specified
+      { count = c-'0';
+        int printed = 1;
+        while(true)
+        { c = ReadChar();
+          if(c=='\b')
+          { if(printed!=0) { Echo(c); printed--; count /= 10; }
+            else { count=-1; break; }
+          }
+          else if(char.IsDigit(c))
+          { int nc = c-'0' + count*10;
+            if(nc>count) // guard against overflow
+            { count=nc;
+              Echo(c);
+              printed++;
+            }
+          }
+          else
+          { if(IsPrintable(c)) Echo(c);
+            break;
+          }
         }
       }
-      if(num<-1 || num==0 || chars.IndexOf(c)==-1) { doRebuke=true; continue; }
-      if(char.IsLetter(c) && num>items[c].Count) { AddLine("You don't have that many!", true); continue; }
-      TextInput = false;
-      if(c=='-') return new MenuItem[1] { new MenuItem(null, 0) };
-      if(c=='?') return Menu(items, flags, classes);
-      if(c=='*') return Menu(items, flags, ItemClass.Any);
-      return new MenuItem[1] { new MenuItem(items[c], num==-1 ? items[c].Count : num) };
-    }
-  }
 
-  public override Spell ChooseSpell(Player player)
-  { string chars="";
-    char c='a';
-    for(int i=0; i<player.Spells.Count; i++) chars += c++;
-    chars += '?';
+      if(count==0 || chars.IndexOf(c)==-1) goto rebuke;
 
-    c = CharChoice("Cast which spell?", chars);
-    if(c==0) return null;
-    if(c!='?') return (Spell)player.Spells[c-'a'];
-
-    ClearScreen();
-    console.SetCursorPosition(0, 0);
-    WriteLine(Color.Normal, "{0} Chance", "Spell".PadRight(38));
-    console.WriteLine();
-
-    c='a';
-    foreach(Spell s in player.Spells)
-      WriteLine(Color.Normal, "{0} - {1} ({2}%)", c++, s.Name.PadRight(34), s.CastChance(player));
-    WriteLine(Color.Normal, "Choose spell by character.");
-      
-    Spell selected;
-    while(true)
-    { c=ReadChar();
-      if(rec.Key.VirtualKey==NTConsole.Key.Escape || c=='\r' || c=='\n') { selected=null; break; }
-      int index = c-'a';
-      if(index>=0 && index<player.Spells.Count) { selected = (Spell)player.Spells[index]; break; }
-    }
-    RestoreScreen();
-    return selected;
-  }
-
-  public override Spell ChooseSpell(Player reader, Spellbook book)
-  { Spell selected=null;
-    bool clear=true;
-    while(true)
-    { if(clear)
-      { ClearScreen();
-        console.SetCursorPosition(0, 0);
-        WriteLine(Color.Normal, "The "+book.GetFullName());
-        console.WriteLine();
-        clear=false;
-      }
-      else console.SetCursorPosition(0, 2);
-      char c='a';
-      foreach(Spell s in book.Spells)
-      { Color color;
-        int knowledge = reader.SpellKnowledge(s);
-        if(knowledge>0) color = knowledge<2500 ? Color.Dire : knowledge<5000 ? Color.Warning : Color.Normal;
-        else
-        { int chance = s.LearnChance(reader);
-          if(chance>=80) color = Color.LightGreen;
-          else if(chance>=50) color = Color.Green;
-          else if(chance>=25) color = Color.Cyan;
-          else color = Color.DarkGrey;
-        }
-        WriteLine(color, "{0} {1} {2} (lv{3}, {4})", c++, s==selected ? '+' : '-', s.Name, s.Level, s.Class);
-      }
-      WriteLine(Color.Normal, "Choose spell by character. ? to view description.");
-      
-      nextchar: c=ReadChar();
-      if(rec.Key.VirtualKey==NTConsole.Key.Escape) { selected=null; break; }
-      if(c=='\r' || c=='\n') break;
-      if(c=='?' && selected!=null)
-      { ClearScreen();
-        console.SetCursorPosition(0, 0);
-        WriteLine(Color.Normal, "{0} (lv{1}, {2})", selected.Name, selected.Level, selected.Class);
-        console.WriteLine();
-
-        string desc = selected.Description;
-        if(desc!=null) WriteWrapped(desc, mapW);
-        else console.WriteLine("THIS SPELL IS MISSING A DESCRIPTION.");
-        console.WriteLine();
-
-        int memory = reader.SpellKnowledge(selected);
-        if(memory==0) console.WriteLine("You do not have this spell memorized.");
-        else if(memory<500) console.WriteLine("Your memory of this spell is very faint!");
-        else if(memory<1000) console.WriteLine("Your memory of this spell is faint.");
-        else console.WriteLine("You know this spell quite well.");
-
-        console.WriteLine("Casting this spell requires {0} MP.", selected.Power);
-        switch(selected.GetSpellTarget(reader))
-        { case SpellTarget.Self: console.WriteLine("This spell only affects the caster."); break;
-          case SpellTarget.Item: console.WriteLine("This spell is cast upon an item."); break;
-          case SpellTarget.Tile: console.WriteLine("This spell is cast at a point in space."); break;
-        }
-        if(selected.Range>0) console.WriteLine("This spell has a range of approximately {0} tiles.", selected.Range);
-
-        ReadChar();
-        clear=true;
+      Item item = items[c];
+      if(count!=-1 && (char.IsLetter(c) || c=='$') && count>item.Count)
+      { AddLine("You don't have that many!");
         continue;
       }
 
-      int index = c-'a';
-      if(index>=0 && index<book.Spells.Length) { selected = book.Spells[index]; continue; }
-      goto nextchar;
-    }
-    RestoreScreen();
-    return selected;
-  }
+      TextInput = false;
+      if(c=='-') return new MenuItem[1] { new MenuItem(null, 0) }; // the "no item" item
+      if(c=='?') return Menu(items, flags, types);
+      if(c=='*') return Menu(items, flags, ItemType.Any);
+      return new MenuItem[1] { new MenuItem(item, count==-1 ? item.Count : count) };
 
-  public override RangeTarget ChooseTarget(Player viewer, Spell spell, bool allowDir)
-  { ClearLines();
-    Point[] vpts = viewer.VisibleTiles();
-    Entity[] mons = viewer.VisibleCreatures(vpts);
-    Point pos = new Point(mapW/2, mapH/2), mpos;
-    int monsi = 0;
-    bool arbitrary=false, first=true;
-    
-    try
-    { while(true)
-      { if(pos.X<0) pos.X=0;
-        else if(pos.X>=mapW) pos.X=mapW-1;
-        if(pos.Y<0) pos.Y=0;
-        else if(pos.Y>=mapH) pos.X=mapH-1;
-        mpos = DisplayToMap(pos, viewer.Position);
-        if(first) { AddLine("Choose target [direction or *+-= to target creatures]:", true); first=false; }
-        else DescribeTile(viewer, mpos, vpts);
-        
-        if(spell!=null)
-        { System.Collections.ICollection affected = spell.TracePath(viewer, mpos);
-          if(affected!=null && affected.Count>0)
-          { RenderMap(viewer, viewer.Position, vpts);
-            foreach(Point ap in affected)
-              if(viewer.Memory[ap].Type!=TileType.Border)
-              { Point pt = MapToDisplay(ap, viewer.Position);
-                buf[pt.Y*mapW+pt.X].Attributes |= NTConsole.ForeToBack(NTConsole.Attribute.Red);
-              }
-            console.PutBlock(0, 0, 0, 0, mapW, mapH, buf);
-          }
-        }
-
-        console.SetCursorPosition(pos);
-
-        nextChar:
-        ReadChar();
-        if(rec.Key.VirtualKey==NTConsole.Key.Escape) return new RangeTarget(new Point(-1, -1), Direction.Invalid);
-        switch(char.ToLower(NormalizeDirChar()))
-        { case 'b':
-            if(arbitrary) pos.Offset(-1, 1);
-            else return new RangeTarget(Direction.DownLeft);
-            break;
-          case 'j':
-            if(arbitrary) pos.Y++;
-            else return new RangeTarget(Direction.Down);
-            break;
-          case 'n':
-            if(arbitrary) pos.Offset(1, 1);
-            else return new RangeTarget(Direction.DownRight);
-            break;
-          case 'h':
-            if(arbitrary) pos.X--;
-            else return new RangeTarget(Direction.Left);
-            break;
-          case '.':
-            if(arbitrary) return new RangeTarget(mpos);
-            else return new RangeTarget(Direction.Self);
-          case 'l':
-            if(arbitrary) pos.X++;
-            else return new RangeTarget(Direction.Right);
-            break;
-          case 'y':
-            if(arbitrary) pos.Offset(-1, -1);
-            else return new RangeTarget(Direction.UpLeft);
-            break;
-          case 'k':
-            if(arbitrary) pos.Y--;
-            else return new RangeTarget(Direction.Up);
-            break;
-          case 'u':
-            if(arbitrary) pos.Offset(1, -1);
-            else return new RangeTarget(Direction.UpRight);
-            break;
-          case '@': pos = new Point(mapW/2, mapH/2); break;
-          case '<': if(!arbitrary) return new RangeTarget(Direction.Above); break;
-          case '>': if(!arbitrary) return new RangeTarget(Direction.Below); break;
-          case '*': AddLine("Move cursor to target position.", true); arbitrary=true; goto nextChar;
-          case '+':
-            if(mons.Length>0)
-            { monsi = (monsi+1)%mons.Length;
-              pos = MapToDisplay(mons[monsi].Position, viewer.Position);
-              arbitrary=true;
-            }
-            else goto nextChar;
-            break;
-          case '-':
-            if(mons.Length>0)
-            { monsi = (monsi+mons.Length-1)%mons.Length;
-              pos = MapToDisplay(mons[monsi].Position, viewer.Position);
-              arbitrary=true;
-            }
-            else goto nextChar;
-            break;
-          case '=':
-            if(lastTarget!=null)
-            { int i;
-              for(i=0; i<mons.Length; i++) if(mons[i]==lastTarget) break;
-              if(i==mons.Length) { lastTarget=null; goto nextChar; }
-              else pos = MapToDisplay(mons[monsi=i].Position, viewer.Position);
-              arbitrary=true;
-            }
-            break;
-          case ' ': case '\r': case '\n':
-            if(arbitrary || mpos!=viewer.Position)
-            { if(mpos==mons[monsi].Position) lastTarget = mons[monsi];
-              return new RangeTarget(mpos);
-            }
-            else goto nextChar;
-          default: goto nextChar;
-        }
-      }
-    }
-    finally { RestoreLines(); }
-  }
-  
-  public override int ConversationChoice(Entity talkingTo, string prompt, string[] options)
-  { ClearScreen();
-
-    console.SetCursorPosition(0, 0);
-    WriteLine(Color.White, talkingTo.AName);
-    WriteLine();
-    WriteWrapped(Color.Green, prompt, MapWidth);
-    WriteLine();
-    for(int i=0; i<options.Length; i++) WriteWrapped(Color.Normal, (i+1).ToString()+". "+options[i], MapWidth);
-    WriteLine();
-    Write(Color.White, "Your choice: ");
-    
-    while(true)
-    { char c=ReadChar();
-      if(char.IsNumber(c))
-      { int ret = c-'0';
-        if(ret>0 && ret<=options.Length) return ret-1;
-      }
+      rebuke:
+      AddLine("Invalid selection!");
     }
   }
 
+  public override void DisplayInventory(IInventory inv, params ItemType[] types)
+  { MenuItem[] menu = CreateMenu(inv, MenuFlag.None, types);
 
-  public override void DisplayInventory(Entity entity, params ItemClass[] classes)
-  { SetupMenu(entity.Inv, MenuFlag.None, classes);
-
-    int cs=0, width=Math.Min(MapWidth, console.Width), height=console.Height, iheight=height-2;
+    int mtop=0, width=Math.Min(MapWidth, console.Width), height=console.Height, iheight=height-2;
     ClearScreen();
 
     while(true)
     { redraw:
-      ItemClass head = ItemClass.Invalid;
-      int mc=cs, yi=0;
-      for(; yi<iheight && mc<menu.Length; yi++) // draw the menu items
-      { if(menu[mc].Item.Class != head)
-        { head = menu[mc].Item.Class;
-          PutString(NTConsole.Attribute.White, 0, yi, head.ToString());
+      ItemType head = ItemType.Invalid;
+      int top=mtop, y=0;
+      for(; y<iheight && top<menu.Length; y++) // draw the menu items
+      { if(menu[top].Item.Type != head)
+        { head = menu[top].Item.Type;
+          PutString(NTConsole.Attribute.White|NTConsole.Attribute.Underlined, 0, y, head.ToString());
         }
         else
-        { PutString(0, yi, "{0} - {1}", menu[mc].Char, menu[mc].Item.GetInvName());
-          mc++;
+        { PutString(0, y, "{0} - {1}", menu[top].Char, menu[top].Item.GetInvName());
+          top++;
         }
       }
-      PutString(0, yi, cs+mc<menu.Length ? "--more--" : "--bottom--");
+
+      PutString(0, y, top<menu.Length ? "--more--" : "--bottom--");
 
       while(true)
       { char c = ReadChar();
-        if(c=='\r' || c=='\n') goto done;
-        if(c==' '  || c=='k') rec.Key.VirtualKey = NTConsole.Key.Next;
-        if(c=='j') rec.Key.VirtualKey = NTConsole.Key.Prior;
+        if(c=='\r' || c=='\n' || c==' ') rec.Key.VirtualKey = NTConsole.Key.Next;
         switch(rec.Key.VirtualKey)
         { case NTConsole.Key.Prior: case NTConsole.Key.Up: case NTConsole.Key.Numpad8:
-            if(cs>0) // page up
-            { cs -= Math.Min(iheight, cs);
+            if(mtop>0) // page up
+            { mtop -= Math.Min(iheight, mtop);
               console.Fill(0, 0, width, height); // clear the area we'll be using
               goto redraw;
             }
             break;
           case NTConsole.Key.Next: case NTConsole.Key.Down: case NTConsole.Key.Numpad2:
-            if(menu.Length>cs+mc) // page down
-            { cs += mc;
+            if(top<menu.Length) // page down
+            { mtop += top-mtop;
               console.Fill(0, 0, width, height); // clear the area we'll be using
               goto redraw;
             }
-            break;
+            else goto done; // if already on the last page, then close the inventory
           case NTConsole.Key.Escape: goto done;
         }
       }
@@ -402,340 +198,7 @@ public sealed class ConsoleIO : InputOutput
   }
 
   public override void DisplayTileItems(IInventory items) { DisplayTileItems(items, true); }
-  public void DisplayTileItems(IInventory items, bool visible)
-  { if(items==null || items.Count==0) return;
-    if(items.Count==1) AddLine((visible ? "You see here: " : "You saw here: ")+items[0].GetAName());
-    else
-    { int nitems=items.Count+1, space=LineSpace-uncleared-2;
-      bool other=false;
-      if(nitems>space)
-      { nitems = space;
-        if(nitems<=1) AddLine("There are several items here.");
-        else if(nitems==2)
-        { AddLine((visible ? "You see here: " : "You saw here: ")+items[0].GetAName()); other=true;
-        }
-      }
-      if(nitems<=space || nitems>2)
-      { AddLine("You see here:"); nitems--;
-        if(nitems<items.Count) { other=true; nitems--; }
-        for(int i=0; i<nitems; i++) AddLine(items[i].GetAName());
-      }
-      if(other) AddLine(visible ? "There are other items here as well." : "There were other items there as well.");
-    }
-  }
-
-  public override void DisplayKnowledge(Player entity)
-  { ClearLines();
-    System.Collections.ICollection items = entity.Knowledge.Keys;
-    string[] arr = new string[items.Count];
-    int i=0;
-    foreach(string s in items) // FIXME: this is probably wrong now
-      arr[i++] = ((Item)Type.GetType(s).GetConstructor(Type.EmptyTypes).Invoke(null)).GetFullName();
-    Array.Sort(arr, System.Collections.Comparer.Default);
-    for(i=0; i<arr.Length; i++) AddLine(arr[i]);
-    DisplayMessages(true);
-    RestoreLines();
-  }
-
-  public override Point DisplayMap(Player viewer)
-  { ClearScreen();
-    ClearLines();
-    SetCursorToPlayer();
-    Point[] vpts = viewer.VisibleTiles();
-    Point pos = viewer.Position, ret = new Point(-1, -1);
-
-    int oldi=0;
-    char c;
-    while(true)
-    { RenderMap(viewer, pos, vpts);
-      lines.Clear(); uncleared=0;
-      AddLine("<,> to find stairs. '@' to find player. 'g' to walk to cursor.");
-      AddLine("Select a creature and press '?' for a description.");
-      DescribeTile(viewer, pos, vpts, false);
-      nextChar:
-      ReadChar();
-      if(rec.Key.VirtualKey==NTConsole.Key.Escape) break;
-      switch(c=char.ToLower(NormalizeDirChar()))
-      { case 'b': pos.Offset(-1, 1); break;
-        case 'j': pos.Y++; break;
-        case 'n': pos.Offset(1, 1); break;
-        case 'h': pos.X--; break;
-        case 'l': pos.X++; break;
-        case 'y': pos.Offset(-1, -1); break;
-        case 'k': pos.Y--; break;
-        case 'u': pos.Offset(1, -1); break;
-        case 'g': ret = pos; goto done;
-        case '@': pos = viewer.Position; break;
-        case '?':
-        { Entity e = pos==viewer.Position ? viewer : viewer.Memory[pos].Entity;
-          if(e!=null) { DescribeEntity(e); break; }
-          else goto nextChar;
-        }
-        case '<': case '>':
-        { Map map = viewer.Memory;
-          int ni  = oldi, size=map.Width*map.Height;
-          TileType sf = c=='<' ? TileType.UpStairs : TileType.DownStairs;
-          int x = ni%map.Width, y;
-          for(y=ni/map.Width; ; y++)
-          { for(; x<map.Width; x++)
-            { if(++ni==size) { x=y=ni=0; }
-              if(ni==oldi) goto nextChar;
-              if(map[x, y].Type==sf) goto found;
-            }
-            x = 0;
-          }
-          found: pos=new Point(x, y); oldi=ni; break;
-        }
-        case ' ': case '\r': case '\n': goto done;
-        default: goto nextChar;
-      }
-    }
-    done:
-    RestoreLines();
-    RestoreScreen();
-    return ret;
-  }
-
-  public override void EndConversation() { RestoreScreen(); }
-
-  public override void ExamineItem(Player viewer, Item item)
-  { ClearScreen();
-    console.SetCursorPosition(0, 0);
-    console.WriteLine("{0} - {1}", item.Char, item.GetInvName());
-    console.WriteLine();
-    string noiseStr=null, shortDesc=item.ShortDesc, longDesc=item.LongDesc;
-    if(shortDesc!=null)
-    { WriteWrapped(shortDesc, MapWidth);
-      console.WriteLine();
-    }
-    if(item is Modifying)
-    { if(item.Identified)
-      { Modifying mod = (Modifying)item;
-        if(mod.AC!=0) console.WriteLine("Armor {0}: {1}", mod.AC<0 ? "penalty" : "bonus", mod.AC);
-        if(mod.Dex!=0) console.WriteLine("Dexterity modifier: {0}", mod.Dex);
-        if(mod.EV!=0) console.WriteLine("Evasion modifier: {0}", mod.EV);
-        if(mod.Int!=0) console.WriteLine("Intelligence modifier: {0}", mod.Int);
-        if(mod.Speed!=0) console.WriteLine("Speed modifier: {0}", mod.Speed);
-        if(mod.Str!=0) console.WriteLine("Strength modifier: {0}", mod.Str);
-        if(mod.ColdRes!=0) console.WriteLine("Cold resistance: {0}{1}%", mod.ColdRes<0 ? '-' : '+', mod.ColdRes);
-        if(mod.ElectricityRes!=0)
-          console.WriteLine("Electricity resistance: {0}{1}%", mod.ElectricityRes<0 ? '-' : '+', mod.ElectricityRes);
-        if(mod.HeatRes!=0) console.WriteLine("Heat resistance: {0}{1}%", mod.HeatRes<0 ? '-' : '+', mod.HeatRes);
-      }
-      else console.WriteLine("This item's modifiers are not fully known.");
-    }
-    if(item is Chargeable)
-    { if(item.Identified)
-      { Chargeable ch = (Chargeable)item;
-        console.WriteLine("This item has {0} charges remaining.", ch.Charges);
-        if(ch.Recharged>0) console.WriteLine("This item has been recharged {0} times.", ch.Recharged);
-      }
-      else console.WriteLine("This item has an unknown number of charges.");
-    }
-    if(item.Class==ItemClass.Weapon)
-    { Weapon w = (Weapon)item;
-      if(w.Delay!=0) console.WriteLine("Attack delay: {0}%", w.Delay);
-      if(w.Identified)
-      { if(w.DamageBonus!=0) console.WriteLine("Damage {0}: {1}", w.DamageBonus<0 ? "penalty" : "bonus", w.DamageBonus);
-        if(w.ToHitBonus!=0) console.WriteLine("To hit {0}: {1}", w.ToHitBonus<0 ? "penalty" : "bonus", w.ToHitBonus);
-      }
-      else console.WriteLine("This weapon's damage and to-hit modifiers are unknown.");
-      console.WriteLine("It falls into the '{0}' category.", w.wClass.ToString().ToLower());
-      noiseStr = "This weapon";
-    }
-    else if(item.Class==ItemClass.Shield)
-    { Shield s = (Shield)item;
-      if(item.Identified) console.WriteLine("Chance to block: {0}%", s.BlockChance);
-      else console.WriteLine("This shield's chance to block is unknown.");
-    }
-    else if(item.Class==ItemClass.Food || item.Class==ItemClass.Potion || item.Class==ItemClass.Scroll ||
-            item.Class==ItemClass.Tool || item.Class==ItemClass.Wand)
-      noiseStr = "Using this item";
-    if(item is Wieldable)
-    { Wieldable w = (Wieldable)item;
-      console.WriteLine("It is a {0}-handed item.", w.AllHandWield ? "two" : "one");
-      console.WriteLine("This item is better for the {0}.",
-                        w.Exercises==Attr.Str ? "strong" : w.Exercises==Attr.Dex ? "dexterous" : "intelligent");
-    }
-    if(noiseStr!=null)
-    { if(item.Noise==0) console.WriteLine("{0} is completely silent (noise=0).", noiseStr);
-      else if(item.Noise<4) console.WriteLine("{0} is rather quiet (noise={1}).", noiseStr, item.Noise);
-      else if(item.Noise<8) console.WriteLine("{0} is quite noisy (noise={1}).", noiseStr, item.Noise);
-      else console.WriteLine("{0} is extremely noisy (noise={1}).", noiseStr, item.Noise);
-    }
-    if(item is Wearable)
-      console.WriteLine("This item is made of {0}.", ((Wearable)item).Material.ToString().ToLower());
-
-    if(item.Count>1)
-    { console.WriteLine("They weigh about {0} mt. each ({1} total).", item.Weight, item.FullWeight);
-      if(item.Shop!=null && item.Shop.Shopkeeper!=null)
-        console.WriteLine("They have not been paid for, and are valued at {0} gold for all of them.",
-                          item.Shop.Shopkeeper.SellCost(item));
-    }
-    else
-    { console.WriteLine("It weighs about {0} mt.", item.Weight);
-      if(item.Shop!=null && item.Shop.Shopkeeper!=null)
-        console.WriteLine("This item has not been paid for, and is valued at {0} gold.",
-                          item.Shop.Shopkeeper.SellCost(item));
-    }
-
-    if(longDesc!=null)
-    { console.WriteLine();
-      WriteWrapped(longDesc, MapWidth);
-    }
-    ReadChar();
-    RestoreScreen();
-  }
-
-  public override void ExamineTile(Player viewer, Point pos)
-  { DescribeTile(viewer, pos, viewer.VisibleTiles());
-  }
-
-  public override void ManageSkills(Player player)
-  { ClearScreen();
-    console.SetCursorPosition(0, 0);
-    console.WriteLine("You have {0} points of unallocated experience.", player.ExpPool);
-
-    int[] skillTable = Entity.RaceSkills[(int)player.Race];
-    Skill[] skills = new Skill[(int)Skill.NumSkills];
-    int numSkills=0;
-
-    for(int i=0; i<(int)Skill.NumSkills; i++) if(player.Skills[i]>0) skills[numSkills++]=(Skill)i;
-    console.WriteLine(numSkills==0 ? "You are completely unskilled!" : "Select a skill to toggle training it.");
-
-    while(true)
-    { char c='a';
-      console.SetCursorPosition(0, 3);
-      for(int i=0; i<numSkills; i++)
-      { bool enabled = player.Training(skills[i]);
-        Write(enabled ? Color.Normal : Color.DarkGrey, "{0} {1} {2} Skill {3} ",
-              c++, enabled ? '+' : '-', skills[i].ToString().PadRight(18), player.GetSkill(skills[i]));
-        WriteLine(Color.LightBlue, "({0})", player.SkillExp[(int)skills[i]]*9/player.NextSkillLevel(skills[i])+1);
-      }
-
-      nextChar:
-      c = ReadChar();
-      if(c==' ' || c=='\r' || c=='\n' || rec.Key.VirtualKey==NTConsole.Key.Escape) break;
-      if(c>='a' && c-'a'<numSkills) player.Train(skills[c-'a'], !player.Training(skills[c-'a']));
-      else goto nextChar;
-    }
-    RestoreScreen();
-  }
-
-  public override MenuItem[] Menu(System.Collections.ICollection items, MenuFlag flags, params ItemClass[] classes)
-  { SetupMenu(items, flags, classes);
-    return Menu(menu, flags);
-  }
-  
-  public override MenuItem[] Menu(MenuItem[] items, MenuFlag flags)
-  { MenuItem[] ret;
-    bool reletter=(flags&MenuFlag.Reletter)!=0, allownum=(flags&MenuFlag.AllowNum)!=0;
-    int cs=0, width=Math.Min(MapWidth, console.Width);
-    int height=reletter ? Math.Min(54, console.Height) : console.Height, iheight=height-2;
-
-    while(true) // drawing
-    { redraw:
-      ClearScreen(); // clear the area we'll be using
-      ItemClass head = ItemClass.Invalid;
-      int mc=cs, yi=0;
-      char c='a';
-      for(; yi<iheight && mc<items.Length; yi++) // draw the menu items
-      { if(items[mc].Item!=null && items[mc].Item.Class != head)
-        { head = items[mc].Item.Class;
-          PutString(NTConsole.Attribute.White, 0, yi, head.ToString());
-        }
-        else
-        { if(reletter) items[mc].Char=c;
-          DrawMenuItem(yi, items[mc++], flags);
-          if(++c>'z') c='A';
-        }
-      }
-      PutString(0, yi, "Enter selection:");
-
-      while(true) // key handling
-      { int num=-1;
-        c = ReadChar();
-
-        if(allownum && char.IsDigit(c)) // read the number of items if allowed
-        { num = c-'0';
-          while(char.IsDigit(c=ReadChar())) num = c-'0' + num*10;
-          if(num<0) continue;
-        }
-        if(char.IsLetter(c))
-        { head = ItemClass.Invalid;
-          for(int i=reletter?cs:0,end=reletter?mc:items.Length,y=-1; i<end; i++)
-          { if(i>=cs && i<cs+mc) // if it's onscreen, calculate the offset to the item
-            { if(items[i].Item!=null && head!=items[i].Item.Class) { head=items[i].Item.Class; y++; }
-              y++;
-            }
-            if(items[i].Char==c)
-            { items[i].Count = num>-1 ? items[i].Item==null ? num : Math.Min(num, items[i].Item.Count)
-                                      : items[i].Item==null ? items[i].Count==0 ? 1 : 0
-                                                            : items[i].Count>0 ? 0 : items[i].Item.Count;
-              if((flags&MenuFlag.Multi)==0 && items[i].Count>0)
-              { /*for(int j=0; j<items.Length; j++) if(j!=i) items[j].Count=0;
-                goto redraw;*/
-                goto done;
-              }
-              else if(i>=cs && i<cs+mc)            // if it's onscreen
-              { DrawMenuItem(y, items[i], flags);  // draw it
-                console.SetCursorPosition(16, yi); // and restore the cursor, 16 == length of "Enter selection:"
-              }
-              break;
-            }
-          }
-        }
-        else
-        { switch(c)
-          { case ',': case '@':
-              bool select=false;
-              for(int i=0; i<items.Length; i++)
-                if(items[i].Count!=(items[i].Item==null ? 1 : items[i].Item.Count)) { select=true; break; }
-              for(int i=0; i<items.Length; i++)
-                items[i].Count = select ? (items[i].Item==null ? 1 : items[i].Item.Count) : 0;
-              goto redraw;
-            case '+': case '=':
-              for(int i=0; i<items.Length; i++) items[i].Count = (items[i].Item==null ? 1 : items[i].Item.Count);
-              goto redraw;
-            case '-': for(int i=0; i<items.Length; i++) items[i].Count = 0; goto redraw;
-            case '\r': case '\n': goto done;
-            case ' ': rec.Key.VirtualKey=NTConsole.Key.Next; break;
-          }
-          switch(rec.Key.VirtualKey)
-          { case NTConsole.Key.Prior: case NTConsole.Key.Up: case NTConsole.Key.Numpad8:
-              if(cs>0) // page up
-              { cs -= Math.Min(iheight, cs);
-                console.Fill(0, 0, width, height); // clear the area we'll be using
-                goto redraw;
-              }
-              break;
-            case NTConsole.Key.Next: case NTConsole.Key.Down: case NTConsole.Key.Numpad2:
-              if(items.Length>cs+mc) // page down
-              { cs += mc;
-                console.Fill(0, 0, width, height); // clear the area we'll be using
-                goto redraw;
-              }
-              break;
-            case NTConsole.Key.Escape: ret=new MenuItem[0]; goto doreturn;
-          }
-        }
-      }
-    }
-    done:
-    cs = 0;
-    for(int i=0; i<items.Length; i++) if(items[i].Count>0) cs++;
-    ret = new MenuItem[cs];
-    for(int i=0,mi=0; i<items.Length; i++)
-      if(items[i].Count>0) { if(items[i].Item!=null) items[i].Char=items[i].Item.Char; ret[mi++]=items[i]; }
-
-    doreturn:
-    if(buf!=null) console.PutBlock(0, 0, 0, 0, mapW, mapH, buf); // replace what we've overwritten
-    DrawLines();
-    return ret;
-  }
-
-  public override void Print() { AddLine(Color.Normal, "", true); }
-  public override void Print(Color color, string line) { AddLine(color, line, true); }
+  public override void ExamineTile(Player viewer, Point pt) { DescribeTile(viewer, pt, viewer.CanSee(pt)); }
 
   public override Input GetNextInput()
   { while(true)
@@ -743,153 +206,323 @@ public sealed class ConsoleIO : InputOutput
       int count = 1;
       ReadChar();
       char c = NormalizeDirChar();
-
-      if(c==0)
-        {
+      
+      if(c==0) continue;
+      if(rec.Key.HasMod(NTConsole.Modifier.Ctrl))
+        switch(c+64)
+        { case 'N': inp.Action = Action.NameItem; break;
+          case 'P': DisplayMessages(false); break;
+          case 'Q': inp.Action = Action.Quit; break;
+          case 'X': inp.Action = Action.Save; break;
         }
-      else if(rec.Key.HasMod(NTConsole.Modifier.Ctrl)) switch(c+64)
-      { case 'P': DisplayMessages(false); break;
-        case 'N': inp.Action = Action.NameItem; break;
-        case 'Q': inp.Action = Action.Quit; break;
-        case 'X': inp.Action = Action.Save; break;
-      }
-      else switch(c)
-      { case 'b': case 'h': case 'j': case 'k': case 'l': case 'n': case 'u': case 'y':
-          inp.Action = Action.Move;
-          inp.Direction = CharToDirection(c);
-          break;
-        case 'B': case 'H': case 'J': case 'K': case 'L': case 'N': case 'U': case 'Y':
-          inp.Action = Action.MoveToInteresting;
-          inp.Direction = CharToDirection(c);
-          break;
-        case '.': inp.Action = Action.Rest; break;
-        case ',': inp.Action = Action.Pickup; break;
-        case 'a': inp.Action = Action.UseItem; break;
-        case 'c': inp.Action = Action.CloseDoor; break;
-        case 'C': inp.Action = Action.Carve; break;
-        case 'd': inp.Action = Action.Drop; break;
-        case 'D': inp.Action = Action.DropType; break;
-        case 'e': inp.Action = Action.Eat; break;
-        case 'f': inp.Action = Action.Fire; break;
-        case 'i': inp.Action = Action.Inventory; break;
-        case 'I': inp.Action = Action.Invoke; break;
-        case 'o': inp.Action = Action.OpenDoor; break;
-        case 'q': inp.Action = Action.Quaff; break;
-        case 'r': inp.Action = Action.Read; break;
-        case 'R': inp.Action = Action.Remove; break;
-        case 'S': inp.Action = Action.ManageSkills; break;
-        case 't': inp.Action = Action.Throw; break;
-        case 'T': inp.Action = Action.TalkTo; break;
-        case 'v': inp.Action = Action.ViewItem; break;
-        case 'w': inp.Action = Action.Wield; break;
-        case 'W': inp.Action = Action.Wear; break;
-        case 'X': inp.Action = Action.ShowMap; break;
-        case 'z': inp.Action = Action.ZapWand; break;
-        case 'Z': inp.Action = Action.CastSpell; break;
-        case '<': inp.Action = Action.GoUp; break;
-        case '>': inp.Action = Action.GoDown; break;
-        case '=': inp.Action = Action.Reassign; break;
-        case ':': inp.Action = Action.ExamineTile; break;
-        case '\'':inp.Action = Action.SwapAB; break;
-        case '\\':inp.Action = Action.ShowKnowledge; break;
-        case '/':
-          inp.Direction = CharToDirection(ReadChar());
-          if(inp.Direction==Direction.Self) { count=100; inp.Action=Action.Rest; }
-          else if(inp.Direction!=Direction.Invalid) inp.Action = Action.MoveToInteresting;
-          break;
-        case '?': DisplayHelp(); break;
-      }
-      if(inp.Action != Action.None)
+      else
+        switch(c)
+        { case 'b': case 'h': case 'j': case 'k': case 'l': case 'n': case 'u': case 'y':
+            inp.Action = Action.Move;
+            inp.Direction = CharToDirection(c);
+            break;
+          case 'B': case 'H': case 'J': case 'K': case 'L': case 'N': case 'U': case 'Y':
+            inp.Action = Action.MoveToInteresting;
+            inp.Direction = CharToDirection(c);
+            break;
+          case '.': inp.Action = Action.Rest; break;
+          case ',': inp.Action = Action.Pickup; break;
+          case 'a': inp.Action = Action.UseItem; break;
+          case 'c': inp.Action = Action.CloseDoor; break;
+          case 'd': inp.Action = Action.Drop; break;
+          case 'D': inp.Action = Action.DropType; break;
+          case 'e': inp.Action = Action.Eat; break;
+          case 'f': inp.Action = Action.Fire; break;
+          case 'i': inp.Action = Action.Inventory; break;
+          case 'I': inp.Action = Action.Invoke; break;
+          case 'o': inp.Action = Action.OpenDoor; break;
+          case 'q': inp.Action = Action.Quaff; break;
+          case 'r': inp.Action = Action.Read; break;
+          case 'R': inp.Action = Action.Remove; break;
+          case 'S': inp.Action = Action.ManageSkills; break;
+          case 't': inp.Action = Action.Throw; break;
+          case 'T': inp.Action = Action.TalkTo; break;
+          case 'v': inp.Action = Action.ViewItem; break;
+          case 'w': inp.Action = Action.Wield; break;
+          case 'W': inp.Action = Action.Wear; break;
+          case 'X': inp.Action = Action.ShowMap; break;
+          case 'z': inp.Action = Action.ZapWand; break;
+          case 'Z': inp.Action = Action.CastSpell; break;
+          case '<': inp.Action = Action.GoUp; break;
+          case '>': inp.Action = Action.GoDown; break;
+          case '=': inp.Action = Action.Reassign; break;
+          case ':': inp.Action = Action.ExamineTile; break;
+          case '\'':inp.Action = Action.SwapAB; break;
+          case '\\':inp.Action = Action.ShowKnowledge; break;
+          case '/':
+            inp.Direction = CharToDirection(ReadChar());
+            if(inp.Direction==Direction.Self) { count=100; inp.Action=Action.Rest; }
+            else if(inp.Direction!=Direction.Invalid) inp.Action = Action.MoveToInteresting;
+            break;
+          case '?': DisplayHelp(); break;
+        }
+
+      if(inp.Action != Action.Invalid)
       { inp.Count = count;
         return inp;
       }
     }
   }
 
-  public override void Render(Entity viewer)
-  { if(viewer.Is(Entity.Flag.Sleep)) return;
-    mapW = Math.Min(console.Width, MapWidth); mapH = Math.Min(console.Height, MapHeight);
-    RenderMap(viewer, viewer.Position, viewer.VisibleTiles());
-    RenderStats(viewer);
-    uncleared = 0;
+  public override void ManageSkills(Player player)
+  { ClearScreen();
+    console.SetCursorPosition(0, 0);
+    console.WriteLine("You have {0} points of unallocated experience.", player.ExpPool);
+
+    Skill[] skills = new Skill[(int)Skill.NumSkills]; // fill an array with the skills in which we have some experience
+    int numSkills=0;
+    for(int i=0; i<(int)Skill.NumSkills; i++) if(player.GetSkill((Skill)i)!=0) skills[numSkills++] = (Skill)i;
+
+    console.WriteLine(numSkills==0 ? "You are completely unskilled!" : "Select a skill to toggle training it.");
+
+    while(true)
+    { char c = 'a';
+      console.SetCursorPosition(0, 3);
+      for(int i=0; i<numSkills; i++)
+      { bool enabled = player.Training(skills[i]);
+        Write(enabled ? Color.Normal : Color.DarkGrey, "{0} {1} {2} Skill {3} ",
+              c++, enabled ? '+' : '-', skills[i].ToString().PadRight(18), player.GetSkill(skills[i]));
+        // TODO: not sure if i want this
+        // WriteLine(Color.LightBlue, "({0})", player.SkillExp[(int)skills[i]]*9/player.NextSkillLevel(skills[i])+1);
+      }
+
+      nextChar:
+      c = ReadChar();
+      if(c==' ' || c=='\r' || c=='\n' || rec.Key.VirtualKey==NTConsole.Key.Escape) break;
+      else if(c>='a' && c-'a'<numSkills) player.SetTraining(skills[c-'a'], !player.Training(skills[c-'a']));
+      else goto nextChar;
+    }
+
+    RestoreScreen();
+  }
+
+  public override MenuItem[] Menu(System.Collections.ICollection items, MenuFlag flags, params ItemType[] types)
+  { return Menu(CreateMenu(items, flags, types), flags);
+  }
+
+  public override MenuItem[] Menu(MenuItem[] items, MenuFlag flags)
+  { MenuItem[] ret;
+
+    bool reletter = (flags&MenuFlag.Reletter)!=0, allownum=(flags&MenuFlag.AllowNum)!=0;
+
+    // width and height are the total height of the menu area.
+    // iheight is the height of the area displaying items. mtop is the index of the first visible item
+    int width = Math.Min(MapWidth, console.Width), height=reletter ? Math.Min(54, console.Height) : console.Height,
+      iheight = height-2, mtop = 0;
+
+    while(true)
+    { redraw:
+      ClearScreen(); // clear the area we'll be using
+      ItemType head = ItemType.Invalid;
+      
+      int top=mtop, y=0;
+      char c = 'a';
+      
+      for(; y<iheight && top<items.Length; y++)
+      { if(items[top].Item!=null && items[top].Item.Type!=head) // if it's the start of a new category
+        { head = items[top].Item.Type;
+          PutString(NTConsole.Attribute.White|NTConsole.Attribute.Underlined, 0, y, head.ToString());
+        }
+        else // otherwise, draw an item within a category
+        { if(reletter) items[top].Char = c;
+          DrawMenuItem(y, items[top++], flags);
+          if(c++=='z') c = 'A';
+        }
+      }
+
+      PutString(0, y, "Enter selection: ");
+      
+      while(true) // key handling
+      { int count = -1;
+
+        c = ReadChar();
+        if(allownum && char.IsDigit(c))
+        { count = c-'0';
+          while(true)
+          { c = ReadChar();
+            if(char.IsDigit(c))
+            { int nc = c-'0' + count*10;
+              if(nc>count) count = nc; // guard against overflow
+            }
+            else if(c=='\b')
+            { if(count==0) { count=-1; break; }
+              count /= 10;
+            }
+            else break;
+          }
+        }
+
+        if(char.IsLetter(c)) // (possibly) (de-)selecting an item
+        { head = ItemType.Invalid;
+          for(int i=mtop,yo=0; i<top; yo++,i++)
+          { if(items[i].Item!=null && head!=items[i].Item.Type)
+            { head = items[i].Item.Type;
+              yo++;
+            }
+            if(items[i].Char==c)
+            { items[i].Count = count!=-1 ? items[i].Item==null ? count : Math.Min(count, items[i].Item.Count)
+                                         : items[i].Item==null ? items[i].Count==0 ? 1 : 0
+                                                               : items[i].Count!=0 ? 0 : items[i].Item.Count;
+              if((flags&MenuFlag.Multi)==0 && items[i].Count!=0) goto done;
+              DrawMenuItem(yo, items[i], flags); // update the menu item
+              console.SetCursorPosition(17, y);  // and then put the cursor back after "Enter selection: "
+              break;
+            }
+          }
+        }
+        else // not selecting an item
+        { switch(c)
+          { case ',': // toggle all onscreen items
+              bool select = false; // by default, deselect everything
+              for(int i=mtop; i<top; i++) // but if not all items are selected, then we'll select them all
+                if(items[i].Count!=(items[i].Item==null ? 1 : items[i].Item.Count)) { select = true; break; }
+              for(int i=mtop; i<top; i++)
+                items[i].Count = select ? (items[i].Item==null ? 1 : items[i].Item.Count) : 0;
+              goto redraw;
+            case '+': case '=': // select all onscreen items
+              for(int i=mtop; i<top; i++) items[i].Count = items[i].Item==null ? 1 : items[i].Item.Count;
+              goto redraw;
+            case '-': // deselect all onscreen items
+              for(int i=mtop; i<top; i++) items[i].Count = 0;
+              goto redraw;
+            case '<': rec.Key.VirtualKey = NTConsole.Key.Prior; break; // aliases for page up and page down
+            case '>': case ' ': case '\r': case '\n': rec.Key.VirtualKey = NTConsole.Key.Next; break;
+          }
+
+          switch(rec.Key.VirtualKey)
+          { case NTConsole.Key.Prior: case NTConsole.Key.Up: case NTConsole.Key.Numpad8: // page up
+              if(mtop!=0) // if we're not at the top already
+              { mtop -= Math.Min(iheight, mtop);
+                console.Fill(0, 0, width, height);
+                goto redraw;
+              }
+              break;
+            case NTConsole.Key.Next: case NTConsole.Key.Down: case NTConsole.Key.Numpad2: // page down
+              if(top<items.Length) // if we're not at the bottom already, scroll down
+              { mtop += top-mtop;
+                console.Fill(0, 0, width, height);
+                goto redraw;
+              }
+              else goto done; // otherwise return the selected items
+            case NTConsole.Key.Escape: ret = new MenuItem[0]; goto doReturn; // abort
+          }
+        }
+      }
+    }
+    
+    done:
+    iheight = 0; // reuse this to count the number of selected items
+    for(int i=0; i<items.Length; i++) if(items[i].Count!=0) iheight++;
+    ret = new MenuItem[iheight];
+    for(int i=0,mi=0; i<items.Length; i++) // now add them to the return array
+      if(items[i].Count!=0)
+      { if(items[i].Item!=null) items[i].Char = items[i].Item.Char;
+        ret[mi++] = items[i];
+      }
+    
+    doReturn:
+    RestoreScreen();
+    return ret;
+  }
+
+  public override void Print(Color color, string line) { AddLine(color, line, true); }
+
+  public override void Render(Player viewer, bool updateMap)
+  { mapW = Math.Min(console.Width, MapWidth);
+    mapH = Math.Min(console.Height, MapHeight);
+    if(updateMap) RenderMap(viewer, viewer.Pos, viewer.VisibleTiles());
+    DrawStats(viewer);
+    unviewed = 0;
     DrawLines();
   }
 
   public override void SetTitle(string title) { console.Title = title; }
 
   public override bool YesNo(Color color, string prompt, bool defaultYes)
-  { char c = CharChoice(color, prompt, defaultYes ? "Yn" : "yN", defaultYes ? 'y' : 'n', true, "Please enter Y or N.");
+  { prompt += " [yes/no]";
+    while(true)
+    { string str = Ask(color, prompt, true, "Please enter 'yes' or 'no'.");
+      if(str=="") { AppendToBL(defaultYes ? "yes" : "no"); return defaultYes; }
+      str = str.ToLower();
+      if(str=="yes") return true;
+      else if(str=="no") return false;
+      else AddLine(color, "Please enter 'yes' or 'no'.");
+    }
+  }
+
+  public override bool YN(Color color, string prompt, bool defaultYes)
+  { char c = CharChoice(color, prompt, defaultYes ? "Yn" : "yN", defaultYes ? 'y' : 'n', true,
+                        "Please enter 'y' or 'n'.");
     return c==0 ? defaultYes : Char.ToLower(c)=='y';
   }
 
-  struct Line
-  { public Line(Color color, string text) { Color=color; Text=text; }
-    public Color Color;
-    public string Text;
-  }
+  int LineSpace { get { return console.Height-MapHeight-4; } } // the amount of space available for text history
+  int MapWidth  { get { return console.Width; } } // the width of the map
+  int MapHeight { get { return Math.Max(console.Height-19, 36); } } // the height of the map
 
-  class ItemComparer : System.Collections.IComparer
-  { public int Compare(object x, object y) { return ((Item)x).Char-((Item)y).Char; }
-    public static readonly ItemComparer Default = new ItemComparer();
-  }
-
-  int LineSpace { get { return console.Height-MapHeight-4; } }
-  int MapWidth  { get { return console.Width; } }
-  int MapHeight { get { return Math.Max(console.Height-19, 36); } }
-
-  bool TextInput
+  bool TextInput // returns true if we're set up to read text
   { get { return inputMode; }
     set
     { if(value==inputMode) return;
       console.InputMode = value ? NTConsole.InputModes.LineBuffered|NTConsole.InputModes.Echo
                                 : NTConsole.InputModes.None;
       DrawLines();
-      uncleared = 0;
+      unviewed  = 0;
       inputMode = value;
     }
   }
 
   void AddLine(string line) { AddLine(Color.Normal, line, false); }
-  void AddLine(string line, bool redraw) { AddLine(Color.Normal, line, redraw); }
+  void AddLine(string line, bool redrawNow) { AddLine(Color.Normal, line, redrawNow); }
   void AddLine(Color color, string line) { AddLine(color, line, false); }
-  void AddLine(Color color, string line, bool redraw)
-  { if(uncleared!=-1) uncleared += LineHeight(line);
-    if(!TextInput && uncleared >= LineSpace-1)
+  void AddLine(Color color, string line, bool redrawNow)
+  { if(unviewed!=-1) unviewed += LineHeight(line); // if we're not skipping, add to the number of unviewed lines
+
+    if(!TextInput && unviewed>=LineSpace-1) // if we're not reading text and we have more lines that can fit at once...
     { lines.Append(new Line(Color.Normal, "--more--"));
       DrawLines();
-      SetCursorAtEOBL();
+      MoveCursorToEOBL();
       while(true)
       { char c = ReadChar();
-        if(c==' ' || c=='\r' || c=='\n') { uncleared=0; break; }
-        if(rec.Key.VirtualKey==NTConsole.Key.Escape) { uncleared=-1; break; }
+        if(c==' ' || c=='\r' || c=='\n') { unviewed=0; break; }
+        if(rec.Key.VirtualKey==NTConsole.Key.Escape) { unviewed=-1; break; } // -1 means skip all pending lines
       }
-      SetCursorToPlayer();
+      MoveCursorToPlayer();
     }
+
     lines.Append(new Line(color, line));
-    while(lines.Count>maxLines) lines.Remove(lines.Head);
-    if(redraw) DrawLines();
+    while(lines.Count>maxLines) lines.Remove(lines.Head); // if the scrollback buffer is overfilled, cut it down to size
+    if(redrawNow) DrawLines();
   }
 
-  void AddWrapped(int i, string line)
-  { if(wrapped.Length<i)
+  // add a line to the 'wrapped' array, at the given index, expanding the array if necessary
+  void AddWrapped(int index, string line)
+  { if(wrapped.Length<index)
     { string[] narr = new string[wrapped.Length*2];
-      Array.Copy(wrapped, narr, i);
+      Array.Copy(wrapped, narr, index);
       wrapped = narr;
     }
-    wrapped[i] = line;
+    wrapped[index] = line;
   }
 
-  void AppendToBL(char c)
-  { Line line = (Line)lines.Tail.Data;
-    line.Text += c;
-    lines.Tail.Data = line;
-  }
   void AppendToBL(string s)
   { Line line = (Line)lines.Tail.Data;
     line.Text += s;
     lines.Tail.Data = line;
   }
 
+  void BLBackspace()
+  { Line line = (Line)lines.Tail.Data;
+    if(line.Text.Length!=0) line.Text = line.Text.Substring(0, line.Text.Length-1);
+    lines.Tail.Data = line;
+  }
+
+  // convert movement characters into the Direction enum
   Direction CharToDirection(char c) { return CharToDirection(c, true, false); }
   Direction CharToDirection(char c, bool allowSelf, bool allowVertical)
   { c = char.ToLower(NormalizeDirChar());
@@ -909,8 +542,6 @@ public sealed class ConsoleIO : InputOutput
     }
   }
 
-  void ClearLines() { oldLines = lines; lines = new LinkedList(); }
-
   void ClearScreen()
   { int width=Math.Min(MapWidth, console.Width), height=console.Height, mheight=MapHeight;
     console.Fill(0, 0, width, height); // clear map area
@@ -918,41 +549,57 @@ public sealed class ConsoleIO : InputOutput
     console.Attributes = ColorToAttr(Color.Normal);
   }
 
-  void DescribeEntity(Entity entity)
-  { ClearScreen();
-    console.SetCursorPosition(0, 0);
-    console.WriteLine("{0}, Race: {1}", entity.AName, entity.Race);
-    console.WriteLine();
+  MenuItem[] CreateMenu(ICollection items, MenuFlag flags, ItemType[] types)
+  { if(items.Count==0) throw new ArgumentException("No items in the collection.", "items");
+    if(types.Length==0) throw new ArgumentException("No types passed.", "types");
+    if(items.Count>52 && (flags&MenuFlag.Reletter)==0)
+      throw new NotSupportedException("Too many items in the collection.");
 
-    string desc = entity.Description;
-    if(desc!=null)
-    { WriteWrapped(desc, MapWidth);
-      console.WriteLine();
+    Item[] itemarr = new Item[items.Count]; // first sort items by type and character
+    items.CopyTo(itemarr, 0);
+    Array.Sort(itemarr, ItemComparer.ByTypeAndChar);
+
+    MenuItem[] ret;
+    if(Array.IndexOf(types, ItemType.Any)!=-1) // if ItemType.Any was passed, add every item to the menu
+    { ret = new MenuItem[items.Count];
+      for(int i=0; i<itemarr.Length; i++) ret[i] = new MenuItem(itemarr[i]);
     }
-    WriteWrapped(Entity.RaceDescs[(int)entity.Race], MapWidth);
+    else // otherwise, use only the item types that were passed
+    { Array.Sort(types); // sort the array of types
 
-    ReadChar();
-    RestoreScreen();
+      ArrayList list = new ArrayList();
+      for(int i=0,j=0; i<types.Length; i++)
+      { ItemType type = types[i];
+        while(j<itemarr.Length && itemarr[j].Type!=type) j++;
+        for(; j<itemarr.Length && itemarr[j].Type==type; j++) list.Add(new MenuItem(itemarr[j]));
+      }
+
+      ret = (MenuItem[])list.ToArray(typeof(MenuItem));
+    }
+    
+    return ret;
   }
 
-  void DescribeTile(Player viewer, Point pos, Point[] vpts) { DescribeTile(viewer, pos, vpts, true); }
-  void DescribeTile(Player viewer, Point pos, Point[] vpts, bool clearLines)
-  { bool visible=false;
-    for(int i=0; i<vpts.Length; i++) if(vpts[i]==pos) { visible=true; break; }
-    if(clearLines) { lines.Clear(); uncleared=0; }
+  void DescribeTile(Player viewer, Point pt, bool visible) { DescribeTile(viewer, pt, visible, true); }
+  void DescribeTile(Player viewer, Point pt, bool visible, bool clearLines)
+  { if(clearLines) { lines.Clear(); unviewed=0; }
+
     if(!visible)
-    { if(!viewer.Memory.GetFlag(pos, Tile.Flag.Seen)) { AddLine("You can't see that position.", true); return; }  
+    { if(!viewer.Memory.GetFlag(pt, TileFlag.Seen)) { AddLine("You can't see that position.", true); return; }
       AddLine("You can't see that position, but here's what you remember:");
     }
+
     Map map = visible ? viewer.Map : viewer.Memory;
 
-    AddLine(map[pos].Type.ToString()+'.');
-    Entity e = visible ? map.GetEntity(pos) : map[pos].Entity;
+    AddLine(map[pt].Type.ToString()+'.');
+    Entity e = map.GetEntity(pt);
     if(e!=null)
     { string prefix = e==viewer ? "You are" : "{0} is";
       AddLine(string.Format(prefix+" here.", e.AName));
-      Weapon w = e.Weapon;
+
+      /* TODO: finish this Weapon w = e.Weapon;
       if(w!=null) AddLine(string.Format(prefix+" wielding {1} {2}.", "It", Global.AorAn(w.Name), w.Name));
+      */
 
       if(e!=viewer)
       { string name = e.Name==null ? "It" : e.Name;
@@ -963,7 +610,7 @@ public sealed class ConsoleIO : InputOutput
         else if(healthpct>=25) AddLine(name+" looks heavily wounded.");
         else AddLine(name+" looks almost dead.");
 
-        if(e is AI)
+        /* TODO: this too if(e is AI)
           switch(((AI)e).State)
           { case AIState.Asleep: AddLine(name+" appears to be asleep."); break;
             case AIState.Attacking: AddLine(name+" looks angry!"); break;
@@ -974,11 +621,13 @@ public sealed class ConsoleIO : InputOutput
             case AIState.Working: AddLine(name+"'s busy working."); break;
             default: AddLine("UNKNOWN AI STATE"); break;
           }
+        */
       }
     }
-    if(viewer.Map.HasItems(pos)) DisplayTileItems(map[pos].Items, visible);
+
+    if(map.HasItems(pt)) DisplayTileItems(map[pt].Items, visible);
     DrawLines();
-    uncleared = 0;
+    unviewed = 0;
   }
 
   void DisplayHelp()
@@ -1007,7 +656,7 @@ z - zap a wand              Z - cast a spell
 : - examine occupied tile   \ - display known items
 < - ascend staircase        > - descend staircase
 = - reassign item letters   ^ - describe religion
-b, h, j, k, l, n, u, y - nethack-like movement
+b, h, j, k, l, n, u, y - movement (in addition to the keypad)
 / DIR  - long walk          / .    - rest up to 100 turns
 Ctrl-A - toggle autopickup  Ctrl-Q - quit
 Ctrl-N - name an item       Ctrl-X - quit + save
@@ -1025,7 +674,7 @@ Ctrl-P - see old messages";
 
   void DisplayMessages(bool fromTop)
   { int width=MapWidth, height=console.Height, ls, lss;
-    System.Collections.ArrayList list = new System.Collections.ArrayList();
+    ArrayList list = new ArrayList();
     for(LinkedList.Node node=lines.Head; node!=null; node=node.Next)
     { Line line = (Line)node.Data;
       if(line.Text=="--more--") continue;
@@ -1039,79 +688,175 @@ Ctrl-P - see old messages";
     while(true)
     { for(int y=0,i=ls; i<list.Count && y<height; y++,i++)
       { Line line = (Line)list[i];
-        PutStringP(line.Color, width, 0, y, line.Text);
+        PutString(line.Color, width, 0, y, line.Text);
       }
 
       nextChar: ReadChar();
       if(rec.Key.VirtualKey==NTConsole.Key.Escape) goto done;
       if(rec.Key.VirtualKey==NTConsole.Key.Prior) ls = Math.Max(0, ls-height*2/3);
       else if(rec.Key.VirtualKey==NTConsole.Key.Next) ls = Math.Min(lss, ls+height*2/3);
-      else switch(char.ToLower(NormalizeDirChar()))
-      { case 'j': if(ls<lss) ls++; break;
-        case 'k': if(ls>0)   ls--; break;
-        case ' ': case '\r': case '\n': goto done;
-        default: goto nextChar;
-      }
+      else
+        switch(char.ToLower(NormalizeDirChar()))
+        { case 'j': if(ls<lss) ls++; break;
+          case 'k': if(ls>0)   ls--; break;
+          case ' ': case '\r': case '\n': goto done;
+          default: goto nextChar;
+        }
     }
 
     done: RestoreScreen();
   }
 
-  Point DisplayToMap(Point pt, Point mapCenter) { return new Point(pt.X-mapW/2+mapCenter.X, pt.Y-mapH/2+mapCenter.Y); }
+  void DisplayTileItems(IInventory items, bool visible)
+  { if(items==null || items.Count==0) return;
+    if(items.Count==1) AddLine((visible ? "You see here: " : "You saw here: ")+items[0].GetAName());
+    else
+    { int needed=items.Count+1, avail=LineSpace-unviewed-2;
+      if(needed>avail)
+      { // TODO: perhaps allow this
+        /*if(allowInventory) DisplayInventory(items);
+        else */if(avail<=2) AddLine("There are several items here.");
+        else
+        { int toshow = avail-2;
+          AddLine(visible ? "You see here:" : "You saw here:");
+          for(int i=0; i<toshow; i++) AddLine(items[i].GetAName());
+          AddLine("There are more items as well.");
+        }
+      }
+      else
+      { AddLine(visible ? "You see here:" : "You saw here");
+        needed--;
+        for(int i=0; i<needed; i++) AddLine(items[i].GetAName());
+      }
+    }
+  }
 
   void DrawLines()
   { int maxlines=LineSpace, li=maxlines-1;
-    Line[] arr = new Line[maxlines];;
-    { LinkedList.Node node = lines.Tail;
+
+    Line[] arr = new Line[maxlines]; // allocate enough lines to cover the maximum available text space
+    { LinkedList.Node node = lines.Tail; // traverse through the list, wordwrapping each entry and filling the array
       while(li>=0 && node!=null)
       { Line line = (Line)node.Data;
         int height = WordWrap(line.Text);
         while(height-->0 && li>=0) arr[li--] = new Line(line.Color, wrapped[height]);
-        node=node.Previous;
+        node = node.Previous;
       }
     }
 
-    blY=console.Height-LineSpace-1;
-    console.Fill(0, blY, console.Width, maxlines);
+    blY = console.Height-LineSpace-1;
+    console.Fill(0, blY, console.Width, maxlines); // clear the area into which we'll be writing
     console.SetCursorPosition(0, blY);
 
-    for(blY--,li++; li<arr.Length; li++)
+    for(blY--,li++; li<arr.Length; li++) // write out the lines
     { console.Attributes = ColorToAttr(arr[li].Color);
       console.WriteLine(arr[li].Text);
-      blX = arr[li].Text.Length; blY++;
+      blX = arr[li].Text.Length; blY++; // update the coordinate of the end of the bottom line
     }
-    SetCursorToPlayer();
+
+    MoveCursorToPlayer();
   }
 
   void DrawMenuItem(int y, MenuItem item, MenuFlag flags)
   { PutString(0, y, "[{0}] {1} - {2}",
               (flags&MenuFlag.AllowNum)==0 ?
                 item.Count==0 ? "-" : "+" :
-                item.Count==0 ? " - " : item.Count==item.Item.Count ? " + " : item.Count.ToString("d3"),
+                item.Count==0 ? " - " :
+                item.Count==item.Item.Count ? " + " :
+                item.Count>999 ? "###" : item.Count.ToString("d3"),
               item.Char, item.Text!=null ? item.Text : item.Item.GetInvName());
   }
 
-  int LineHeight(string line) { return WordWrap(line); }
+  void DrawStats(Player player)
+  { int x=0, y=MapHeight, width=console.Width-x;
+    console.SetCursorPosition(x, y);
+    x += Write(Color.Normal, "{0} the {1}  St:{2} Dx:{3} In:{4} AC:{5} EV:{6} ",
+               player.Name, player.Title, player.Str, player.Dex, player.Int, player.AC, player.EV);
 
-  Point MapToDisplay(Point pt, Point mapCenter) { return new Point(pt.X-mapCenter.X+mapW/2, pt.Y-mapCenter.Y+mapH/2); }
+    while(x++<width) console.WriteChar(' ');
+    x = 0; y++;
+    console.SetCursorPosition(x, y);
 
-  char NormalizeDirChar()
+    x += Write(Color.Normal, "Dlvl:{0} $:{1} ", player.Map.Index+1, player.Gold);
+    int percent = player.MaxHP==0 ? 0 : player.HP*100/player.MaxHP;
+    x += Write(percent<25 ? Color.Dire : percent<50 ? Color.Warning : percent<75 ? Color.Yellow :
+               percent<100 ? Color.Green : Color.Normal, "HP:{0}/{1} ", player.HP, player.MaxHP);
+    percent = player.MaxMP==0 ? 0 : player.MP*100/player.MaxMP;
+    x += Write(percent<25 ? Color.Dire : percent<50 ? Color.Warning : Color.Normal, "MP:{0}/{1} ",
+               player.MP, player.MaxMP);
+    x += Write(Color.Normal, "Exp:{0} ({1}/{2},{3}) T:{4}",
+               player.XL, player.XP, player.NextXL, player.ExpPool, player.Turns);
+
+    while(x++<width) console.WriteChar(' ');
+    x = 0; y++;
+    console.SetCursorPosition(x, y);
+
+    switch(player.HungerLevel)
+    { case HungerLevel.Fainting: x += Write(Color.Dire, "Fainting "); break;
+      case HungerLevel.Hungry: x += Write(Color.Warning, "Hungry "); break;
+      case HungerLevel.Satiated: case HungerLevel.Stuffed: x += Write(Color.Normal, "Satiated "); break;
+      case HungerLevel.Weak: x += Write(Color.Dire, "Weak "); break;
+    }
+
+    int amount = player.GetEffectValue(EffectType.Sickness);
+    if(amount!=0) x += Write(amount>1 ? Color.Dire : Color.Warning, "Sick ");
+
+    switch(player.CarryStress)
+    { case CarryStress.Burdened: x += Write(Color.Normal, "Burdened "); break;
+      case CarryStress.Overloaded: x += Write(Color.Dire, "Overloaded "); break;
+      case CarryStress.Overtaxed: x += Write(Color.Dire, "Overtaxed "); break;
+      case CarryStress.Strained: x += Write(Color.Dire, "Strained "); break;
+      case CarryStress.Stressed: x += Write(Color.Warning, "Stressed "); break;
+    }
+
+    if(player.HasAilment(Ailment.Blind)) x += Write(Color.Warning, "Blind ");
+    if(player.HasAilment(Ailment.Confused)) x += Write(Color.Warning, "Conf ");
+    if(player.HasAilment(Ailment.Hallucinating)) x += Write(Color.Warning, "Halluc ");
+    if(player.HasAilment(Ailment.Stunned)) x += Write(Color.Warning, "Stun ");
+
+    while(x++<width) console.WriteChar(' ');
+    /*x = 0; y++;
+    console.SetCursorPosition(x, y);
+
+    if(player.Hands!=null)
+      for(int i=0; i<player.Hands.Length; i++)
+        if(player.Hands[i]!=null && (i==0 || player.Hands[i]!=player.Hands[i-1]))
+        { Item item = player.Hands[i];
+          x += Write(item.Type==ItemType.Weapon ? Color.LightCyan : Color.LightGreen, "{0}:{1} ",
+                    item.Char, item.GetFullName());
+        }
+    while(x++<width) console.WriteChar(' ');*/
+  }
+
+  void Echo(char c)
+  { console.WriteChar(rec.Key.Char);
+    if(c=='\b') BLBackspace();
+    else AppendToBL(c.ToString());
+  }
+
+  int LineHeight(string line) { return WordWrap(line); } // this is not the best implementation...
+
+  void MoveCursorToEOBL() { console.SetCursorPosition(blX, blY); }
+  void MoveCursorToPlayer() { console.SetCursorPosition(mapW/2, mapH/2); }
+
+  char NormalizeDirChar() // convert keypad movement to character movement
   { char c = rec.Key.Char;
     if(rec.Key.VirtualKey>=NTConsole.Key.Numpad1 && rec.Key.VirtualKey<=NTConsole.Key.Numpad9)
     { c = dirLets[(int)rec.Key.VirtualKey-(int)NTConsole.Key.Numpad1];
       if(rec.Key.HasMod(NTConsole.Modifier.Shift)) c = char.ToUpper(c);
     }
-    else switch(rec.Key.VirtualKey)
-    { case NTConsole.Key.End:   c='B'; break;
-      case NTConsole.Key.Down:  c='J'; break;
-      case NTConsole.Key.Next:  c='N'; break;
-      case NTConsole.Key.Left:  c='H'; break;
-      case NTConsole.Key.Right: c='L'; break;
-      case NTConsole.Key.Home:  c='Y'; break;
-      case NTConsole.Key.Up:    c='K'; break;
-      case NTConsole.Key.Prior: c='U'; break;
-      default: return c;
-    }
+    else
+      switch(rec.Key.VirtualKey)
+      { case NTConsole.Key.End:   c='B'; break;
+        case NTConsole.Key.Down:  c='J'; break;
+        case NTConsole.Key.Next:  c='N'; break;
+        case NTConsole.Key.Left:  c='H'; break;
+        case NTConsole.Key.Right: c='L'; break;
+        case NTConsole.Key.Home:  c='Y'; break;
+        case NTConsole.Key.Up:    c='K'; break;
+        case NTConsole.Key.Prior: c='U'; break;
+        default: return c;
+      }
     return rec.Key.Char = c;
   }
 
@@ -1130,17 +875,17 @@ Ctrl-P - see old messages";
     console.Write(str);
   }
 
-  void PutStringP(int width, int x, int y, string str) { PutStringP(Color.Normal, width, x, y, str); }
-  void PutStringP(int width, int x, int y, string format, params object[] parms)
-  { PutStringP(Color.Normal, width, x, y, string.Format(format, parms));
+  void PutString(int width, int x, int y, string str) { PutString(Color.Normal, width, x, y, str); }
+  void PutString(int width, int x, int y, string format, params object[] parms)
+  { PutString(Color.Normal, width, x, y, string.Format(format, parms));
   }
-  void PutStringP(Color color, int width, int x, int y, string str)
+  void PutString(Color color, int width, int x, int y, string str)
   { if(str.Length>width) str = str.Substring(0, width);
     PutString(color, x, y, str);
     for(int i=str.Length; i<width; i++) console.WriteChar(' ');
   }
-  void PutStringP(Color color, int width, int x, int y, string format, params object[] parms)
-  { PutStringP(color, width, x, y, string.Format(format, parms));
+  void PutString(Color color, int width, int x, int y, string format, params object[] parms)
+  { PutString(color, width, x, y, string.Format(format, parms));
   }
 
   char ReadChar() { return ReadChar(false); }
@@ -1150,26 +895,37 @@ Ctrl-P - see old messages";
     while(rec.Type!=NTConsole.InputType.Keyboard || !rec.Key.KeyDown || rec.Key.Char==0 &&
           (rec.Key.VirtualKey>=NTConsole.Key.Shift && rec.Key.VirtualKey<=NTConsole.Key.Menu ||
            rec.Key.VirtualKey>=NTConsole.Key.Numlock))
-      rec = console.ReadInput();
+      rec = console.ReadInput(); // skip non-character inputs
     if(echo && rec.Key.Char!=0) console.WriteChar(rec.Key.Char);
     return rec.Key.Char;
   }
 
-  void RenderMap(Entity viewer, Point pos, Point[] vpts)
-  { Rectangle rect = new Rectangle(pos.X-mapW/2, pos.Y-mapH/2, mapW, mapH);
+  void RenderEntities(ICollection coll, Point[] vpts, Rectangle rect)
+  { foreach(Entity c in coll)
+    { if(!seeInvisible && c.HasAbility(Ability.SeeInvisible)) continue; // TODO: clairvoyance, warning, etc
+      Point cp = c.Pos;
+      int bi = (c.Y-rect.Y)*rect.Width + c.X-rect.X;
+      if(!rect.Contains(cp) || !vis[bi]) continue;
+      for(int i=0; i<vpts.Length; i++) if(vpts[i]==cp) { buf[bi] = EntityToChar(c, vis[bi]); break; }
+    }
+  }
+
+  void RenderMap(Player viewer, Point center, Point[] vpts)
+  { Rectangle rect = new Rectangle(center.X-mapW/2, center.Y-mapH/2, mapW, mapH);
     int size = mapW*mapH;
-    bool showAll = viewer.Map.IsOverworld;
+    bool showAll = viewer.Map.Type==MapType.Overworld;
     if(buf==null || buf.Length<size) buf = new NTConsole.CharInfo[size];
     if(vis==null || vis.Length<size) vis = new bool[size];
 
-    seeInvisible = viewer.Is(Entity.Flag.SeeInvisible);
+    seeInvisible = viewer.HasAbility(Ability.SeeInvisible); // TODO: take clairvoyance, etc into account
 
-    Map map = viewer==App.Player && App.Player.Memory!=null ? App.Player.Memory : viewer.Map;
+    Map map = viewer.Memory==null ? viewer.Map : viewer.Memory;
     if(map==viewer.Map)
     { for(int i=0,y=rect.Top; y<rect.Bottom; y++)
         for(int x=rect.Left; x<rect.Right; i++,x++)
           buf[i] = TileToChar(map[x,y], true);
-      RenderMonsters(map.Entities, vpts, rect);
+      unsafe { fixed(bool* visp=vis) GameLib.Interop.Unsafe.Fill(visp, 1, size); }
+      RenderEntities(map.Entities, vpts, rect);
     }
     else
     { Array.Clear(vis, 0, size);
@@ -1179,106 +935,24 @@ Ctrl-P - see old messages";
         for(int x=rect.Left; x<rect.Right; i++,x++)
         { Tile tile = map[x,y];
           buf[i] = tile.Type==TileType.UpStairs || tile.Type==TileType.DownStairs || tile.Entity==null ?
-                    TileToChar(tile, showAll || vis[i]) : CreatureToChar(tile.Entity, vis[i]);
+                    TileToChar(tile, showAll || vis[i]) : EntityToChar(tile.Entity, vis[i]);
         }
       map = viewer.Map;
       for(int i=0,y=rect.Top; y<rect.Bottom; y++)
         for(int x=rect.Left; x<rect.Right; i++,x++) if(vis[i]) buf[i] = TileToChar(map[x,y], showAll || vis[i]);
-      RenderMonsters(map.Entities, vpts, rect);
+      RenderEntities(map.Entities, vpts, rect);
     }
+
     console.PutBlock(new Rectangle(0, 0, rect.Width, rect.Height), buf);
   }
 
-  void RenderMonsters(System.Collections.ICollection coll, Point[] vpts, Rectangle rect)
-  { foreach(Entity c in coll)
-    { if(!seeInvisible && c.Is(Entity.Flag.Invisible)) continue;
-      Point cp = c.Position;
-      int bi = (c.Y-rect.Y)*rect.Width + c.X-rect.X;
-      if(!rect.Contains(cp) || !vis[bi]) continue;
-      for(int i=0; i<vpts.Length; i++) if(vpts[i]==cp) { buf[bi] = CreatureToChar(c, vis[bi]); break; }
-    }
-  }
-
-  void RenderStats(Entity player)
-  { int x=0, y=MapHeight, width=console.Width-x;
-    console.SetCursorPosition(x, y);
-    x += Write(Color.Normal, "{0} the {1}  St:{2} Dx:{3} In:{4} AC:{5} EV:{6} ",
-               player.Name, player.Title, player.Str, player.Dex, player.Int, player.AC, player.EV);
-    if(player.HungerLevel==HungerLevel.Hungry) x += Write(Color.Warning, "Hungr ");
-    else if(player.HungerLevel==HungerLevel.Starving) x += Write(Color.Dire, "Starv ");
-
-    if(player.Sickness>0) x += Write(player.Sickness>1 ? Color.Dire : Color.Warning, "Sick ");
-
-    switch(player.CarryStress)
-    { case CarryStress.Burdened: x += Write(Color.Warning, "Burden ");break;
-      case CarryStress.Stressed: x += Write(Color.Dire, "Stress "); break;
-      case CarryStress.Overtaxed: x += Write(Color.Dire, "Overtax "); break;
-    }
-
-    if(player.Is(Entity.Flag.Confuse)) x += Write(Color.Warning, "Conf ");
-    if(player.Is(Entity.Flag.Hallucinate)) x += Write(Color.Warning, "Halluc ");
-
-    while(x++<width) console.WriteChar(' ');
-    x = 0; y++;
-    console.SetCursorPosition(x, y);
-
-    x += Write(Color.Normal, "Dlvl:{0} $:{1} ", player.Map.Index+1, player.Gold);
-    int healthpct = player.HP*100/player.MaxHP;
-    x += Write(healthpct<25 ? Color.Dire : healthpct<50 ? Color.Warning : Color.Normal, "HP:{0}/{1} ",
-               player.HP, player.MaxHP);
-    int magicpct = player.MP*100/player.MaxMP;
-    x += Write(magicpct<25 ? Color.Dire : magicpct<50 ? Color.Warning : Color.Normal, "MP:{0}/{1} ",
-               player.MP, player.MaxMP);
-    x += Write(Color.Normal, "Exp:{0} ({1}/{2},{3}) T:{4}", player.ExpLevel, player.Exp, player.NextExp,
-               player.ExpPool, player.Age);
-    
-    while(x++<width) console.WriteChar(' ');
-    x = 0; y++;
-    console.SetCursorPosition(x, y);
-
-    for(int i=0; i<player.Hands.Length; i++)
-      if(player.Hands[i]!=null)
-      { Item item = player.Hands[i];
-        x += Write(item.Class==ItemClass.Weapon ? Color.LightCyan : Color.LightGreen, "{0}:{1} ",
-                   item.Char, item.GetFullName());
-      }
-    while(x++<width) console.WriteChar(' ');
-  }
-
-  void RestoreLines() { lines=oldLines; oldLines=null; }
-
   void RestoreScreen()
   { if(buf!=null) console.PutBlock(0, 0, 0, 0, mapW, mapH, buf); // replace what we've overwritten
-    RenderStats(App.Player);
+    DrawStats(App.Player);
     DrawLines();
   }
 
-  void SetCursorAtEOBL() { console.SetCursorPosition(blX, blY); }
-  void SetCursorToPlayer() { console.SetCursorPosition(mapW/2, mapH/2); }
-
-  void SetupMenu(System.Collections.ICollection items, MenuFlag flags, ItemClass[] classes)
-  { if(items.Count==0) throw new ArgumentException("No items in the collection.", "items");
-    if(items.Count>52 && (flags&MenuFlag.Reletter)==0)
-      throw new NotSupportedException("Too many items in the collection.");
-
-    Item[] itemarr = new Item[items.Count]; // first sort by character
-    items.CopyTo(itemarr, 0);
-    Array.Sort(itemarr, ItemComparer.Default);
-
-    if(Array.IndexOf(classes, ItemClass.Any)!=-1)
-    { menu = new MenuItem[items.Count];
-      for(int i=0,mi=0; i<(int)ItemClass.NumClasses; i++) // then group by item class
-        for(int j=0; j<itemarr.Length; j++) if(itemarr[j].Class==(ItemClass)i) menu[mi++] = new MenuItem(itemarr[j]);
-    }
-    else
-    { System.Collections.ArrayList list = new System.Collections.ArrayList();
-      for(int ci=0; ci<classes.Length; ci++)
-        for(int i=0; i<itemarr.Length; i++)
-          if(itemarr[i].Class==classes[ci]) list.Add(new MenuItem(itemarr[i]));
-      menu = (MenuItem[])list.ToArray(typeof(MenuItem));
-    }
-  }
-
+  // wordwrap a string, placing the output into 'wrapped' and returning the height in lines
   int WordWrap(string line) { return WordWrap(line, console.Width-1); }
   int WordWrap(string line, int width)
   { int s=0, e=line.Length, height=0;
@@ -1299,42 +973,20 @@ Ctrl-P - see old messages";
     return height;
   }
 
-  int Write(Color color, string format, params object[] parms)
-  { string str = string.Format(format, parms);
-    console.Attributes = ColorToAttr(color);
+  int Write(Color color, string format, params object[] parms) { return Write(color, string.Format(format, parms)); }
+  int Write(Color color, string str)
+  { console.Attributes = ColorToAttr(color);
     console.Write(str);
     return str.Length;
   }
 
-  void WriteLine() { console.WriteLine(); }
-  void WriteLine(Color color, string str)
-  { console.Attributes = ColorToAttr(color);
-    console.WriteLine(str);
-  }
-  void WriteLine(Color color, string format, params object[] parms)
-  { console.Attributes = ColorToAttr(color);
-    console.WriteLine(string.Format(format, parms));
-  }
-
-  void WriteWrapped(Color color, string text, int width)
-  { console.Attributes = ColorToAttr(color);
-    WriteWrapped(text, width);
-  }
-  void WriteWrapped(string text, int width)
-  { int height = WordWrap(text, width);
-    for(int i=0; i<height; i++) console.WriteLine(wrapped[i]);
-  }
-
+  NTConsole console = new NTConsole();
+  LinkedList lines = new LinkedList();
+  string[] wrapped = new string[4];
   NTConsole.CharInfo[] buf;
   bool[] vis;
-  MenuItem[] menu;
-  string[] wrapped = new string[4];
-  Entity lastTarget;
-
-  NTConsole console = new NTConsole();
-  LinkedList lines = new LinkedList(), oldLines; // a circular array would be more efficient...
   NTConsole.InputRecord rec;
-  int  uncleared, maxLines=200, blX, blY, mapW, mapH;
+  int unviewed, maxLines=200, blX, blY, mapW, mapH;
   bool inputMode, seeInvisible;
 
   static NTConsole.Attribute ColorToAttr(Color color)
@@ -1346,12 +998,17 @@ Ctrl-P - see old messages";
     return attr;
   }
 
-  static NTConsole.CharInfo CreatureToChar(Entity c, bool visible)
-  { return new NTConsole.CharInfo(raceMap[(int)c.Race], visible ? ColorToAttr(c.Color) : NTConsole.Attribute.DarkGrey);
+  static NTConsole.CharInfo EntityToChar(Entity e, bool visible)
+  { EntityClass ec = e.Class;
+    return new NTConsole.CharInfo(raceMap[(int)ec.GetRace(e)],
+                                  visible ? ColorToAttr(ec.GetColor(e)) : NTConsole.Attribute.DarkGrey);
   }
 
+  static bool IsPrintable(char c) { return char.IsLetterOrDigit(c) || char.IsPunctuation(c) || char.IsSymbol(c); }
+
   static NTConsole.CharInfo ItemToChar(Item item)
-  { return new NTConsole.CharInfo(itemMap[(int)item.Class], ColorToAttr(item.Color));
+  { ItemClass ic = item.Class;
+    return new NTConsole.CharInfo(itemMap[(int)ic.Type], ColorToAttr(ic.Color));
   }
 
   static NTConsole.CharInfo TileToChar(Tile tile, bool visible)
@@ -1375,7 +1032,6 @@ Ctrl-P - see old messages";
       case TileType.Lava: ci = new NTConsole.CharInfo((char)0xF7, NTConsole.Attribute.LightRed); break;
       case TileType.Pit: ci = new NTConsole.CharInfo('o', NTConsole.Attribute.Grey); break;
       case TileType.Hole: ci = new NTConsole.CharInfo('O', NTConsole.Attribute.Grey); break;
-      case TileType.Trap: ci = new NTConsole.CharInfo('^', NTConsole.Attribute.LightCyan); break;
       case TileType.Altar: ci = new NTConsole.CharInfo('_', NTConsole.Attribute.Grey); break;
       case TileType.Tree: case TileType.Forest: ci = new NTConsole.CharInfo('T', NTConsole.Attribute.Green); break;
       case TileType.DirtSand: ci = new NTConsole.CharInfo((char)0xFA, NTConsole.Attribute.Brown); break;
@@ -1394,15 +1050,18 @@ Ctrl-P - see old messages";
     return ci;
   }
 
-  // Amulet, Weapon, Shield, Armor, Ammo, Food, Corpse, Scroll, Ring, Potion, Wand, Tool, Spellbook, Container, Treasure,
-  static readonly char[] itemMap = new char[(int)ItemClass.NumClasses]
-  { '$', '"', ')', '[', '[', '(', '%', '&', '?', '=', '!', '/', ']', '+', ']', '*',
-  };
-  static readonly char[] raceMap = new char[(int)Race.NumRaces]
-  { '@', 'o'
+  // Gold, Amulet, Weapon, Shield, Armor, Ammo, Food, Scroll, Ring, Potion, Wand, Tool, Spellbook, Container, Treasure,
+  static readonly char[] itemMap = new char[(int)ItemType.NumTypes]
+  { '$', '"', ')', '[', '[', '(', '%', '?', '=', '!', '/', ']', '+', ']', '*',
   };
 
+  // Human
+  static readonly char[] raceMap = new char[(int)Race.NumRaces]
+  { '@'
+  };
+
+  // convert keypad keys to movement letters
   static readonly char[] dirLets = new char[9] { 'b', 'j', 'n', 'h', '.', 'l', 'y', 'k', 'u' };
 }
 
-} // namespace Chrono.Application
+} // namespace Chrono

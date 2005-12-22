@@ -4,84 +4,68 @@ using System.Xml;
 namespace Chrono
 {
 
-public abstract class Tool : Item
-{ public Tool() { Class=ItemClass.Tool; }
-}
-
-public abstract class ChargedTool : Chargeable
-{ public ChargedTool() { Class=ItemClass.Tool; }
-}
-
-#region XmlTool
-public sealed class XmlTool : Tool
-{ public XmlTool() { }
-  public XmlTool(XmlNode node)
-  { XmlItem.Init(this, node);
-    Spell = XmlItem.GetSpell(node);
-
-    switch(Spell.GetSpellTarget(App.Player))
-    { case SpellTarget.Self: Usability=ItemUse.Self; break;
-      case SpellTarget.Tile: Usability=ItemUse.Both; break;
-      default: throw new NotImplementedException("unhandled spell target");
-    }
-  }
-
-  public override bool CanStackWith(Item item) { return base.CanStackWith(item) && item.Name==Name; }
-
-  public override bool Use(Entity user, Direction dir)
-  { user.OnUse(this);
-    Spell.Cast(user, Status, dir);
-    return false;
-  }
-
-  public override bool Use(Entity user, System.Drawing.Point target)
-  { user.OnUse(this);
-    Spell.Cast(user, Status, target);
-    return false;
-  }
-
-  public Spell Spell;
+#region Tool
+public abstract class Tool : ItemClass
+{ protected Tool() { Type=ItemType.Tool; }
 }
 #endregion
 
-#region XmlChargeTool
-public sealed class XmlChargedTool : ChargedTool
-{ public XmlChargedTool() { }
-  public XmlChargedTool(XmlNode node)
-  { XmlItem.Init(this, node);
-    Spell = XmlItem.GetSpell(node);
-    Charges = Xml.RangeInt(node, "charges");
-
-    switch(Spell.GetSpellTarget(App.Player))
-    { case SpellTarget.Self: Usability=ItemUse.Self; break;
-      case SpellTarget.Tile: Usability=ItemUse.Both; break;
-      default: throw new NotImplementedException("unhandled spell target");
-    }
+#region XmlTool
+public sealed class XmlTool : Tool
+{ public XmlTool(XmlNode node)
+  { ItemClass.Init(this, node);
+    Spell = Spell.Get(Xml.Attr(node, "spell"));
+    
+    if(!Xml.IsEmpty(node, "usability"))
+      Usability = (ItemUse)Enum.Parse(typeof(ItemUse), Xml.Attr(node, "usability"));
+    else
+      switch(Spell.GetSpellTarget(null, null))
+      { case SpellTarget.Self: Usability = ItemUse.Self; break;
+        case SpellTarget.Item: Usability = ItemUse.Item; break;
+        case SpellTarget.Tile: Usability = ItemUse.Tile; break;
+      }
   }
+
+  public override bool Use(Item item, Entity user, Item usedOn)
+  { if(TryUse(item, user))
+    { if(user==App.Player) App.IO.Print("You use {0} on {1}.", item.GetAName(true), usedOn.GetAName());
+      else if(App.Player.CanSee(user))
+        App.IO.Print("{0} uses {1} on {2}.", user.TheName, item.GetAName(true), usedOn.GetAName());
+      Spell.Cast(user, item, usedOn);
+    }
+    return false;
+  }
+
+  public override bool Use(Item item, Entity user, Direction dir)
+  { if(TryUse(item, user))
+    { if(user==App.Player) App.IO.Print("You use {0}.", item.GetAName(true));
+      else if(App.Player.CanSee(user)) App.IO.Print("{0} uses {1}.", user.TheName, item.GetAName(true));
+      Spell.Cast(user, item, dir);
+    }
+    return false;
+  }
+
+  public override bool Use(Item item, Entity user, System.Drawing.Point pt)
+  { if(TryUse(item, user))
+    { if(user==App.Player) App.IO.Print("You use {0}.", item.GetAName(true));
+      else if(App.Player.CanSee(user)) App.IO.Print("{0} uses {1}.", user.TheName, item.GetAName(true));
+      Spell.Cast(user, item, pt);
+    }
+    return false;
+  }
+
+  public readonly Spell Spell;
   
-  public override bool CanStackWith(Item item) { return base.CanStackWith(item) && item.Name==Name; }
-
-  public override bool Use(Entity user, Direction dir)
-  { user.OnUse(this);
-    if(Charges>0)
-    { Spell.Cast(user, Status, dir);
-      Charges--;
-      return false;
+  bool TryUse(Item item, Entity user)
+  { if(item.Is(ItemStatus.HasCharges))
+    { if(item.Charges==0)
+      { if(user==App.Player) App.IO.Print("Nothing happens.");
+        return false;
+      }
+      else item.Charges--;
     }
-    else return base.Use(user, dir);
+    return true;
   }
-
-  public override bool Use(Entity user, System.Drawing.Point target)
-  { user.OnUse(this);
-    if(Charges>0)
-    { Spell.Cast(user, Status, target);
-      Charges--;
-      return false;
-    }
-    else return base.Use(user, target);
-  }
-
-  public Spell Spell;
 }
 #endregion
 

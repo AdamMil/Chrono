@@ -119,16 +119,20 @@ public class NTConsole
   public InputModes InputMode
   { get { return inMode; }
     set
-    { Check(SetConsoleMode(hRead, (uint)value));
-      SyncInputMode();
+    { if(inMode!=value)
+      { Check(SetConsoleMode(hRead, (uint)value));
+        SyncInputMode();
+      }
     }
   }
 
   public OutputModes OutputMode
   { get { return outMode; }
     set
-    { Check(SetConsoleMode(hWrite, (uint)value));
-      SyncOutputMode();
+    { if(outMode!=value)
+      { Check(SetConsoleMode(hWrite, (uint)value));
+        SyncOutputMode();
+      }
     }
   }
 
@@ -238,7 +242,7 @@ public class NTConsole
 
   public char ReadChar()
   { InputModes old = inMode;
-    if((inMode&InputModes.LineBuffered)!=0) InputMode = inMode & ~(InputModes.LineBuffered|InputModes.Echo);
+    InputMode &= ~InputModes.LineBuffered;
     uint len;
     char c;
     unsafe
@@ -249,8 +253,7 @@ public class NTConsole
       }
       else Check(ReadConsoleW(hRead, &c, 1, out len, NULL));
     }
-    if(InputMode!=old) InputMode=old;
-    if((old&InputModes.Echo)!=0) WriteChar(c);
+    InputMode = old;
     return c;
   }
 
@@ -273,7 +276,7 @@ public class NTConsole
 
   public string ReadLine()
   { InputModes old = inMode;
-    if((inMode&InputModes.LineBuffered)==0) InputMode = inMode|InputModes.LineBuffered;
+    InputMode |= InputModes.LineBuffered|InputModes.Processed;
     uint   len;
     string ret;
     if(ascii)
@@ -296,7 +299,7 @@ public class NTConsole
       if(buf[len-1]=='\r') len--;
       ret = BufferToString(buf, len);
     }
-    if(InputMode!=old) InputMode=old;
+    InputMode = old;
     WriteChar('\n');
     return ret;
   }
@@ -451,8 +454,7 @@ public class NTConsole
   public void PutBlock(Point dest, Point src, int width, int height, CharInfo[] buf) { PutBlock(dest.X, dest.Y, src.X, src.Y, width, height, buf); }
   public void PutBlock(Rectangle rect, CharInfo[] buf) { PutBlock(rect.X, rect.Y, 0, 0, rect.Width, rect.Height, buf); }
   public void PutBlock(int dx, int dy, int sx, int sy, int width, int height, CharInfo[] buf)
-  { OutputModes old = outMode;
-    SmallRect drect = new SmallRect(dx, dy, dx+width, dy+height);
+  { SmallRect drect = new SmallRect(dx, dy, dx+width, dy+height);
     WriteConsoleOutput(hWrite, buf, new Coord(width, height), new Coord(sx, sy), ref drect);
   }
 
@@ -481,6 +483,7 @@ public class NTConsole
     GetConsoleMode(hRead, out mode);
     inMode = (InputModes)mode;
   }
+
   protected void SyncOutputMode()
   { uint mode;
     GetConsoleMode(hWrite, out mode);

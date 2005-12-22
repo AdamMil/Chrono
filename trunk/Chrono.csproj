@@ -3,7 +3,7 @@
         ProjectType = "Local"
         ProductVersion = "7.10.3077"
         SchemaVersion = "2.0"
-        ProjectGuid = "{FE156648-D3D4-430E-919A-B037CCDC345E}"
+        ProjectGuid = "{E7D3B356-EC69-4620-B74A-C5AC0518D5B9}"
     >
         <Build>
             <Settings
@@ -62,62 +62,32 @@
                     TreatWarningsAsErrors = "false"
                     WarningLevel = "4"
                 />
-                <Config
-                    Name = "Profile"
-                    AllowUnsafeBlocks = "true"
-                    BaseAddress = "285212672"
-                    CheckForOverflowUnderflow = "false"
-                    ConfigurationOverrideFile = ""
-                    DefineConstants = "TRACE"
-                    DocumentationFile = ""
-                    DebugSymbols = "true"
-                    FileAlignment = "4096"
-                    IncrementalBuild = "false"
-                    NoStdLib = "false"
-                    NoWarn = ""
-                    Optimize = "true"
-                    OutputPath = "bin\Profile\"
-                    RegisterForComInterop = "false"
-                    RemoveIntegerChecks = "false"
-                    TreatWarningsAsErrors = "false"
-                    WarningLevel = "4"
-                />
             </Settings>
             <References>
                 <Reference
                     Name = "System"
                     AssemblyName = "System"
-                    HintPath = "..\..\WINDOWS\Microsoft.NET\Framework\v1.1.4322\System.dll"
-                />
-                <Reference
-                    Name = "System.Drawing"
-                    AssemblyName = "System.Drawing"
-                    HintPath = "..\..\WINDOWS\Microsoft.NET\Framework\v1.1.4322\System.Drawing.dll"
+                    HintPath = "C:\WINDOWS\Microsoft.NET\Framework\v1.1.4322\System.dll"
                 />
                 <Reference
                     Name = "System.XML"
                     AssemblyName = "System.Xml"
-                    HintPath = "..\..\WINDOWS\Microsoft.NET\Framework\v1.1.4322\System.XML.dll"
+                    HintPath = "C:\WINDOWS\Microsoft.NET\Framework\v1.1.4322\System.XML.dll"
                 />
                 <Reference
-                    Name = "ICSharpCode.SharpZipLib"
-                    AssemblyName = "ICSharpCode.SharpZipLib"
-                    HintPath = "..\dlls\ICSharpCode.SharpZipLib.dll"
+                    Name = "System.Drawing"
+                    AssemblyName = "System.Drawing"
+                    HintPath = "C:\WINDOWS\Microsoft.NET\Framework\v1.1.4322\System.Drawing.dll"
                 />
                 <Reference
                     Name = "GameLib"
-                    Project = "{79014105-2BDA-4D27-98AE-2DE3F5254252}"
-                    Package = "{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}"
+                    AssemblyName = "GameLib"
+                    HintPath = "..\GameLib\bin\Debug\GameLib.dll"
                 />
             </References>
         </Build>
         <Files>
             <Include>
-                <File
-                    RelPath = "AI.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
                 <File
                     RelPath = "Amulets.cs"
                     SubType = "Code"
@@ -135,11 +105,6 @@
                 />
                 <File
                     RelPath = "ConsoleIO.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "Corpses.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
                 />
@@ -229,6 +194,11 @@
                     BuildAction = "Compile"
                 />
                 <File
+                    RelPath = "Shopkeeper.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
                     RelPath = "Spellbooks.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
@@ -239,11 +209,12 @@
                     BuildAction = "Compile"
                 />
                 <File
-                    RelPath = "TODO"
-                    BuildAction = "None"
+                    RelPath = "Tools.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
                 />
                 <File
-                    RelPath = "Tools.cs"
+                    RelPath = "Treasure.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
                 />
@@ -293,6 +264,14 @@
                     BuildAction = "Content"
                 />
                 <File
+                    RelPath = "data\shops.xml"
+                    BuildAction = "Content"
+                />
+                <File
+                    RelPath = "data\shops.xsd"
+                    BuildAction = "Content"
+                />
+                <File
                     RelPath = "data\ai\ai.xsd"
                     BuildAction = "Content"
                 />
@@ -325,11 +304,6 @@
                     BuildAction = "Content"
                 />
                 <File
-                    RelPath = "data\dungeon\dungeon.xsx"
-                    DependentUpon = "dungeon.xsd"
-                    BuildAction = "None"
-                />
-                <File
                     RelPath = "data\dungeon\overworld.xml"
                     BuildAction = "Content"
                 />
@@ -352,11 +326,6 @@
                 <File
                     RelPath = "data\map\map.xsd"
                     BuildAction = "Content"
-                />
-                <File
-                    RelPath = "data\map\map.xsx"
-                    DependentUpon = "map.xsd"
-                    BuildAction = "None"
                 />
                 <File
                     RelPath = "data\map\MapFormat.txt"

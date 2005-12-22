@@ -6,12 +6,12 @@ using System.Xml;
 namespace Chrono
 {
 
-public class Dungeon
+public sealed class Dungeon
 { public Dungeon(string path) : this(LoadDungeon(path)) { }
   public Dungeon(XmlElement dungeon) { node=dungeon; }
 
   #region Section
-  public class Section : UniqueObject
+  public sealed class Section
   { public Section(XmlNode section, Dungeon dungeon)
     { node=section; this.dungeon=dungeon;
       foreach(XmlNode part in node.SelectNodes("levels")) // convert depth ranges to constant values

@@ -1,20 +1,14 @@
 using System;
-using SD=System.Drawing;
+using Point=System.Drawing.Point;
 
 namespace Chrono
 {
 
+#region Enums
 public enum Action
-{ None, Quit, Rest, Move, MoveToInteresting, MoveToDanger, MoveAFAP, OpenDoor, CloseDoor, Pickup, Drop, DropType,
+{ Invalid, Quit, Rest, Move, MoveToInteresting, MoveToDanger, MoveAFAP, OpenDoor, CloseDoor, Pickup, Drop, DropType,
   GoUp, GoDown, Eat, Wear, Remove, Wield, Inventory, ShowMap, Fire, Quaff, Read, ViewItem, Invoke, SwapAB, Reassign,
-  ManageSkills, UseItem, Carve, ExamineTile, Throw, ZapWand, CastSpell, ShowKnowledge, Save, NameItem, TalkTo
-}
-
-public struct Input
-{ public Input(Action action) { Action=action; Direction=Direction.Invalid; Count=1; }
-  public Action Action;
-  public Direction Direction;
-  public int Count;
+  ManageSkills, UseItem, ExamineTile, Throw, ZapWand, CastSpell, ShowKnowledge, Save, NameItem, TalkTo
 }
 
 [Flags]
@@ -28,44 +22,27 @@ public enum Color : byte
 }
 
 [Flags] public enum MenuFlag { None=0, Reletter=1, Multi=2, AllowNum=4, AllowNothing=8 };
+#endregion
 
-public struct MenuItem
-{ public MenuItem(Item item) { Item=item; Text=null; Count=0; Char = item==null ? '\0' : item.Char; }
-  public MenuItem(Item item, int count) { Item=item; Text=null; Count=count; Char = item==null ? '\0' : item.Char; }
-  public MenuItem(string text, char c) { Item=null; Text=text; Count=0; Char=c; }
-  public Item Item;
-  public string Text;
-  public int  Count;
-  public char Char;
+#region Input
+public struct Input
+{ public Input(Action action) { Action=action; Direction=Direction.Invalid; Count=1; }
+  public Action Action;
+  public Direction Direction;
+  public int Count;
 }
+#endregion
 
-public struct RangeTarget
-{ public RangeTarget(Direction dir) { Point=new SD.Point(-1, -1); Dir=dir; }
-  public RangeTarget(SD.Point pt) { Point=pt; Dir=Direction.Invalid; }
-  public RangeTarget(SD.Point pt, Direction dir) { Point=pt; Dir=dir; }
-  public SD.Point Point; // X,Y == -1,-1 for an invalid point (no selection)
-  public Direction Dir;
-}
-
+#region InputOutput
 public abstract class InputOutput
-{ public abstract int ScrollBack { get; set; }
-
-  public void Alert(string message) { Alert(Color.Warning, message); }
-  public abstract void Alert(Color color, string message);
-
-  public string Ask(string prompt) { return Ask(Color.Normal, prompt, true, null); }
-  public string Ask(Color color, string prompt) { return Ask(color, prompt, true, null); }
-  public string Ask(string prompt, bool allowEmpty) { return Ask(Color.Normal, prompt, allowEmpty); }
-  public string Ask(Color color, string prompt, bool allowEmpty)
-  { return Ask(color, prompt, allowEmpty, "Hey, enter something!");
-  }
+{ public string Ask(string prompt) { return Ask(Color.Normal, prompt, true, null); }
+  public string Ask(Color color, string prompt) { return Ask(Color.Normal, prompt, true, null); }
+  public string Ask(string prompt, bool allowEmpty) { return Ask(Color.Normal, prompt, allowEmpty, null); }
+  public string Ask(Color color, string prompt, bool allowEmpty) { return Ask(color, prompt, allowEmpty, null); }
   public string Ask(string prompt, bool allowEmpty, string rebuke)
   { return Ask(Color.Normal, prompt, allowEmpty, rebuke);
   }
   public abstract string Ask(Color color, string prompt, bool allowEmpty, string rebuke);
-
-  public abstract int ConversationChoice(Entity talkingTo, string prompt, string[] options);
-  public abstract void EndConversation();
 
   public char CharChoice(string prompt, string chars)
   { return CharChoice(Color.Normal, prompt, chars, '\0', false, null);
@@ -92,47 +69,61 @@ public abstract class InputOutput
   }
   public abstract Direction ChooseDirection(string prompt, bool allowSelf, bool allowVertical);
 
-  public MenuItem[] ChooseItem(string prompt, Player player, MenuFlag flags, params ItemClass[] classes)
-  { return ChooseItem(prompt, player.Inv, flags, classes);
-  }
-  public abstract MenuItem[] ChooseItem(string prompt, IKeyedInventory items, MenuFlag flags,
-                                        params ItemClass[] classes);
-  public abstract Spell ChooseSpell(Player player);
-  public abstract Spell ChooseSpell(Player reader, Spellbook book);
-  public RangeTarget ChooseTarget(Player viewer, bool allowDir) { return ChooseTarget(viewer, null, allowDir); }
-  public abstract RangeTarget ChooseTarget(Player viewer, Spell spell, bool allowDir);
+  public abstract MenuItem[] ChooseItem(string prompt, IKeyedInventory items, MenuFlag flags, params ItemType[] types);
 
-  public void DisplayInventory(Entity entity) { DisplayInventory(entity, ItemClass.Any); }
-  public abstract void DisplayInventory(Entity entity, params ItemClass[] classes);
-  public abstract void DisplayKnowledge(Player entity);
+  public void DisplayInventory(IInventory inv) { DisplayInventory(inv, ItemType.Any); }
+  public abstract void DisplayInventory(IInventory inv, params ItemType[] types);
+
   public abstract void DisplayTileItems(IInventory items);
-  public abstract SD.Point DisplayMap(Player viewer);
-
-  public abstract void ExamineItem(Player viewer, Item item);
-  public abstract void ExamineTile(Player viewer, SD.Point pos);
-
+  public abstract void ExamineTile(Player viewer, Point pt);
   public abstract Input GetNextInput();
-
   public abstract void ManageSkills(Player player);
 
   public MenuItem[] Menu(IInventory items, MenuFlag flags)
-  { return Menu(items, flags, ItemClass.Any);
+  { return Menu(items, flags, ItemType.Any);
   }
-  public abstract MenuItem[] Menu(System.Collections.ICollection items, MenuFlag flags, params ItemClass[] classes);
+  public abstract MenuItem[] Menu(System.Collections.ICollection items, MenuFlag flags, params ItemType[] types);
   public abstract MenuItem[] Menu(MenuItem[] items, MenuFlag flags);
 
+  public void Print() { Print(Color.Normal, ""); }
   public void Print(string format, params object[] parms) { Print(Color.Normal, format, parms); }
-  public void Print(Color color, string format, params object[] parms) { Print(color, String.Format(format, parms)); }
+  public void Print(Color color, string format, params object[] parms) { Print(color, string.Format(format, parms)); }
   public void Print(string line) { Print(Color.Normal, line); }
-  public abstract void Print();
   public abstract void Print(Color color, string line);
 
-  public abstract void Render(Entity viewer);
+  public void Render(Player viewer) { Render(viewer, true); }
+  public abstract void Render(Player viewer, bool updateMap);
 
   public abstract void SetTitle(string title);
 
   public bool YesNo(string prompt, bool defaultYes) { return YesNo(Color.Normal, prompt, defaultYes); }
   public abstract bool YesNo(Color color, string prompt, bool defaultYes);
+
+  public bool YN(string prompt, bool defaultYes) { return YN(Color.Normal, prompt, defaultYes); }
+  public abstract bool YN(Color color, string prompt, bool defaultYes);
 }
+#endregion
+
+#region MenuItem
+public struct MenuItem
+{ public MenuItem(Item item) { Item=item; Text=null; Count=0; Char = item==null ? '\0' : item.Char; }
+  public MenuItem(Item item, int count) { Item=item; Text=null; Count=count; Char = item==null ? '\0' : item.Char; }
+  public MenuItem(string text, char c) { Item=null; Text=text; Count=0; Char=c; }
+  public Item Item;
+  public string Text;
+  public int  Count;
+  public char Char;
+}
+#endregion
+
+#region RangeTarget
+public struct RangeTarget
+{ public RangeTarget(Direction dir) { Point=new Point(-1, -1); Dir=dir; }
+  public RangeTarget(Point pt) { Point=pt; Dir=Direction.Invalid; }
+  public RangeTarget(Point pt, Direction dir) { Point=pt; Dir=dir; }
+  public Point Point; // X,Y == -1,-1 for an invalid point (no selection)
+  public Direction Dir;
+}
+#endregion
 
 } // namespace Chrono

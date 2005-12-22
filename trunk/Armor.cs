@@ -6,29 +6,21 @@ namespace Chrono
 
 #region Armor
 public abstract class Armor : Wearable
-{ public Armor() { Class=ItemClass.Armor; }
-  
-  public override string GetFullName(bool forceSingular)
-  { if(!Identified) return base.GetFullName(forceSingular);
-    string status = StatusString;
-    if(status!="") status += ' ';
-    string ret = status + (AC<baseAC ? "" : "+") + (AC-baseAC) + ' ' + Name;
-    if(Title!=null) ret += " named "+Title;
-    return ret;
+{ protected Armor() { Type=ItemType.Armor; ShowEnchantment=true; }
+
+  public override float Modify(Item item, Attr attr, float value)
+  { if(attr==Attr.AC) return value + Math.Max(0, AC-item.Damage) + item.Enchantment;
+    else if(attr==Attr.EV) return value + EV;
+    else return value;
   }
 
-  protected int baseAC;
+  public int AC, EV;
 }
 #endregion
 
 #region XmlArmor
 public sealed class XmlArmor : Armor
-{ public XmlArmor() { }
-
-  public XmlArmor(XmlNode node)
-  { XmlItem.InitModifying(this, node);
-    Slot = XmlItem.GetSlot(node);
-  }
+{ public XmlArmor(XmlNode node) { ItemClass.InitWearable(this, node); }
 }
 #endregion
 

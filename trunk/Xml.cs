@@ -8,11 +8,16 @@ namespace Chrono
 public class Xml
 { Xml() { }
 
-  public static string Attr(XmlNode node, string attr)
-  { if(node==null) return null;
-    XmlAttribute an = node.Attributes[attr];
-    return an==null ? null : an.Value;
-  }
+  public static Ability Abilities(XmlAttribute node) { return node==null ? Ability.None : Abilities(node.Value); }
+  public static Ability Abilities(string list) { return (Ability)FlagList(typeof(Ability), list); }
+  
+  public static Ailment Ailments(XmlAttribute node) { return node==null ? Ailment.None : Ailments(node.Value); }
+  public static Ailment Ailments(string list) { return (Ailment)FlagList(typeof(Ailment), list); }
+
+  public static AIFlag AIFlags(XmlAttribute node) { return node==null ? AIFlag.None : AIFlags(node.Value); }
+  public static AIFlag AIFlags(string list) { return (AIFlag)FlagList(typeof(AIFlag), list); }
+
+  public static string Attr(XmlNode node, string attr) { return Attr(node, attr, null); }
   public static string Attr(XmlNode node, string attr, string defaultValue)
   { if(node==null) return defaultValue;
     XmlAttribute an = node.Attributes[attr];
@@ -84,15 +89,17 @@ public class Xml
     return sb.ToString();
   }
 
+  public static Color Color(XmlNode node, string attrName) { return Color(node.Attributes[attrName]); }
   public static Color Color(XmlAttribute attr) { return Color(attr.Value); }
   public static Color Color(string color) { return (Color)Enum.Parse(typeof(Color), color); }
 
-  public static EntityClass EntityClass(XmlNode node, string attr) { return EntityClass(node.Attributes[attr].Value); }
-  public static EntityClass EntityClass(XmlAttribute attr) { return EntityClass(attr.Value); }
-  public static EntityClass EntityClass(string entClass)
-  { if(entClass=="Melee") return Chrono.EntityClass.Fighter;
-    else if(entClass=="Magic") return Chrono.EntityClass.Wizard;
-    else return (EntityClass)Enum.Parse(typeof(EntityClass), entClass);
+  public static EntitySize EntitySize(XmlAttribute attr) { return EntitySize(attr.Value); }
+  public static EntitySize EntitySize(string str) { return (EntitySize)Enum.Parse(typeof(EntitySize), str); }
+
+  public static uint FlagList(Type enumType, string list)
+  { uint flags = 0;
+    if(!IsEmpty(list)) foreach(string str in List(list)) flags |= Convert.ToUInt32(Enum.Parse(enumType, str));
+    return flags;
   }
 
   public static float Float(XmlAttribute attr) { return Float(attr, 0); }
@@ -105,10 +112,7 @@ public class Xml
   }
 
   public static Gender Gender(XmlAttribute attr) { return Gender(attr.Value); }
-  public static Gender Gender(string gender)
-  { return gender=="Either" ? Global.Coinflip() ? Chrono.Gender.Male : Chrono.Gender.Female :
-                            (Gender)Enum.Parse(typeof(Gender), gender);
-  }
+  public static Gender Gender(string gender) { return (Gender)Enum.Parse(typeof(Gender), gender); }
 
   public static int Int(XmlAttribute attr) { return Int(attr, 0); }
   public static int Int(XmlAttribute attr, int defaultValue)
@@ -118,6 +122,9 @@ public class Xml
   public static int Int(XmlNode node, string attr, int defaultValue)
   { return Int(node.Attributes[attr], defaultValue);
   }
+
+  public static Intrinsic Intrinsics(XmlAttribute node) { return node==null ? Intrinsic.None : Intrinsics(node.Value); }
+  public static Intrinsic Intrinsics(string list) { return (Intrinsic)FlagList(typeof(Intrinsic), list); }
 
   public static bool IsEmpty(XmlAttribute attr) { return attr==null || IsEmpty(attr.Value); }
   public static bool IsEmpty(string str) { return str==null || str==""; }
@@ -131,11 +138,8 @@ public class Xml
   public static string[] List(XmlAttribute attr) { return IsEmpty(attr) ? new string[0] : split.Split(attr.Value); }
   public static string[] List(string data) { return IsEmpty(data) ? new string[0] : split.Split(data); }
 
-  public static Race Race(XmlNode node, string attr) { return Race(node.Attributes[attr].Value); }
   public static Race Race(XmlAttribute attr) { return Race(attr.Value); }
-  public static Race Race(string race)
-  { return race=="Player" ? App.Player.Race : (Race)Enum.Parse(typeof(Race), race);
-  }
+  public static Race Race(string str) { return (Race)Enum.Parse(typeof(Race), str); }
 
   public static int RangeInt(string range) { return RangeInt(range, 0); }
   public static int RangeInt(string range, int defaultValue)
@@ -156,9 +160,21 @@ public class Xml
   public static string String(XmlAttribute str, string defaultValue) { return str==null ? defaultValue : str.Value; }
   public static string String(XmlNode node, string attr) { return String(node.Attributes[attr]); }
   
-  static Regex ltbl  = new Regex(@"^(?:\s*\n)+|\s+$", RegexOptions.Singleline);
-  static Regex lspc  = new Regex(@"^\s+", RegexOptions.Singleline);
-  static Regex split = new Regex(@"\s+", RegexOptions.Singleline);
+  public static int Weight(XmlNode node, string attr) { return Weight(node.Attributes[attr]); }
+  public static int Weight(XmlAttribute attr) { return attr==null ? 0 : Weight(attr.Value); }
+  public static int Weight(string str)
+  { if(IsEmpty(str)) return 0;
+    Match m = weight.Match(str);
+    if(!m.Success) throw new ArgumentException("'"+str+"' is not a valid weight");
+    double d = double.Parse(m.Groups[1].Value);
+    if(m.Groups[1].Value=="kg") d *= 1000;
+    return (int)Math.Round(d);
+  }
+
+  static Regex ltbl   = new Regex(@"^(?:\s*\n)+|\s+$", RegexOptions.Singleline);
+  static Regex lspc   = new Regex(@"^\s+", RegexOptions.Singleline);
+  static Regex split  = new Regex(@"\s+", RegexOptions.Singleline);
+  static Regex weight = new Regex(@"(\d+(?:\.\d+)?|\.\d+)(g|kg)", RegexOptions.Singleline);
 }
 
 } // namespace Chrono

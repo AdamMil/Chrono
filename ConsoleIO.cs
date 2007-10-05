@@ -1,6 +1,6 @@
 using System;
 using System.Collections;
-using GameLib.Collections;
+using System.Collections.Generic;
 using Point=System.Drawing.Point;
 using Rectangle=System.Drawing.Rectangle;
 
@@ -484,7 +484,7 @@ public sealed class ConsoleIO : InputOutput
   { if(unviewed!=-1) unviewed += LineHeight(line); // if we're not skipping, add to the number of unviewed lines
 
     if(!TextInput && unviewed>=LineSpace-1) // if we're not reading text and we have more lines that can fit at once...
-    { lines.Append(new Line(Color.Normal, "--more--"));
+    { lines.AddLast(new Line(Color.Normal, "--more--"));
       DrawLines();
       MoveCursorToEOBL();
       while(true)
@@ -495,8 +495,8 @@ public sealed class ConsoleIO : InputOutput
       MoveCursorToPlayer();
     }
 
-    lines.Append(new Line(color, line));
-    while(lines.Count>maxLines) lines.Remove(lines.Head); // if the scrollback buffer is overfilled, cut it down to size
+    lines.AddLast(new Line(color, line));
+    while(lines.Count>maxLines) lines.Remove(lines.First); // if the scrollback buffer is overfilled, cut it down to size
     if(redrawNow) DrawLines();
   }
 
@@ -511,15 +511,15 @@ public sealed class ConsoleIO : InputOutput
   }
 
   void AppendToBL(string s)
-  { Line line = (Line)lines.Tail.Data;
+  { Line line = lines.Last.Value;
     line.Text += s;
-    lines.Tail.Data = line;
+    lines.Last.Value = line;
   }
 
   void BLBackspace()
-  { Line line = (Line)lines.Tail.Data;
+  { Line line = lines.Last.Value;
     if(line.Text.Length!=0) line.Text = line.Text.Substring(0, line.Text.Length-1);
-    lines.Tail.Data = line;
+    lines.Last.Value = line;
   }
 
   // convert movement characters into the Direction enum
@@ -675,8 +675,8 @@ Ctrl-P - see old messages";
   void DisplayMessages(bool fromTop)
   { int width=MapWidth, height=console.Height, ls, lss;
     ArrayList list = new ArrayList();
-    for(LinkedList.Node node=lines.Head; node!=null; node=node.Next)
-    { Line line = (Line)node.Data;
+    for(LinkedListNode<Line> node=lines.First; node!=null; node=node.Next)
+    { Line line = (Line)node.Value;
       if(line.Text=="--more--") continue;
       int lh = WordWrap(line.Text, width);
       for(int i=0; i<lh; i++) list.Add(new Line(line.Color, wrapped[i]));
@@ -735,9 +735,9 @@ Ctrl-P - see old messages";
   { int maxlines=LineSpace, li=maxlines-1;
 
     Line[] arr = new Line[maxlines]; // allocate enough lines to cover the maximum available text space
-    { LinkedList.Node node = lines.Tail; // traverse through the list, wordwrapping each entry and filling the array
+    { LinkedListNode<Line> node = lines.Last; // traverse through the list, wordwrapping each entry and filling the array
       while(li>=0 && node!=null)
-      { Line line = (Line)node.Data;
+      { Line line = node.Value;
         int height = WordWrap(line.Text);
         while(height-->0 && li>=0) arr[li--] = new Line(line.Color, wrapped[height]);
         node = node.Previous;
@@ -981,7 +981,7 @@ Ctrl-P - see old messages";
   }
 
   NTConsole console = new NTConsole();
-  LinkedList lines = new LinkedList();
+  LinkedList<Line> lines = new LinkedList<Line>();
   string[] wrapped = new string[4];
   NTConsole.CharInfo[] buf;
   bool[] vis;

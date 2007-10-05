@@ -1,8 +1,9 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Xml;
-using GameLib.Collections;
+using AdamMil.Collections;
 using Point=System.Drawing.Point;
 using Rectangle=System.Drawing.Rectangle;
 using Size=System.Drawing.Size;
@@ -742,7 +743,7 @@ public struct PathNode
 }
 
 public sealed class PathFinder
-{ public PathFinder() { queue = new PriorityQueue(new NodeComparer(this)); }
+{ public PathFinder() { queue = new PriorityQueue<Point>(new NodeComparer(this)); }
 
   public const int BadPathCost = 1000;
 
@@ -761,7 +762,7 @@ public sealed class PathFinder
 
     byte maxlen = (byte)Math.Min(Math.Max(map.Width, map.Height)*2, 255);
     while(queue.Count>0)
-    { Point nodePt = (Point)queue.Dequeue();
+    { Point nodePt = queue.Dequeue();
       if(nodePt==start) { queue.Clear(); return true; } // work backwards
       PathNode node = nodes[nodePt.Y, nodePt.X];
       if(node.Length==maxlen) break;
@@ -808,12 +809,11 @@ public sealed class PathFinder
     return cost;
   }
 
-  sealed class NodeComparer : IComparer
+  sealed class NodeComparer : IComparer<Point>
   { public NodeComparer(PathFinder pf) { this.pf=pf; }
 
-    public int Compare(object x, object y)
-    { Point a=(Point)x, b=(Point)y;
-
+    public int Compare(Point a, Point b)
+    { 
       int n = pf.nodes[a.Y, a.X].Cost - pf.nodes[b.Y, b.X].Cost;
       if(n==0)
       { n = a.X - b.X;
@@ -826,7 +826,7 @@ public sealed class PathFinder
     PathFinder pf;
   }
 
-  PriorityQueue queue;
+  PriorityQueue<Point> queue;
   Map map;
   PathNode[,] nodes;
 }

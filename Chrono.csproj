@@ -1,342 +1,238 @@
-<VisualStudioProject>
-    <CSHARP
-        ProjectType = "Local"
-        ProductVersion = "7.10.3077"
-        SchemaVersion = "2.0"
-        ProjectGuid = "{E7D3B356-EC69-4620-B74A-C5AC0518D5B9}"
-    >
-        <Build>
-            <Settings
-                ApplicationIcon = ""
-                AssemblyKeyContainerName = ""
-                AssemblyName = "Chrono"
-                AssemblyOriginatorKeyFile = ""
-                DefaultClientScript = "JScript"
-                DefaultHTMLPageLayout = "Grid"
-                DefaultTargetSchema = "IE50"
-                DelaySign = "false"
-                OutputType = "Exe"
-                PreBuildEvent = ""
-                PostBuildEvent = ""
-                RootNamespace = "Chrono"
-                RunPostBuildEvent = "OnBuildSuccess"
-                StartupObject = ""
-            >
-                <Config
-                    Name = "Debug"
-                    AllowUnsafeBlocks = "true"
-                    BaseAddress = "285212672"
-                    CheckForOverflowUnderflow = "false"
-                    ConfigurationOverrideFile = ""
-                    DefineConstants = "DEBUG;TRACE"
-                    DocumentationFile = ""
-                    DebugSymbols = "true"
-                    FileAlignment = "4096"
-                    IncrementalBuild = "false"
-                    NoStdLib = "false"
-                    NoWarn = ""
-                    Optimize = "false"
-                    OutputPath = "bin\Debug\"
-                    RegisterForComInterop = "false"
-                    RemoveIntegerChecks = "false"
-                    TreatWarningsAsErrors = "false"
-                    WarningLevel = "4"
-                />
-                <Config
-                    Name = "Release"
-                    AllowUnsafeBlocks = "true"
-                    BaseAddress = "285212672"
-                    CheckForOverflowUnderflow = "false"
-                    ConfigurationOverrideFile = ""
-                    DefineConstants = "TRACE"
-                    DocumentationFile = ""
-                    DebugSymbols = "false"
-                    FileAlignment = "4096"
-                    IncrementalBuild = "false"
-                    NoStdLib = "false"
-                    NoWarn = ""
-                    Optimize = "true"
-                    OutputPath = "bin\Release\"
-                    RegisterForComInterop = "false"
-                    RemoveIntegerChecks = "false"
-                    TreatWarningsAsErrors = "false"
-                    WarningLevel = "4"
-                />
-            </Settings>
-            <References>
-                <Reference
-                    Name = "System"
-                    AssemblyName = "System"
-                    HintPath = "C:\WINDOWS\Microsoft.NET\Framework\v1.1.4322\System.dll"
-                />
-                <Reference
-                    Name = "System.XML"
-                    AssemblyName = "System.Xml"
-                    HintPath = "C:\WINDOWS\Microsoft.NET\Framework\v1.1.4322\System.XML.dll"
-                />
-                <Reference
-                    Name = "System.Drawing"
-                    AssemblyName = "System.Drawing"
-                    HintPath = "C:\WINDOWS\Microsoft.NET\Framework\v1.1.4322\System.Drawing.dll"
-                />
-                <Reference
-                    Name = "GameLib"
-                    AssemblyName = "GameLib"
-                    HintPath = "..\GameLib\bin\Debug\GameLib.dll"
-                />
-            </References>
-        </Build>
-        <Files>
-            <Include>
-                <File
-                    RelPath = "Amulets.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "Armor.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "AssemblyInfo.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "ConsoleIO.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "Dungeon.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "Entity.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "Food.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "InputOutput.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "Inventory.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "Item.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "Main.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "Map.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "MapGenerator.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "Misc.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "Monsters.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "NTConsole.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "Player.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "Potions.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "Rings.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "Scrolls.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "Shields.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "Shopkeeper.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "Spellbooks.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "Spells.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "Tools.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "Treasure.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "Wands.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "Weapons.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "Xml.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "data\common.xsd"
-                    BuildAction = "Content"
-                />
-                <File
-                    RelPath = "data\common.xsx"
-                    DependentUpon = "common.xsd"
-                    BuildAction = "None"
-                />
-                <File
-                    RelPath = "data\entities.xml"
-                    BuildAction = "Content"
-                />
-                <File
-                    RelPath = "data\entities.xsd"
-                    BuildAction = "Content"
-                />
-                <File
-                    RelPath = "data\entities.xsx"
-                    DependentUpon = "entities.xsd"
-                    BuildAction = "None"
-                />
-                <File
-                    RelPath = "data\items.xml"
-                    BuildAction = "Content"
-                />
-                <File
-                    RelPath = "data\items.xsd"
-                    BuildAction = "Content"
-                />
-                <File
-                    RelPath = "data\shops.xml"
-                    BuildAction = "Content"
-                />
-                <File
-                    RelPath = "data\shops.xsd"
-                    BuildAction = "Content"
-                />
-                <File
-                    RelPath = "data\ai\ai.xsd"
-                    BuildAction = "Content"
-                />
-                <File
-                    RelPath = "data\ai\fatherOfPC.xml"
-                    BuildAction = "Content"
-                />
-                <File
-                    RelPath = "data\ai\fathersBrother.xml"
-                    BuildAction = "Content"
-                />
-                <File
-                    RelPath = "data\ai\quips.xml"
-                    BuildAction = "Content"
-                />
-                <File
-                    RelPath = "data\ai\quips.xsd"
-                    BuildAction = "Content"
-                />
-                <File
-                    RelPath = "data\ai\socialGroups.xml"
-                    BuildAction = "Content"
-                />
-                <File
-                    RelPath = "data\ai\socialGroups.xsd"
-                    BuildAction = "Content"
-                />
-                <File
-                    RelPath = "data\dungeon\dungeon.xsd"
-                    BuildAction = "Content"
-                />
-                <File
-                    RelPath = "data\dungeon\overworld.xml"
-                    BuildAction = "Content"
-                />
-                <File
-                    RelPath = "data\map\gtown.xml"
-                    BuildAction = "Content"
-                />
-                <File
-                    RelPath = "data\map\gtownDungeonBottom.xml"
-                    BuildAction = "Content"
-                />
-                <File
-                    RelPath = "data\map\gtownDungeonCave.xml"
-                    BuildAction = "Content"
-                />
-                <File
-                    RelPath = "data\map\gtownDungeonRoomy.xml"
-                    BuildAction = "Content"
-                />
-                <File
-                    RelPath = "data\map\map.xsd"
-                    BuildAction = "Content"
-                />
-                <File
-                    RelPath = "data\map\MapFormat.txt"
-                    BuildAction = "Content"
-                />
-                <File
-                    RelPath = "data\map\overworld.xml"
-                    BuildAction = "Content"
-                />
-            </Include>
-        </Files>
-    </CSHARP>
-</VisualStudioProject>
-
+﻿<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <ProjectType>Local</ProjectType>
+    <ProductVersion>8.0.50727</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{E7D3B356-EC69-4620-B74A-C5AC0518D5B9}</ProjectGuid>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ApplicationIcon>
+    </ApplicationIcon>
+    <AssemblyKeyContainerName>
+    </AssemblyKeyContainerName>
+    <AssemblyName>Chrono</AssemblyName>
+    <AssemblyOriginatorKeyFile>
+    </AssemblyOriginatorKeyFile>
+    <DefaultClientScript>JScript</DefaultClientScript>
+    <DefaultHTMLPageLayout>Grid</DefaultHTMLPageLayout>
+    <DefaultTargetSchema>IE50</DefaultTargetSchema>
+    <DelaySign>false</DelaySign>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Chrono</RootNamespace>
+    <RunPostBuildEvent>OnBuildSuccess</RunPostBuildEvent>
+    <StartupObject>
+    </StartupObject>
+    <FileUpgradeFlags>
+    </FileUpgradeFlags>
+    <UpgradeBackupLocation>
+    </UpgradeBackupLocation>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <OutputPath>bin\Debug\</OutputPath>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <BaseAddress>285212672</BaseAddress>
+    <CheckForOverflowUnderflow>false</CheckForOverflowUnderflow>
+    <ConfigurationOverrideFile>
+    </ConfigurationOverrideFile>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DocumentationFile>
+    </DocumentationFile>
+    <DebugSymbols>true</DebugSymbols>
+    <FileAlignment>4096</FileAlignment>
+    <NoStdLib>false</NoStdLib>
+    <NoWarn>
+    </NoWarn>
+    <Optimize>false</Optimize>
+    <RegisterForComInterop>false</RegisterForComInterop>
+    <RemoveIntegerChecks>false</RemoveIntegerChecks>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <WarningLevel>4</WarningLevel>
+    <DebugType>full</DebugType>
+    <ErrorReport>prompt</ErrorReport>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <OutputPath>bin\Release\</OutputPath>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <BaseAddress>285212672</BaseAddress>
+    <CheckForOverflowUnderflow>false</CheckForOverflowUnderflow>
+    <ConfigurationOverrideFile>
+    </ConfigurationOverrideFile>
+    <DefineConstants>TRACE</DefineConstants>
+    <DocumentationFile>
+    </DocumentationFile>
+    <DebugSymbols>false</DebugSymbols>
+    <FileAlignment>4096</FileAlignment>
+    <NoStdLib>false</NoStdLib>
+    <NoWarn>
+    </NoWarn>
+    <Optimize>true</Optimize>
+    <RegisterForComInterop>false</RegisterForComInterop>
+    <RemoveIntegerChecks>false</RemoveIntegerChecks>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <WarningLevel>4</WarningLevel>
+    <DebugType>none</DebugType>
+    <ErrorReport>prompt</ErrorReport>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System">
+      <Name>System</Name>
+    </Reference>
+    <Reference Include="System.Drawing">
+      <Name>System.Drawing</Name>
+    </Reference>
+    <Reference Include="System.Xml">
+      <Name>System.XML</Name>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Amulets.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Armor.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="AssemblyInfo.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="ConsoleIO.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Dungeon.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Entity.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Food.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="InputOutput.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Inventory.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Item.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Main.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Map.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="MapGenerator.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Misc.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Monsters.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="NTConsole.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Player.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Potions.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Rings.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Scrolls.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Shields.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Shopkeeper.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Spellbooks.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Spells.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Tools.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Treasure.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Wands.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Weapons.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Xml.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Content Include="data\ai\ai.xsd">
+      <SubType>Designer</SubType>
+    </Content>
+    <Content Include="data\ai\fatherOfPC.xml" />
+    <Content Include="data\ai\fathersBrother.xml" />
+    <Content Include="data\ai\quips.xml" />
+    <Content Include="data\ai\quips.xsd">
+      <SubType>Designer</SubType>
+    </Content>
+    <Content Include="data\ai\socialGroups.xml" />
+    <Content Include="data\ai\socialGroups.xsd">
+      <SubType>Designer</SubType>
+    </Content>
+    <Content Include="data\common.xsd">
+      <SubType>Designer</SubType>
+    </Content>
+    <Content Include="data\dungeon\dungeon.xsd">
+      <SubType>Designer</SubType>
+    </Content>
+    <Content Include="data\dungeon\overworld.xml" />
+    <Content Include="data\entities.xml" />
+    <Content Include="data\entities.xsd">
+      <SubType>Designer</SubType>
+    </Content>
+    <Content Include="data\items.xml" />
+    <Content Include="data\items.xsd">
+      <SubType>Designer</SubType>
+    </Content>
+    <Content Include="data\map\gtown.xml" />
+    <Content Include="data\map\gtownDungeonBottom.xml" />
+    <Content Include="data\map\gtownDungeonCave.xml" />
+    <Content Include="data\map\gtownDungeonRoomy.xml" />
+    <Content Include="data\map\map.xsd">
+      <SubType>Designer</SubType>
+    </Content>
+    <Content Include="data\map\MapFormat.txt" />
+    <Content Include="data\map\overworld.xml" />
+    <Content Include="data\shops.xml" />
+    <Content Include="data\shops.xsd" />
+    <None Include="data\common.xsx">
+      <DependentUpon>common.xsd</DependentUpon>
+    </None>
+    <None Include="data\entities.xsx">
+      <DependentUpon>entities.xsd</DependentUpon>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AdamMil.net\Collections\AdamMil.Collections.csproj">
+      <Project>{D9724C65-C54A-4671-BA0B-40B0B38464DD}</Project>
+      <Name>AdamMil.Collections</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\GameLib\Base\GameLib.Base.csproj">
+      <Project>{711792B7-5B4A-4BAC-9FAE-1476F4A4D5C3}</Project>
+      <Name>GameLib.Base</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PreBuildEvent>
+    </PreBuildEvent>
+    <PostBuildEvent>
+    </PostBuildEvent>
+  </PropertyGroup>
+</Project>

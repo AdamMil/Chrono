@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using Point=System.Drawing.Point;
 using Rectangle=System.Drawing.Rectangle;
@@ -8,8 +7,10 @@ namespace Chrono
 {
 
 public sealed class ConsoleIO : InputOutput
-{ public ConsoleIO()
-  { console.SetSize(80, 50);
+{
+  public ConsoleIO()
+  {
+    console.SetSize(80, 50);
     console.InputMode  = NTConsole.InputModes.None;
     console.OutputMode = NTConsole.OutputModes.Processed|NTConsole.OutputModes.WrapAtEOL;
     console.Fill();
@@ -17,21 +18,25 @@ public sealed class ConsoleIO : InputOutput
   }
 
   struct Line
-  { public Line(Color color, string text) { Color=color; Text=text; }
+  {
+    public Line(Color color, string text) { Color=color; Text=text; }
     public Color Color;
     public string Text;
   }
 
   public override string Ask(Color color, string prompt, bool allowEmpty, string rebuke)
-  { prompt += " ";
+  {
+    prompt += " ";
     TextInput = true;
     if(rebuke==null) rebuke = "Please enter something!";
     while(true)
-    { AddLine(color, prompt, true);
+    {
+      AddLine(color, prompt, true);
       MoveCursorToEOBL();
       string answer = console.ReadLine();
       if(answer!="" || allowEmpty)
-      { AppendToBL(answer);
+      {
+        AppendToBL(answer);
         TextInput = false;
         return answer;
       }
@@ -41,12 +46,14 @@ public sealed class ConsoleIO : InputOutput
 
   public override char CharChoice(Color color, string prompt, string chars, char defaultChar, bool caseInsensitive,
                                   string rebuke)
-  { prompt += (chars!=null ? " [" + chars + "] " : " ");
+  {
+    prompt += (chars!=null ? " [" + chars + "] " : " ");
     TextInput = true;
     if(caseInsensitive) chars = chars.ToLower();
     if(rebuke==null) rebuke = "Invalid selection!";
     while(true)
-    { AddLine(color, prompt, true);
+    {
+      AddLine(color, prompt, true);
       MoveCursorToEOBL();
 
       char c = ReadChar();
@@ -55,7 +62,8 @@ public sealed class ConsoleIO : InputOutput
 
       int index = chars==null ? -1 : chars.IndexOf(caseInsensitive ? char.ToLower(c) : c);
       if(chars==null || c==defaultChar || index!=-1)
-      { TextInput = false;
+      {
+        TextInput = false;
         return index==-1 ? c : chars[index];
       }
 
@@ -64,9 +72,11 @@ public sealed class ConsoleIO : InputOutput
   }
 
   public override Direction ChooseDirection(string prompt, bool allowSelf, bool allowVertical)
-  { if(prompt==null) prompt = "Choose a direction";
+  {
+    if(prompt==null) prompt = "Choose a direction";
     if(allowSelf || allowVertical)
-    { prompt += " [dir, ";
+    {
+      prompt += " [dir, ";
       if(allowSelf) prompt += '5';
       if(allowVertical) prompt += "<>";
       prompt += "]:";
@@ -78,13 +88,15 @@ public sealed class ConsoleIO : InputOutput
   }
 
   public override MenuItem[] ChooseItem(string prompt, IKeyedInventory items, MenuFlag flags, params ItemType[] types)
-  { bool any  = types.Length==(int)ItemType.NumTypes || Array.IndexOf(types, ItemType.Any) != -1;
+  {
+    bool any  = types.Length==(int)ItemType.NumTypes || Array.IndexOf(types, ItemType.Any) != -1;
     bool none = (flags&MenuFlag.AllowNothing) != 0;
     string chars = items.CharString(types);
     if(any && !none && chars.Length==0) return new MenuItem[0];
 
     if(chars.Length!=0 || !any) // if we have '?' or '*'
-    { prompt += " [";
+    {
+      prompt += " [";
       if(none) prompt += "-";
       prompt = prompt + chars + " or ";
       if(chars.Length!=0) { chars += "?"; prompt += "?"; } // if there are items, allow them to be selected with a menu
@@ -97,7 +109,8 @@ public sealed class ConsoleIO : InputOutput
 
     TextInput = true;
     while(true)
-    { int count = -1;
+    {
+      int count = -1;
 
       AddLine(prompt, true);
       MoveCursorToEOBL();
@@ -106,24 +119,30 @@ public sealed class ConsoleIO : InputOutput
       else if(IsPrintable(c)) Echo(c);
 
       if(char.IsDigit(c) && (flags&MenuFlag.AllowNum)!=0) // a count of items is specified
-      { count = c-'0';
+      {
+        count = c-'0';
         int printed = 1;
         while(true)
-        { c = ReadChar();
+        {
+          c = ReadChar();
           if(c=='\b')
-          { if(printed!=0) { Echo(c); printed--; count /= 10; }
+          {
+            if(printed!=0) { Echo(c); printed--; count /= 10; }
             else { count=-1; break; }
           }
           else if(char.IsDigit(c))
-          { int nc = c-'0' + count*10;
+          {
+            int nc = c-'0' + count*10;
             if(nc>count) // guard against overflow
-            { count=nc;
+            {
+              count=nc;
               Echo(c);
               printed++;
             }
           }
           else
-          { if(IsPrintable(c)) Echo(c);
+          {
+            if(IsPrintable(c)) Echo(c);
             break;
           }
         }
@@ -133,7 +152,8 @@ public sealed class ConsoleIO : InputOutput
 
       Item item = items[c];
       if(count!=-1 && (char.IsLetter(c) || c=='$') && count>item.Count)
-      { AddLine("You don't have that many!");
+      {
+        AddLine("You don't have that many!");
         continue;
       }
 
@@ -149,22 +169,27 @@ public sealed class ConsoleIO : InputOutput
   }
 
   public override void DisplayInventory(IInventory inv, params ItemType[] types)
-  { MenuItem[] menu = CreateMenu(inv, MenuFlag.None, types);
+  {
+    MenuItem[] menu = CreateMenu(inv, MenuFlag.None, types);
 
     int mtop=0, width=Math.Min(MapWidth, console.Width), height=console.Height, iheight=height-2;
     ClearScreen();
 
     while(true)
-    { redraw:
+    {
+      redraw:
       ItemType head = ItemType.Invalid;
       int top=mtop, y=0;
       for(; y<iheight && top<menu.Length; y++) // draw the menu items
-      { if(menu[top].Item.Type != head)
-        { head = menu[top].Item.Type;
+      {
+        if(menu[top].Item.Type != head)
+        {
+          head = menu[top].Item.Type;
           PutString(NTConsole.Attribute.White|NTConsole.Attribute.Underlined, 0, y, head.ToString());
         }
         else
-        { PutString(0, y, "{0} - {1}", menu[top].Char, menu[top].Item.GetInvName());
+        {
+          PutString(0, y, "{0} - {1}", menu[top].Char, menu[top].Item.GetInvName());
           top++;
         }
       }
@@ -172,19 +197,27 @@ public sealed class ConsoleIO : InputOutput
       PutString(0, y, top<menu.Length ? "--more--" : "--bottom--");
 
       while(true)
-      { char c = ReadChar();
+      {
+        char c = ReadChar();
         if(c=='\r' || c=='\n' || c==' ') rec.Key.VirtualKey = NTConsole.Key.Next;
         switch(rec.Key.VirtualKey)
-        { case NTConsole.Key.Prior: case NTConsole.Key.Up: case NTConsole.Key.Numpad8:
+        {
+          case NTConsole.Key.Prior:
+          case NTConsole.Key.Up:
+          case NTConsole.Key.Numpad8:
             if(mtop>0) // page up
-            { mtop -= Math.Min(iheight, mtop);
+            {
+              mtop -= Math.Min(iheight, mtop);
               console.Fill(0, 0, width, height); // clear the area we'll be using
               goto redraw;
             }
             break;
-          case NTConsole.Key.Next: case NTConsole.Key.Down: case NTConsole.Key.Numpad2:
+          case NTConsole.Key.Next:
+          case NTConsole.Key.Down:
+          case NTConsole.Key.Numpad2:
             if(top<menu.Length) // page down
-            { mtop += top-mtop;
+            {
+              mtop += top-mtop;
               console.Fill(0, 0, width, height); // clear the area we'll be using
               goto redraw;
             }
@@ -201,27 +234,45 @@ public sealed class ConsoleIO : InputOutput
   public override void ExamineTile(Player viewer, Point pt) { DescribeTile(viewer, pt, viewer.CanSee(pt)); }
 
   public override Input GetNextInput()
-  { while(true)
-    { Input inp = new Input();
+  {
+    while(true)
+    {
+      Input inp = new Input();
       int count = 1;
       ReadChar();
       char c = NormalizeDirChar();
-      
+
       if(c==0) continue;
       if(rec.Key.HasMod(NTConsole.Modifier.Ctrl))
         switch(c+64)
-        { case 'N': inp.Action = Action.NameItem; break;
+        {
+          case 'N': inp.Action = Action.NameItem; break;
           case 'P': DisplayMessages(false); break;
           case 'Q': inp.Action = Action.Quit; break;
           case 'X': inp.Action = Action.Save; break;
         }
       else
         switch(c)
-        { case 'b': case 'h': case 'j': case 'k': case 'l': case 'n': case 'u': case 'y':
+        {
+          case 'b':
+          case 'h':
+          case 'j':
+          case 'k':
+          case 'l':
+          case 'n':
+          case 'u':
+          case 'y':
             inp.Action = Action.Move;
             inp.Direction = CharToDirection(c);
             break;
-          case 'B': case 'H': case 'J': case 'K': case 'L': case 'N': case 'U': case 'Y':
+          case 'B':
+          case 'H':
+          case 'J':
+          case 'K':
+          case 'L':
+          case 'N':
+          case 'U':
+          case 'Y':
             inp.Action = Action.MoveToInteresting;
             inp.Direction = CharToDirection(c);
             break;
@@ -252,8 +303,8 @@ public sealed class ConsoleIO : InputOutput
           case '>': inp.Action = Action.GoDown; break;
           case '=': inp.Action = Action.Reassign; break;
           case ':': inp.Action = Action.ExamineTile; break;
-          case '\'':inp.Action = Action.SwapAB; break;
-          case '\\':inp.Action = Action.ShowKnowledge; break;
+          case '\'': inp.Action = Action.SwapAB; break;
+          case '\\': inp.Action = Action.ShowKnowledge; break;
           case '/':
             inp.Direction = CharToDirection(ReadChar());
             if(inp.Direction==Direction.Self) { count=100; inp.Action=Action.Rest; }
@@ -263,14 +314,16 @@ public sealed class ConsoleIO : InputOutput
         }
 
       if(inp.Action != Action.Invalid)
-      { inp.Count = count;
+      {
+        inp.Count = count;
         return inp;
       }
     }
   }
 
   public override void ManageSkills(Player player)
-  { ClearScreen();
+  {
+    ClearScreen();
     console.SetCursorPosition(0, 0);
     console.WriteLine("You have {0} points of unallocated experience.", player.ExpPool);
 
@@ -281,10 +334,12 @@ public sealed class ConsoleIO : InputOutput
     console.WriteLine(numSkills==0 ? "You are completely unskilled!" : "Select a skill to toggle training it.");
 
     while(true)
-    { char c = 'a';
+    {
+      char c = 'a';
       console.SetCursorPosition(0, 3);
       for(int i=0; i<numSkills; i++)
-      { bool enabled = player.Training(skills[i]);
+      {
+        bool enabled = player.Training(skills[i]);
         Write(enabled ? Color.Normal : Color.DarkGrey, "{0} {1} {2} Skill {3} ",
               c++, enabled ? '+' : '-', skills[i].ToString().PadRight(18), player.GetSkill(skills[i]));
         // TODO: not sure if i want this
@@ -301,12 +356,14 @@ public sealed class ConsoleIO : InputOutput
     RestoreScreen();
   }
 
-  public override MenuItem[] Menu(System.Collections.ICollection items, MenuFlag flags, params ItemType[] types)
-  { return Menu(CreateMenu(items, flags, types), flags);
+  public override MenuItem[] Menu(ICollection<Item> items, MenuFlag flags, params ItemType[] types)
+  {
+    return Menu(CreateMenu(items, flags, types), flags);
   }
 
   public override MenuItem[] Menu(MenuItem[] items, MenuFlag flags)
-  { MenuItem[] ret;
+  {
+    MenuItem[] ret;
 
     bool reletter = (flags&MenuFlag.Reletter)!=0, allownum=(flags&MenuFlag.AllowNum)!=0;
 
@@ -316,41 +373,50 @@ public sealed class ConsoleIO : InputOutput
       iheight = height-2, mtop = 0;
 
     while(true)
-    { redraw:
+    {
+      redraw:
       ClearScreen(); // clear the area we'll be using
       ItemType head = ItemType.Invalid;
-      
+
       int top=mtop, y=0;
       char c = 'a';
-      
+
       for(; y<iheight && top<items.Length; y++)
-      { if(items[top].Item!=null && items[top].Item.Type!=head) // if it's the start of a new category
-        { head = items[top].Item.Type;
+      {
+        if(items[top].Item!=null && items[top].Item.Type!=head) // if it's the start of a new category
+        {
+          head = items[top].Item.Type;
           PutString(NTConsole.Attribute.White|NTConsole.Attribute.Underlined, 0, y, head.ToString());
         }
         else // otherwise, draw an item within a category
-        { if(reletter) items[top].Char = c;
+        {
+          if(reletter) items[top].Char = c;
           DrawMenuItem(y, items[top++], flags);
           if(c++=='z') c = 'A';
         }
       }
 
       PutString(0, y, "Enter selection: ");
-      
+
       while(true) // key handling
-      { int count = -1;
+      {
+        int count = -1;
 
         c = ReadChar();
         if(allownum && char.IsDigit(c))
-        { count = c-'0';
+        {
+          count = c-'0';
           while(true)
-          { c = ReadChar();
+          {
+            c = ReadChar();
             if(char.IsDigit(c))
-            { int nc = c-'0' + count*10;
+            {
+              int nc = c-'0' + count*10;
               if(nc>count) count = nc; // guard against overflow
             }
             else if(c=='\b')
-            { if(count==0) { count=-1; break; }
+            {
+              if(count==0) { count=-1; break; }
               count /= 10;
             }
             else break;
@@ -358,16 +424,20 @@ public sealed class ConsoleIO : InputOutput
         }
 
         if(char.IsLetter(c)) // (possibly) (de-)selecting an item
-        { head = ItemType.Invalid;
-          for(int i=mtop,yo=0; i<top; yo++,i++)
-          { if(items[i].Item!=null && head!=items[i].Item.Type)
-            { head = items[i].Item.Type;
+        {
+          head = ItemType.Invalid;
+          for(int i=mtop, yo=0; i<top; yo++, i++)
+          {
+            if(items[i].Item!=null && head!=items[i].Item.Type)
+            {
+              head = items[i].Item.Type;
               yo++;
             }
             if(items[i].Char==c)
-            { items[i].Count = count!=-1 ? items[i].Item==null ? count : Math.Min(count, items[i].Item.Count)
-                                         : items[i].Item==null ? items[i].Count==0 ? 1 : 0
-                                                               : items[i].Count!=0 ? 0 : items[i].Item.Count;
+            {
+              items[i].Count = count!=-1 ? items[i].Item==null ? count : Math.Min(count, items[i].Item.Count)
+                                       : items[i].Item==null ? items[i].Count==0 ? 1 : 0
+                                                             : items[i].Count!=0 ? 0 : items[i].Item.Count;
               if((flags&MenuFlag.Multi)==0 && items[i].Count!=0) goto done;
               DrawMenuItem(yo, items[i], flags); // update the menu item
               console.SetCursorPosition(17, y);  // and then put the cursor back after "Enter selection: "
@@ -376,35 +446,48 @@ public sealed class ConsoleIO : InputOutput
           }
         }
         else // not selecting an item
-        { switch(c)
-          { case ',': // toggle all onscreen items
+        {
+          switch(c)
+          {
+            case ',': // toggle all onscreen items
               bool select = false; // by default, deselect everything
               for(int i=mtop; i<top; i++) // but if not all items are selected, then we'll select them all
                 if(items[i].Count!=(items[i].Item==null ? 1 : items[i].Item.Count)) { select = true; break; }
               for(int i=mtop; i<top; i++)
                 items[i].Count = select ? (items[i].Item==null ? 1 : items[i].Item.Count) : 0;
               goto redraw;
-            case '+': case '=': // select all onscreen items
+            case '+':
+            case '=': // select all onscreen items
               for(int i=mtop; i<top; i++) items[i].Count = items[i].Item==null ? 1 : items[i].Item.Count;
               goto redraw;
             case '-': // deselect all onscreen items
               for(int i=mtop; i<top; i++) items[i].Count = 0;
               goto redraw;
             case '<': rec.Key.VirtualKey = NTConsole.Key.Prior; break; // aliases for page up and page down
-            case '>': case ' ': case '\r': case '\n': rec.Key.VirtualKey = NTConsole.Key.Next; break;
+            case '>':
+            case ' ':
+            case '\r':
+            case '\n': rec.Key.VirtualKey = NTConsole.Key.Next; break;
           }
 
           switch(rec.Key.VirtualKey)
-          { case NTConsole.Key.Prior: case NTConsole.Key.Up: case NTConsole.Key.Numpad8: // page up
+          {
+            case NTConsole.Key.Prior:
+            case NTConsole.Key.Up:
+            case NTConsole.Key.Numpad8: // page up
               if(mtop!=0) // if we're not at the top already
-              { mtop -= Math.Min(iheight, mtop);
+              {
+                mtop -= Math.Min(iheight, mtop);
                 console.Fill(0, 0, width, height);
                 goto redraw;
               }
               break;
-            case NTConsole.Key.Next: case NTConsole.Key.Down: case NTConsole.Key.Numpad2: // page down
+            case NTConsole.Key.Next:
+            case NTConsole.Key.Down:
+            case NTConsole.Key.Numpad2: // page down
               if(top<items.Length) // if we're not at the bottom already, scroll down
-              { mtop += top-mtop;
+              {
+                mtop += top-mtop;
                 console.Fill(0, 0, width, height);
                 goto redraw;
               }
@@ -414,17 +497,18 @@ public sealed class ConsoleIO : InputOutput
         }
       }
     }
-    
+
     done:
     iheight = 0; // reuse this to count the number of selected items
     for(int i=0; i<items.Length; i++) if(items[i].Count!=0) iheight++;
     ret = new MenuItem[iheight];
-    for(int i=0,mi=0; i<items.Length; i++) // now add them to the return array
+    for(int i=0, mi=0; i<items.Length; i++) // now add them to the return array
       if(items[i].Count!=0)
-      { if(items[i].Item!=null) items[i].Char = items[i].Item.Char;
+      {
+        if(items[i].Item!=null) items[i].Char = items[i].Item.Char;
         ret[mi++] = items[i];
       }
-    
+
     doReturn:
     RestoreScreen();
     return ret;
@@ -433,7 +517,8 @@ public sealed class ConsoleIO : InputOutput
   public override void Print(Color color, string line) { AddLine(color, line, true); }
 
   public override void Render(Player viewer, bool updateMap)
-  { mapW = Math.Min(console.Width, MapWidth);
+  {
+    mapW = Math.Min(console.Width, MapWidth);
     mapH = Math.Min(console.Height, MapHeight);
     if(updateMap) RenderMap(viewer, viewer.Pos, viewer.VisibleTiles());
     DrawStats(viewer);
@@ -444,9 +529,11 @@ public sealed class ConsoleIO : InputOutput
   public override void SetTitle(string title) { console.Title = title; }
 
   public override bool YesNo(Color color, string prompt, bool defaultYes)
-  { prompt += " [yes/no]";
+  {
+    prompt += " [yes/no]";
     while(true)
-    { string str = Ask(color, prompt, true, "Please enter 'yes' or 'no'.");
+    {
+      string str = Ask(color, prompt, true, "Please enter 'yes' or 'no'.");
       if(str=="") { AppendToBL(defaultYes ? "yes" : "no"); return defaultYes; }
       str = str.ToLower();
       if(str=="yes") return true;
@@ -456,21 +543,24 @@ public sealed class ConsoleIO : InputOutput
   }
 
   public override bool YN(Color color, string prompt, bool defaultYes)
-  { char c = CharChoice(color, prompt, defaultYes ? "Yn" : "yN", defaultYes ? 'y' : 'n', true,
+  {
+    char c = CharChoice(color, prompt, defaultYes ? "Yn" : "yN", defaultYes ? 'y' : 'n', true,
                         "Please enter 'y' or 'n'.");
     return c==0 ? defaultYes : Char.ToLower(c)=='y';
   }
 
   int LineSpace { get { return console.Height-MapHeight-4; } } // the amount of space available for text history
-  int MapWidth  { get { return console.Width; } } // the width of the map
+  int MapWidth { get { return console.Width; } } // the width of the map
   int MapHeight { get { return Math.Max(console.Height-19, 36); } } // the height of the map
 
   bool TextInput // returns true if we're set up to read text
-  { get { return inputMode; }
+  {
+    get { return inputMode; }
     set
-    { if(value==inputMode) return;
+    {
+      if(value==inputMode) return;
       console.InputMode = value ? NTConsole.InputModes.LineBuffered|NTConsole.InputModes.Echo
-                                : NTConsole.InputModes.None;
+                              : NTConsole.InputModes.None;
       DrawLines();
       unviewed  = 0;
       inputMode = value;
@@ -481,14 +571,17 @@ public sealed class ConsoleIO : InputOutput
   void AddLine(string line, bool redrawNow) { AddLine(Color.Normal, line, redrawNow); }
   void AddLine(Color color, string line) { AddLine(color, line, false); }
   void AddLine(Color color, string line, bool redrawNow)
-  { if(unviewed!=-1) unviewed += LineHeight(line); // if we're not skipping, add to the number of unviewed lines
+  {
+    if(unviewed!=-1) unviewed += LineHeight(line); // if we're not skipping, add to the number of unviewed lines
 
     if(!TextInput && unviewed>=LineSpace-1) // if we're not reading text and we have more lines that can fit at once...
-    { lines.AddLast(new Line(Color.Normal, "--more--"));
+    {
+      lines.AddLast(new Line(Color.Normal, "--more--"));
       DrawLines();
       MoveCursorToEOBL();
       while(true)
-      { char c = ReadChar();
+      {
+        char c = ReadChar();
         if(c==' ' || c=='\r' || c=='\n') { unviewed=0; break; }
         if(rec.Key.VirtualKey==NTConsole.Key.Escape) { unviewed=-1; break; } // -1 means skip all pending lines
       }
@@ -502,8 +595,10 @@ public sealed class ConsoleIO : InputOutput
 
   // add a line to the 'wrapped' array, at the given index, expanding the array if necessary
   void AddWrapped(int index, string line)
-  { if(wrapped.Length<index)
-    { string[] narr = new string[wrapped.Length*2];
+  {
+    if(wrapped.Length<index)
+    {
+      string[] narr = new string[wrapped.Length*2];
       Array.Copy(wrapped, narr, index);
       wrapped = narr;
     }
@@ -511,13 +606,15 @@ public sealed class ConsoleIO : InputOutput
   }
 
   void AppendToBL(string s)
-  { Line line = lines.Last.Value;
+  {
+    Line line = lines.Last.Value;
     line.Text += s;
     lines.Last.Value = line;
   }
 
   void BLBackspace()
-  { Line line = lines.Last.Value;
+  {
+    Line line = lines.Last.Value;
     if(line.Text.Length!=0) line.Text = line.Text.Substring(0, line.Text.Length-1);
     lines.Last.Value = line;
   }
@@ -525,9 +622,11 @@ public sealed class ConsoleIO : InputOutput
   // convert movement characters into the Direction enum
   Direction CharToDirection(char c) { return CharToDirection(c, true, false); }
   Direction CharToDirection(char c, bool allowSelf, bool allowVertical)
-  { c = char.ToLower(NormalizeDirChar());
+  {
+    c = char.ToLower(NormalizeDirChar());
     switch(c)
-    { case 'b': return Direction.DownLeft;
+    {
+      case 'b': return Direction.DownLeft;
       case 'j': return Direction.Down;
       case 'n': return Direction.DownRight;
       case 'h': return Direction.Left;
@@ -543,14 +642,16 @@ public sealed class ConsoleIO : InputOutput
   }
 
   void ClearScreen()
-  { int width=Math.Min(MapWidth, console.Width), height=console.Height, mheight=MapHeight;
+  {
+    int width=Math.Min(MapWidth, console.Width), height=console.Height, mheight=MapHeight;
     console.Fill(0, 0, width, height); // clear map area
     console.Fill(0, mheight, console.Width, height-mheight); // clear message area
     console.Attributes = ColorToAttr(Color.Normal);
   }
 
-  MenuItem[] CreateMenu(ICollection items, MenuFlag flags, ItemType[] types)
-  { if(items.Count==0) throw new ArgumentException("No items in the collection.", "items");
+  MenuItem[] CreateMenu(ICollection<Item> items, MenuFlag flags, ItemType[] types)
+  {
+    if(items.Count==0) throw new ArgumentException("No items in the collection.", "items");
     if(types.Length==0) throw new ArgumentException("No types passed.", "types");
     if(items.Count>52 && (flags&MenuFlag.Reletter)==0)
       throw new NotSupportedException("Too many items in the collection.");
@@ -560,32 +661,36 @@ public sealed class ConsoleIO : InputOutput
     Array.Sort(itemarr, ItemComparer.ByTypeAndChar);
 
     MenuItem[] ret;
-    if(Array.IndexOf(types, ItemType.Any)!=-1) // if ItemType.Any was passed, add every item to the menu
-    { ret = new MenuItem[items.Count];
+    if(Array.IndexOf(types, ItemType.Any) != -1) // if ItemType.Any was passed, add every item to the menu
+    {
+      ret = new MenuItem[items.Count];
       for(int i=0; i<itemarr.Length; i++) ret[i] = new MenuItem(itemarr[i]);
     }
     else // otherwise, use only the item types that were passed
-    { Array.Sort(types); // sort the array of types
+    {
+      Array.Sort(types); // sort the array of types
 
-      ArrayList list = new ArrayList();
-      for(int i=0,j=0; i<types.Length; i++)
-      { ItemType type = types[i];
+      List<MenuItem> list = new List<MenuItem>();
+      for(int i=0, j=0; i<types.Length; i++)
+      {
+        ItemType type = types[i];
         while(j<itemarr.Length && itemarr[j].Type!=type) j++;
         for(; j<itemarr.Length && itemarr[j].Type==type; j++) list.Add(new MenuItem(itemarr[j]));
       }
-
-      ret = (MenuItem[])list.ToArray(typeof(MenuItem));
+      ret = list.ToArray();
     }
-    
+
     return ret;
   }
 
   void DescribeTile(Player viewer, Point pt, bool visible) { DescribeTile(viewer, pt, visible, true); }
   void DescribeTile(Player viewer, Point pt, bool visible, bool clearLines)
-  { if(clearLines) { lines.Clear(); unviewed=0; }
+  {
+    if(clearLines) { lines.Clear(); unviewed=0; }
 
     if(!visible)
-    { if(!viewer.Memory.GetFlag(pt, TileFlag.Seen)) { AddLine("You can't see that position.", true); return; }
+    {
+      if(!viewer.Memory.GetFlag(pt, TileFlag.Seen)) { AddLine("You can't see that position.", true); return; }
       AddLine("You can't see that position, but here's what you remember:");
     }
 
@@ -594,7 +699,8 @@ public sealed class ConsoleIO : InputOutput
     AddLine(map[pt].Type.ToString()+'.');
     Entity e = map.GetEntity(pt);
     if(e!=null)
-    { string prefix = e==viewer ? "You are" : "{0} is";
+    {
+      string prefix = e==viewer ? "You are" : "{0} is";
       AddLine(string.Format(prefix+" here.", e.AName));
 
       /* TODO: finish this Weapon w = e.Weapon;
@@ -602,7 +708,8 @@ public sealed class ConsoleIO : InputOutput
       */
 
       if(e!=viewer)
-      { string name = e.Name==null ? "It" : e.Name;
+      {
+        string name = e.Name==null ? "It" : e.Name;
         int healthpct = e.HP*100/e.MaxHP;
         if(healthpct>=90) AddLine(name+" looks healthy.");
         else if(healthpct>=75) AddLine(name+" looks slightly wounded.");
@@ -631,7 +738,8 @@ public sealed class ConsoleIO : InputOutput
   }
 
   void DisplayHelp()
-  { ClearScreen();
+  {
+    ClearScreen();
     string helptext =
 @"                                  Chrono Help
 a - use/apply item
@@ -673,11 +781,13 @@ Ctrl-P - see old messages";
   }
 
   void DisplayMessages(bool fromTop)
-  { int width=MapWidth, height=console.Height, ls, lss;
-    ArrayList list = new ArrayList();
+  {
+    int width=MapWidth, height=console.Height, ls, lss;
+    List<Line> list = new List<Line>();
     for(LinkedListNode<Line> node=lines.First; node!=null; node=node.Next)
-    { Line line = (Line)node.Value;
-      if(line.Text=="--more--") continue;
+    {
+      Line line = (Line)node.Value;
+      if(line.Text == "--more--") continue;
       int lh = WordWrap(line.Text, width);
       for(int i=0; i<lh; i++) list.Add(new Line(line.Color, wrapped[i]));
     }
@@ -686,9 +796,10 @@ Ctrl-P - see old messages";
 
     ClearScreen();
     while(true)
-    { for(int y=0,i=ls; i<list.Count && y<height; y++,i++)
-      { Line line = (Line)list[i];
-        PutString(line.Color, width, 0, y, line.Text);
+    {
+      for(int y=0, i=ls; i<list.Count && y<height; y++, i++)
+      {
+        PutString(list[i].Color, width, 0, y, list[i].Text);
       }
 
       nextChar: ReadChar();
@@ -696,35 +807,43 @@ Ctrl-P - see old messages";
       if(rec.Key.VirtualKey==NTConsole.Key.Prior) ls = Math.Max(0, ls-height*2/3);
       else if(rec.Key.VirtualKey==NTConsole.Key.Next) ls = Math.Min(lss, ls+height*2/3);
       else
+      {
         switch(char.ToLower(NormalizeDirChar()))
-        { case 'j': if(ls<lss) ls++; break;
-          case 'k': if(ls>0)   ls--; break;
+        {
+          case 'j': if(ls<lss) ls++; break;
+          case 'k': if(ls>0) ls--; break;
           case ' ': case '\r': case '\n': goto done;
           default: goto nextChar;
         }
+      }
     }
 
     done: RestoreScreen();
   }
 
   void DisplayTileItems(IInventory items, bool visible)
-  { if(items==null || items.Count==0) return;
+  {
+    if(items==null || items.Count==0) return;
     if(items.Count==1) AddLine((visible ? "You see here: " : "You saw here: ")+items[0].GetAName());
     else
-    { int needed=items.Count+1, avail=LineSpace-unviewed-2;
+    {
+      int needed=items.Count+1, avail=LineSpace-unviewed-2;
       if(needed>avail)
       { // TODO: perhaps allow this
         /*if(allowInventory) DisplayInventory(items);
-        else */if(avail<=2) AddLine("There are several items here.");
+        else */
+        if(avail<=2) AddLine("There are several items here.");
         else
-        { int toshow = avail-2;
+        {
+          int toshow = avail-2;
           AddLine(visible ? "You see here:" : "You saw here:");
           for(int i=0; i<toshow; i++) AddLine(items[i].GetAName());
           AddLine("There are more items as well.");
         }
       }
       else
-      { AddLine(visible ? "You see here:" : "You saw here");
+      {
+        AddLine(visible ? "You see here:" : "You saw here");
         needed--;
         for(int i=0; i<needed; i++) AddLine(items[i].GetAName());
       }
@@ -732,12 +851,15 @@ Ctrl-P - see old messages";
   }
 
   void DrawLines()
-  { int maxlines=LineSpace, li=maxlines-1;
+  {
+    int maxlines=LineSpace, li=maxlines-1;
 
     Line[] arr = new Line[maxlines]; // allocate enough lines to cover the maximum available text space
-    { LinkedListNode<Line> node = lines.Last; // traverse through the list, wordwrapping each entry and filling the array
+    {
+      LinkedListNode<Line> node = lines.Last; // traverse through the list, wordwrapping each entry and filling the array
       while(li>=0 && node!=null)
-      { Line line = node.Value;
+      {
+        Line line = node.Value;
         int height = WordWrap(line.Text);
         while(height-->0 && li>=0) arr[li--] = new Line(line.Color, wrapped[height]);
         node = node.Previous;
@@ -748,8 +870,9 @@ Ctrl-P - see old messages";
     console.Fill(0, blY, console.Width, maxlines); // clear the area into which we'll be writing
     console.SetCursorPosition(0, blY);
 
-    for(blY--,li++; li<arr.Length; li++) // write out the lines
-    { console.Attributes = ColorToAttr(arr[li].Color);
+    for(blY--, li++; li<arr.Length; li++) // write out the lines
+    {
+      console.Attributes = ColorToAttr(arr[li].Color);
       console.WriteLine(arr[li].Text);
       blX = arr[li].Text.Length; blY++; // update the coordinate of the end of the bottom line
     }
@@ -758,17 +881,19 @@ Ctrl-P - see old messages";
   }
 
   void DrawMenuItem(int y, MenuItem item, MenuFlag flags)
-  { PutString(0, y, "[{0}] {1} - {2}",
+  {
+    PutString(0, y, "[{0}] {1} - {2}",
               (flags&MenuFlag.AllowNum)==0 ?
-                item.Count==0 ? "-" : "+" :
-                item.Count==0 ? " - " :
-                item.Count==item.Item.Count ? " + " :
-                item.Count>999 ? "###" : item.Count.ToString("d3"),
+              item.Count==0 ? "-" : "+" :
+              item.Count==0 ? " - " :
+              item.Count==item.Item.Count ? " + " :
+              item.Count>999 ? "###" : item.Count.ToString("d3"),
               item.Char, item.Text!=null ? item.Text : item.Item.GetInvName());
   }
 
   void DrawStats(Player player)
-  { int x=0, y=MapHeight, width=console.Width-x;
+  {
+    int x=0, y=MapHeight, width=console.Width-x;
     console.SetCursorPosition(x, y);
     x += Write(Color.Normal, "{0} the {1}  St:{2} Dx:{3} In:{4} AC:{5} EV:{6} ",
                player.Name, player.Title, player.Str, player.Dex, player.Int, player.AC, player.EV);
@@ -780,7 +905,7 @@ Ctrl-P - see old messages";
     x += Write(Color.Normal, "Dlvl:{0} $:{1} ", player.Map.Index+1, player.Gold);
     int percent = player.MaxHP==0 ? 0 : player.HP*100/player.MaxHP;
     x += Write(percent<25 ? Color.Dire : percent<50 ? Color.Warning : percent<75 ? Color.Yellow :
-               percent<100 ? Color.Green : Color.Normal, "HP:{0}/{1} ", player.HP, player.MaxHP);
+             percent<100 ? Color.Green : Color.Normal, "HP:{0}/{1} ", player.HP, player.MaxHP);
     percent = player.MaxMP==0 ? 0 : player.MP*100/player.MaxMP;
     x += Write(percent<25 ? Color.Dire : percent<50 ? Color.Warning : Color.Normal, "MP:{0}/{1} ",
                player.MP, player.MaxMP);
@@ -792,9 +917,11 @@ Ctrl-P - see old messages";
     console.SetCursorPosition(x, y);
 
     switch(player.HungerLevel)
-    { case HungerLevel.Fainting: x += Write(Color.Dire, "Fainting "); break;
+    {
+      case HungerLevel.Fainting: x += Write(Color.Dire, "Fainting "); break;
       case HungerLevel.Hungry: x += Write(Color.Warning, "Hungry "); break;
-      case HungerLevel.Satiated: case HungerLevel.Stuffed: x += Write(Color.Normal, "Satiated "); break;
+      case HungerLevel.Satiated:
+      case HungerLevel.Stuffed: x += Write(Color.Normal, "Satiated "); break;
       case HungerLevel.Weak: x += Write(Color.Dire, "Weak "); break;
     }
 
@@ -802,7 +929,8 @@ Ctrl-P - see old messages";
     if(amount!=0) x += Write(amount>1 ? Color.Dire : Color.Warning, "Sick ");
 
     switch(player.CarryStress)
-    { case CarryStress.Burdened: x += Write(Color.Normal, "Burdened "); break;
+    {
+      case CarryStress.Burdened: x += Write(Color.Normal, "Burdened "); break;
       case CarryStress.Overloaded: x += Write(Color.Dire, "Overloaded "); break;
       case CarryStress.Overtaxed: x += Write(Color.Dire, "Overtaxed "); break;
       case CarryStress.Strained: x += Write(Color.Dire, "Strained "); break;
@@ -829,7 +957,8 @@ Ctrl-P - see old messages";
   }
 
   void Echo(char c)
-  { console.WriteChar(rec.Key.Char);
+  {
+    console.WriteChar(rec.Key.Char);
     if(c=='\b') BLBackspace();
     else AppendToBL(c.ToString());
   }
@@ -840,20 +969,23 @@ Ctrl-P - see old messages";
   void MoveCursorToPlayer() { console.SetCursorPosition(mapW/2, mapH/2); }
 
   char NormalizeDirChar() // convert keypad movement to character movement
-  { char c = rec.Key.Char;
+  {
+    char c = rec.Key.Char;
     if(rec.Key.VirtualKey>=NTConsole.Key.Numpad1 && rec.Key.VirtualKey<=NTConsole.Key.Numpad9)
-    { c = dirLets[(int)rec.Key.VirtualKey-(int)NTConsole.Key.Numpad1];
+    {
+      c = dirLets[(int)rec.Key.VirtualKey-(int)NTConsole.Key.Numpad1];
       if(rec.Key.HasMod(NTConsole.Modifier.Shift)) c = char.ToUpper(c);
     }
     else
       switch(rec.Key.VirtualKey)
-      { case NTConsole.Key.End:   c='B'; break;
-        case NTConsole.Key.Down:  c='J'; break;
-        case NTConsole.Key.Next:  c='N'; break;
-        case NTConsole.Key.Left:  c='H'; break;
+      {
+        case NTConsole.Key.End: c='B'; break;
+        case NTConsole.Key.Down: c='J'; break;
+        case NTConsole.Key.Next: c='N'; break;
+        case NTConsole.Key.Left: c='H'; break;
         case NTConsole.Key.Right: c='L'; break;
-        case NTConsole.Key.Home:  c='Y'; break;
-        case NTConsole.Key.Up:    c='K'; break;
+        case NTConsole.Key.Home: c='Y'; break;
+        case NTConsole.Key.Up: c='K'; break;
         case NTConsole.Key.Prior: c='U'; break;
         default: return c;
       }
@@ -864,45 +996,54 @@ Ctrl-P - see old messages";
   void PutString(Color color, int x, int y, string str) { PutString(ColorToAttr(color), x, y, str); }
   void PutString(int x, int y, string format, params object[] parms) { PutString(Color.Normal, x, y, format, parms); }
   void PutString(Color color, int x, int y, string format, params object[] parms)
-  { PutString(ColorToAttr(Color.Normal), x, y, string.Format(format, parms));
+  {
+    PutString(ColorToAttr(Color.Normal), x, y, string.Format(format, parms));
   }
   void PutString(NTConsole.Attribute attr, int x, int y, string format, params object[] parms)
-  { PutString(attr, x, y, string.Format(format, parms));
+  {
+    PutString(attr, x, y, string.Format(format, parms));
   }
   void PutString(NTConsole.Attribute attr, int x, int y, string str)
-  { console.SetCursorPosition(x, y);
+  {
+    console.SetCursorPosition(x, y);
     console.Attributes = attr;
     console.Write(str);
   }
 
   void PutString(int width, int x, int y, string str) { PutString(Color.Normal, width, x, y, str); }
   void PutString(int width, int x, int y, string format, params object[] parms)
-  { PutString(Color.Normal, width, x, y, string.Format(format, parms));
+  {
+    PutString(Color.Normal, width, x, y, string.Format(format, parms));
   }
   void PutString(Color color, int width, int x, int y, string str)
-  { if(str.Length>width) str = str.Substring(0, width);
+  {
+    if(str.Length>width) str = str.Substring(0, width);
     PutString(color, x, y, str);
     for(int i=str.Length; i<width; i++) console.WriteChar(' ');
   }
   void PutString(Color color, int width, int x, int y, string format, params object[] parms)
-  { PutString(color, width, x, y, string.Format(format, parms));
+  {
+    PutString(color, width, x, y, string.Format(format, parms));
   }
 
   char ReadChar() { return ReadChar(false); }
   char ReadChar(bool echo)
-  { if(rec.Type==NTConsole.InputType.Keyboard && --rec.Key.RepeatCount<=0)
+  {
+    if(rec.Type==NTConsole.InputType.Keyboard && --rec.Key.RepeatCount<=0)
       rec.Type=NTConsole.InputType.BufferResize;
     while(rec.Type!=NTConsole.InputType.Keyboard || !rec.Key.KeyDown || rec.Key.Char==0 &&
-          (rec.Key.VirtualKey>=NTConsole.Key.Shift && rec.Key.VirtualKey<=NTConsole.Key.Menu ||
-           rec.Key.VirtualKey>=NTConsole.Key.Numlock))
+        (rec.Key.VirtualKey>=NTConsole.Key.Shift && rec.Key.VirtualKey<=NTConsole.Key.Menu ||
+         rec.Key.VirtualKey>=NTConsole.Key.Numlock))
       rec = console.ReadInput(); // skip non-character inputs
     if(echo && rec.Key.Char!=0) console.WriteChar(rec.Key.Char);
     return rec.Key.Char;
   }
 
-  void RenderEntities(ICollection coll, Point[] vpts, Rectangle rect)
-  { foreach(Entity c in coll)
-    { if(!seeInvisible && c.HasAbility(Ability.SeeInvisible)) continue; // TODO: clairvoyance, warning, etc
+  void RenderEntities(ICollection<Entity> entities, Point[] vpts, Rectangle rect)
+  {
+    foreach(Entity c in entities)
+    {
+      if(!seeInvisible && c.HasAbility(Ability.SeeInvisible)) continue; // TODO: clairvoyance, warning, etc
       Point cp = c.Pos;
       int bi = (c.Y-rect.Y)*rect.Width + c.X-rect.X;
       if(!rect.Contains(cp) || !vis[bi]) continue;
@@ -911,7 +1052,8 @@ Ctrl-P - see old messages";
   }
 
   void RenderMap(Player viewer, Point center, Point[] vpts)
-  { Rectangle rect = new Rectangle(center.X-mapW/2, center.Y-mapH/2, mapW, mapH);
+  {
+    Rectangle rect = new Rectangle(center.X-mapW/2, center.Y-mapH/2, mapW, mapH);
     int size = mapW*mapH;
     bool showAll = viewer.Map.Type==MapType.Overworld;
     if(buf==null || buf.Length<size) buf = new NTConsole.CharInfo[size];
@@ -921,25 +1063,28 @@ Ctrl-P - see old messages";
 
     Map map = viewer.Memory==null ? viewer.Map : viewer.Memory;
     if(map==viewer.Map)
-    { for(int i=0,y=rect.Top; y<rect.Bottom; y++)
-        for(int x=rect.Left; x<rect.Right; i++,x++)
-          buf[i] = TileToChar(map[x,y], true);
+    {
+      for(int i=0, y=rect.Top; y<rect.Bottom; y++)
+        for(int x=rect.Left; x<rect.Right; i++, x++)
+          buf[i] = TileToChar(map[x, y], true);
       unsafe { fixed(bool* visp=vis) GameLib.Interop.Unsafe.Fill(visp, 1, size); }
       RenderEntities(map.Entities, vpts, rect);
     }
     else
-    { Array.Clear(vis, 0, size);
+    {
+      Array.Clear(vis, 0, size);
       for(int i=0; i<vpts.Length; i++)
         if(rect.Contains(vpts[i])) vis[(vpts[i].Y-rect.Y)*rect.Width+vpts[i].X-rect.X] = true;
-      for(int i=0,y=rect.Top; y<rect.Bottom; y++)
-        for(int x=rect.Left; x<rect.Right; i++,x++)
-        { Tile tile = map[x,y];
+      for(int i=0, y=rect.Top; y<rect.Bottom; y++)
+        for(int x=rect.Left; x<rect.Right; i++, x++)
+        {
+          Tile tile = map[x, y];
           buf[i] = tile.Type==TileType.UpStairs || tile.Type==TileType.DownStairs || tile.Entity==null ?
-                    TileToChar(tile, showAll || vis[i]) : EntityToChar(tile.Entity, vis[i]);
+                  TileToChar(tile, showAll || vis[i]) : EntityToChar(tile.Entity, vis[i]);
         }
       map = viewer.Map;
-      for(int i=0,y=rect.Top; y<rect.Bottom; y++)
-        for(int x=rect.Left; x<rect.Right; i++,x++) if(vis[i]) buf[i] = TileToChar(map[x,y], showAll || vis[i]);
+      for(int i=0, y=rect.Top; y<rect.Bottom; y++)
+        for(int x=rect.Left; x<rect.Right; i++, x++) if(vis[i]) buf[i] = TileToChar(map[x, y], showAll || vis[i]);
       RenderEntities(map.Entities, vpts, rect);
     }
 
@@ -947,7 +1092,8 @@ Ctrl-P - see old messages";
   }
 
   void RestoreScreen()
-  { if(buf!=null) console.PutBlock(0, 0, 0, 0, mapW, mapH, buf); // replace what we've overwritten
+  {
+    if(buf!=null) console.PutBlock(0, 0, 0, 0, mapW, mapH, buf); // replace what we've overwritten
     DrawStats(App.Player);
     DrawLines();
   }
@@ -955,19 +1101,22 @@ Ctrl-P - see old messages";
   // wordwrap a string, placing the output into 'wrapped' and returning the height in lines
   int WordWrap(string line) { return WordWrap(line, console.Width-1); }
   int WordWrap(string line, int width)
-  { int s=0, e=line.Length, height=0;
+  {
+    int s=0, e=line.Length, height=0;
     if(e==0) { AddWrapped(0, ""); return 1; }
 
     while(e-s>width)
-    { for(int i=Math.Min(s+width, e)-1; i>=s; i--)
+    {
+      for(int i=Math.Min(s+width, e)-1; i>=s; i--)
         if(char.IsWhiteSpace(line[i]))
-        { AddWrapped(height++, line.Substring(s, i-s));
+        {
+          AddWrapped(height++, line.Substring(s, i-s));
           s = i+1;
           goto next;
         }
       AddWrapped(height++, line.Substring(s, width));
       s += width;
-      next:;
+      next: ;
     }
     if(e-s>0) AddWrapped(height++, line.Substring(s, e-s));
     return height;
@@ -975,7 +1124,8 @@ Ctrl-P - see old messages";
 
   int Write(Color color, string format, params object[] parms) { return Write(color, string.Format(format, parms)); }
   int Write(Color color, string str)
-  { console.Attributes = ColorToAttr(color);
+  {
+    console.Attributes = ColorToAttr(color);
     console.Write(str);
     return str.Length;
   }
@@ -990,7 +1140,8 @@ Ctrl-P - see old messages";
   bool inputMode, seeInvisible;
 
   static NTConsole.Attribute ColorToAttr(Color color)
-  { NTConsole.Attribute attr = NTConsole.Attribute.Black;
+  {
+    NTConsole.Attribute attr = NTConsole.Attribute.Black;
     if((color & Color.Red)    != Color.Black) attr |= NTConsole.Attribute.Red;
     if((color & Color.Green)  != Color.Black) attr |= NTConsole.Attribute.Green;
     if((color & Color.Blue)   != Color.Black) attr |= NTConsole.Attribute.Blue;
@@ -999,7 +1150,8 @@ Ctrl-P - see old messages";
   }
 
   static NTConsole.CharInfo EntityToChar(Entity e, bool visible)
-  { EntityClass ec = e.Class;
+  {
+    EntityClass ec = e.Class;
     return new NTConsole.CharInfo(raceMap[(int)ec.GetRace(e)],
                                   visible ? ColorToAttr(ec.GetColor(e)) : NTConsole.Attribute.DarkGrey);
   }
@@ -1007,43 +1159,53 @@ Ctrl-P - see old messages";
   static bool IsPrintable(char c) { return char.IsLetterOrDigit(c) || char.IsPunctuation(c) || char.IsSymbol(c); }
 
   static NTConsole.CharInfo ItemToChar(Item item)
-  { ItemClass ic = item.Class;
+  {
+    ItemClass ic = item.Class;
     return new NTConsole.CharInfo(itemMap[(int)ic.Type], ColorToAttr(ic.Color));
   }
 
   static NTConsole.CharInfo TileToChar(Tile tile, bool visible)
-  { NTConsole.CharInfo ci;
+  {
+    NTConsole.CharInfo ci;
     if((visible || tile.Type!=TileType.UpStairs && tile.Type!=TileType.DownStairs) &&
        tile.Items!=null && tile.Items.Count>0)
+    {
       ci = ItemToChar(tile.Items[0]);
-    else switch(tile.Type)
-    { case TileType.Wall:       ci = new NTConsole.CharInfo('#', NTConsole.Attribute.Brown); break;
-      case TileType.ClosedDoor: ci = new NTConsole.CharInfo('+', NTConsole.Attribute.Yellow); break;
-      case TileType.OpenDoor:   ci = new NTConsole.CharInfo((char)0xFE, NTConsole.Attribute.Yellow); break;
-      case TileType.RoomFloor:  ci = new NTConsole.CharInfo((char)0xFA, NTConsole.Attribute.Grey); break;
-      case TileType.Corridor:   ci = new NTConsole.CharInfo((char)0xB0, NTConsole.Attribute.Grey); break;
-      case TileType.UpStairs:
-        return new NTConsole.CharInfo('<', visible ? NTConsole.Attribute.Grey : NTConsole.Attribute.LightBlue);
-      case TileType.DownStairs:
-        return new NTConsole.CharInfo('>', visible ? NTConsole.Attribute.Grey : NTConsole.Attribute.Red);
-      case TileType.ShallowWater: ci = new NTConsole.CharInfo((char)0xF7, NTConsole.Attribute.Cyan); break;
-      case TileType.DeepWater: ci = new NTConsole.CharInfo((char)0xF7, NTConsole.Attribute.Blue); break;
-      case TileType.Ice: ci = new NTConsole.CharInfo((char)'/', NTConsole.Attribute.White); break;
-      case TileType.Lava: ci = new NTConsole.CharInfo((char)0xF7, NTConsole.Attribute.LightRed); break;
-      case TileType.Pit: ci = new NTConsole.CharInfo('o', NTConsole.Attribute.Grey); break;
-      case TileType.Hole: ci = new NTConsole.CharInfo('O', NTConsole.Attribute.Grey); break;
-      case TileType.Altar: ci = new NTConsole.CharInfo('_', NTConsole.Attribute.Grey); break;
-      case TileType.Tree: case TileType.Forest: ci = new NTConsole.CharInfo('T', NTConsole.Attribute.Green); break;
-      case TileType.DirtSand: ci = new NTConsole.CharInfo((char)0xFA, NTConsole.Attribute.Brown); break;
-      case TileType.Grass: ci = new NTConsole.CharInfo('\"', NTConsole.Attribute.LightGreen); break;
-      case TileType.Hill: ci = new NTConsole.CharInfo('^', NTConsole.Attribute.Brown); break;
-      case TileType.Mountain: ci = new NTConsole.CharInfo('^', NTConsole.Attribute.White); break;
-      case TileType.Road: ci = new NTConsole.CharInfo((char)0xB0, NTConsole.Attribute.Brown); break;
-      case TileType.Town:
-        return new NTConsole.CharInfo('o', visible ? NTConsole.Attribute.Grey : NTConsole.Attribute.LightRed);
-      case TileType.Portal: return new NTConsole.CharInfo('\\', NTConsole.Attribute.Yellow);
-      default: ci = new NTConsole.CharInfo(' ', NTConsole.Attribute.Black); break;
     }
+    else
+    {
+      switch(tile.Type)
+      {
+        case TileType.Wall: ci = new NTConsole.CharInfo('#', NTConsole.Attribute.Brown); break;
+        case TileType.ClosedDoor: ci = new NTConsole.CharInfo('+', NTConsole.Attribute.Yellow); break;
+        case TileType.OpenDoor: ci = new NTConsole.CharInfo((char)0xFE, NTConsole.Attribute.Yellow); break;
+        case TileType.RoomFloor: ci = new NTConsole.CharInfo((char)0xFA, NTConsole.Attribute.Grey); break;
+        case TileType.Corridor: ci = new NTConsole.CharInfo((char)0xB0, NTConsole.Attribute.Grey); break;
+        case TileType.UpStairs:
+          return new NTConsole.CharInfo('<', visible ? NTConsole.Attribute.Grey : NTConsole.Attribute.LightBlue);
+        case TileType.DownStairs:
+          return new NTConsole.CharInfo('>', visible ? NTConsole.Attribute.Grey : NTConsole.Attribute.Red);
+        case TileType.ShallowWater: ci = new NTConsole.CharInfo((char)0xF7, NTConsole.Attribute.Cyan); break;
+        case TileType.DeepWater: ci = new NTConsole.CharInfo((char)0xF7, NTConsole.Attribute.Blue); break;
+        case TileType.Ice: ci = new NTConsole.CharInfo((char)'/', NTConsole.Attribute.White); break;
+        case TileType.Lava: ci = new NTConsole.CharInfo((char)0xF7, NTConsole.Attribute.LightRed); break;
+        case TileType.Pit: ci = new NTConsole.CharInfo('o', NTConsole.Attribute.Grey); break;
+        case TileType.Hole: ci = new NTConsole.CharInfo('O', NTConsole.Attribute.Grey); break;
+        case TileType.Altar: ci = new NTConsole.CharInfo('_', NTConsole.Attribute.Grey); break;
+        case TileType.Tree:
+        case TileType.Forest: ci = new NTConsole.CharInfo('T', NTConsole.Attribute.Green); break;
+        case TileType.DirtSand: ci = new NTConsole.CharInfo((char)0xFA, NTConsole.Attribute.Brown); break;
+        case TileType.Grass: ci = new NTConsole.CharInfo('\"', NTConsole.Attribute.LightGreen); break;
+        case TileType.Hill: ci = new NTConsole.CharInfo('^', NTConsole.Attribute.Brown); break;
+        case TileType.Mountain: ci = new NTConsole.CharInfo('^', NTConsole.Attribute.White); break;
+        case TileType.Road: ci = new NTConsole.CharInfo((char)0xB0, NTConsole.Attribute.Brown); break;
+        case TileType.Town:
+          return new NTConsole.CharInfo('o', visible ? NTConsole.Attribute.Grey : NTConsole.Attribute.LightRed);
+        case TileType.Portal: return new NTConsole.CharInfo('\\', NTConsole.Attribute.Yellow);
+        default: ci = new NTConsole.CharInfo(' ', NTConsole.Attribute.Black); break;
+      }
+    }
+
     if(!visible && tile.Type!=TileType.ClosedDoor) ci.Attributes = NTConsole.Attribute.DarkGrey;
     //ci.Attributes |= NTConsole.ForeToBack((NTConsole.Attribute)((tile.Sound*15+Map.MaxSound-1)/Map.MaxSound));
     //ci.Attributes |= NTConsole.ForeToBack((NTConsole.Attribute)((tile.Scent*15+Map.MaxScent-1)/Map.MaxScent));
@@ -1052,12 +1214,14 @@ Ctrl-P - see old messages";
 
   // Gold, Amulet, Weapon, Shield, Armor, Ammo, Food, Scroll, Ring, Potion, Wand, Tool, Spellbook, Container, Treasure,
   static readonly char[] itemMap = new char[(int)ItemType.NumTypes]
-  { '$', '"', ')', '[', '[', '(', '%', '?', '=', '!', '/', ']', '+', ']', '*',
+  {
+    '$', '"', ')', '[', '[', '(', '%', '?', '=', '!', '/', ']', '+', ']', '*',
   };
 
   // Human
   static readonly char[] raceMap = new char[(int)Race.NumRaces]
-  { '@'
+  { 
+    '@'
   };
 
   // convert keypad keys to movement letters

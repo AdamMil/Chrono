@@ -1,5 +1,6 @@
 using System;
-using Point=System.Drawing.Point;
+using System.Collections.Generic;
+using Point = System.Drawing.Point;
 
 namespace Chrono
 {
@@ -80,9 +81,10 @@ public abstract class InputOutput
   public abstract void ManageSkills(Player player);
 
   public MenuItem[] Menu(IInventory items, MenuFlag flags)
-  { return Menu(items, flags, ItemType.Any);
+  { 
+    return Menu(items, flags, ItemType.Any);
   }
-  public abstract MenuItem[] Menu(System.Collections.ICollection items, MenuFlag flags, params ItemType[] types);
+  public abstract MenuItem[] Menu(ICollection<Item> items, MenuFlag flags, params ItemType[] types);
   public abstract MenuItem[] Menu(MenuItem[] items, MenuFlag flags);
 
   public void Print() { Print(Color.Normal, ""); }
@@ -105,10 +107,11 @@ public abstract class InputOutput
 #endregion
 
 #region MenuItem
-public struct MenuItem
+public sealed class MenuItem
 { public MenuItem(Item item) { Item=item; Text=null; Count=0; Char = item==null ? '\0' : item.Char; }
   public MenuItem(Item item, int count) { Item=item; Text=null; Count=count; Char = item==null ? '\0' : item.Char; }
   public MenuItem(string text, char c) { Item=null; Text=text; Count=0; Char=c; }
+
   public Item Item;
   public string Text;
   public int  Count;

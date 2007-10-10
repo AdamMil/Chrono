@@ -1,5 +1,5 @@
 using System;
-using System.Collections;
+using System.Collections.Generic;
 using System.Xml;
 using Point=System.Drawing.Point;
 
@@ -11,7 +11,8 @@ namespace Chrono
 public enum AttackType : byte { Bite, Breath, Explosion, Gaze, Kick, Spell, Spit, Sting, Touch, Weapon }
 
 public enum Attr
-{ Invalid=-1,
+{
+  Invalid=-1,
   Str, // influences attack damage, toughness, carry weight, etc
   Dex, // influences accuracy, evasiveness, etc
   Int, // influences spellcasting, puzzlesolving, etc
@@ -38,7 +39,8 @@ public enum Attr
 public enum CarryStress { Normal, Burdened=25, Stressed=41, Strained=61, Overtaxed=81, Overloaded=101 }
 
 public enum Death // causes of death
-{ Quit, Starvation, Petrified, Disintegrated, Digested, Choking, KilledBy
+{
+  Quit, Starvation, Petrified, Disintegrated, Digested, Choking, KilledBy
 }
 
 // how to resolve the situation where an identical effect is already in place (NoChange only used for value combination)
@@ -46,96 +48,104 @@ public enum EffectCombo { Greater, Lesser, Sum, Replace, KeepOld, NoChange }
 public enum EffectType { Ability, Ailment, Attr, Intrinsic, Poison, Sickness }
 
 public enum HungerLevel
-{ Starved=0, Fainting=200, Weak=250, Hungry=350, NotHungry=1200, Satiated=1700, Stuffed=2200, Choked
+{
+  Starved=0, Fainting=200, Weak=250, Hungry=350, NotHungry=1200, Satiated=1700, Stuffed=2200, Choked
 }
 
 public enum Noise { Walking, Bang, Combat, Alert, NeedHelp, Item, Zap } // types of noise that we can make
 
 public enum Race : sbyte // Player means "whatever race the player is"
-{ Player=-2, Invalid=-1, Human=0, NumRaces
+{
+  Player=-2, Invalid=-1, Human=0, NumRaces
 }
 
 public sealed class Speed
-{ Speed() { }
+{
+  Speed() { }
   public const int Stopped=0, Slowest=1, OneFourth=6, Quarter=OneFourth, Half=Quarter*2, Normal=Half*2,
                    Double=Normal*2, TwoPointFive=OneFourth*10, Quadruple=Double*2, Fastest=100;
 }
 
 [Flags]
 public enum Ailment : byte // (usually) temporary ailments
-{ None          =0x00,
-  Confused      =0x01, // slight impairment, more like to miss or stagger
-  Hallucinating =0x02, // everything looks weird!
-  Sleeping      =0x04,
-  Blind         =0x08,
-  Invisible     =0x10,
-  Stunned       =0x20, // serious impairment, quite likely to miss or stagger
+{
+  None=0x00,
+  Confused=0x01, // slight impairment, more like to miss or stagger
+  Hallucinating=0x02, // everything looks weird!
+  Sleeping=0x04,
+  Blind=0x08,
+  Invisible=0x10,
+  Stunned=0x20, // serious impairment, quite likely to miss or stagger
 }
 
 [Flags]
 public enum Ability : ushort // abilities (usually gained), and resistances
-{ None            =0x0000,
-  SeeInvisible    =0x0001, // can see invisible
-  TeleportControl =0x0002, // can teleport at will and control where it teleports to
+{
+  None=0x0000,
+  SeeInvisible=0x0001, // can see invisible
+  TeleportControl=0x0002, // can teleport at will and control where it teleports to
   PolymorphControl=0x0004, // can polymorph at will and control what it polymorphs into
-  Levitating      =0x0008, 
-  Warning         =0x0010, // has warning of nearby monsters
-  MagicBreath     =0x0020, // can breathe magically
-  Reflection      =0x0040, // reflects rays, beams, etc
-  Clairvoyant     =0x0080, // can sense creatures that have minds
-  Regenerates     =0x0100, // regenerates HP quickly
+  Levitating=0x0008,
+  Warning=0x0010, // has warning of nearby monsters
+  MagicBreath=0x0020, // can breathe magically
+  Reflection=0x0040, // reflects rays, beams, etc
+  Clairvoyant=0x0080, // can sense creatures that have minds
+  Regenerates=0x0100, // regenerates HP quickly
 
-  FireRes         =0x0200, // resistances
-  ColdRes         =0x0400,
-  SleepRes        =0x0800,
-  ElectricRes     =0x1000,
-  PoisonRes       =0x2000,
-  AcidRes         =0x4000,
-  PetrifyRes      =0x8000,
+  FireRes=0x0200, // resistances
+  ColdRes=0x0400,
+  SleepRes=0x0800,
+  ElectricRes=0x1000,
+  PoisonRes=0x2000,
+  AcidRes=0x4000,
+  PetrifyRes=0x8000,
 }
 
 [Flags]
 public enum Intrinsic : uint // abilities (usually intrinsic) and body description
-{ None          =0x000000,
-  CanFly        =0x000001, // can toggle levitation at will
-  NoWalk        =0x000002, // cannot traverse land
-  CanSwim       =0x000004, // can traverse water
-  Amorphous     =0x000008, // can change its body to squeeze through any opening (eg, go under doors, etc)
-  Phasing       =0x000010, // can move through solid matter by warping into another dimension
-  Tunnels       =0x000020, // digs tunnels
-  Breathless    =0x000040, // doesn't need to breathe
-  Oviparous     =0x000080, // can lay eggs
-  NoCarry       =0x000100, // cannot carry items
-  NoHands       =0x000200, // doesn't have hands (can't manipulate items)
-  NoLimbs       =0x000400, // can't hit or kick, or wear items
-  NoHead        =0x000800, // no head (can't wear helmets, can't be beheaded)
-  Mindless      =0x001000, // has (and needs) no mind
-  Autorevive    =0x002000, // can revive itself automatically (sometimes)
-  Teleportation =0x004000, // can teleport (not at will)
-  Acidic        =0x008000, // is acidic if eaten
-  Poisonous     =0x010000, // is poisonous if eaten
-  Carnivore     =0x020000, // eats meat
-  Herbivore     =0x040000, // eats plants
-  Omnivore      =Carnivore|Herbivore,
-  Metallivore   =0x080000, // eats metal
-  Undead        =0x100000,
-  Were          =0x200000, // is a lycanthrope
+{
+  None=0x000000,
+  CanFly=0x000001, // can toggle levitation at will
+  NoWalk=0x000002, // cannot traverse land
+  CanSwim=0x000004, // can traverse water
+  Amorphous=0x000008, // can change its body to squeeze through any opening (eg, go under doors, etc)
+  Phasing=0x000010, // can move through solid matter by warping into another dimension
+  Tunnels=0x000020, // digs tunnels
+  Breathless=0x000040, // doesn't need to breathe
+  Oviparous=0x000080, // can lay eggs
+  NoCarry=0x000100, // cannot carry items
+  NoHands=0x000200, // doesn't have hands (can't manipulate items)
+  NoLimbs=0x000400, // can't hit or kick, or wear items
+  NoHead=0x000800, // no head (can't wear helmets, can't be beheaded)
+  Mindless=0x001000, // has (and needs) no mind
+  Autorevive=0x002000, // can revive itself automatically (sometimes)
+  Teleportation=0x004000, // can teleport (not at will)
+  Acidic=0x008000, // is acidic if eaten
+  Poisonous=0x010000, // is poisonous if eaten
+  Carnivore=0x020000, // eats meat
+  Herbivore=0x040000, // eats plants
+  Omnivore=Carnivore|Herbivore,
+  Metallivore=0x080000, // eats metal
+  Undead=0x100000,
+  Were=0x200000, // is a lycanthrope
 }
 
 [Flags]
 public enum AIFlag : byte // AI and other misc flags
-{ None        =0x00,
+{
+  None=0x00,
   CantPolyInto=0x01, // player can't polymorph into this creature
-  WantsGold   =0x02, // picking up gold is a high priority
-  WantsGems   =0x04, // picking up gems is a high priority
-  Intelligent =0x08, // intelligent enough to try clever strategies (eg, polymorphing itself)
-  Genocided   =0x10, // has been genocided
-  Unique      =0x20, // unique creature
-  HasData     =0x40, // data has been initialized
+  WantsGold=0x02, // picking up gold is a high priority
+  WantsGems=0x04, // picking up gems is a high priority
+  Intelligent=0x08, // intelligent enough to try clever strategies (eg, polymorphing itself)
+  Genocided=0x10, // has been genocided
+  Unique=0x20, // unique creature
+  HasData=0x40, // data has been initialized
 }
 
 public enum EntitySize : byte
-{ Tiny, Small, Medium, Humanoid=Medium, Large, Huge, Gigantic
+{
+  Tiny, Small, Medium, Humanoid=Medium, Large, Huge, Gigantic
 }
 
 public enum Gender : byte { Male, Female, Neither, Either }
@@ -151,7 +161,8 @@ public enum Skill : byte
 }
 
 public enum Slot : sbyte
-{ Ring=-2, // any available ring finger
+{
+  Ring=-2, // any available ring finger
   Invalid=-1,
   Head, Cloak, Torso, Legs, Neck, Hands, Feet, LRing, RRing, NumSlots
 }
@@ -159,8 +170,10 @@ public enum Slot : sbyte
 
 #region Attack
 public struct Attack
-{ public Attack(XmlNode node)
-  { Type   = (AttackType)Enum.Parse(typeof(AttackType), Xml.Attr(node, "type"));
+{
+  public Attack(XmlNode node)
+  {
+    Type   = (AttackType)Enum.Parse(typeof(AttackType), Xml.Attr(node, "type"));
     Damage = (DamageType)Enum.Parse(typeof(DamageType), Xml.Attr(node, "damage", "Physical"));
     Amount = new Range(node.Attributes["amount"]);
   }
@@ -173,30 +186,34 @@ public struct Attack
 
 #region Conference
 public struct Conference
-{ public Conference(XmlNode node)
-  { Ability   = Xml.Abilities(node.Attributes["ability"]);
+{
+  public Conference(XmlNode node)
+  {
+    Ability   = Xml.Abilities(node.Attributes["ability"]);
     Ailment   = Xml.Ailments(node.Attributes["ailment"]);
     Intrinsic = Xml.Intrinsics(node.Attributes["intrinsic"]);
     Chance    = (byte)Xml.Int(node, "chance", 100);
   }
 
-  public Ability   Ability;
-  public Ailment   Ailment;
+  public Ability Ability;
+  public Ailment Ailment;
   public Intrinsic Intrinsic;
-  public byte      Chance; // 0-100%
+  public byte Chance; // 0-100%
 }
 #endregion
 
 #region Effect
 public struct Effect
-{ public Effect(Ability ability, bool isOn, int timeout)
+{
+  public Effect(Ability ability, bool isOn, int timeout)
     : this(EffectType.Ability, (uint)ability, isOn ? 1 : -1, timeout) { }
   public Effect(Ailment ailment, int timeout) : this(EffectType.Ailment, (uint)ailment, 1, timeout) { }
   public Effect(Intrinsic intrinsic, bool isOn, int timeout)
     : this(EffectType.Intrinsic, (uint)intrinsic, isOn ? 1 : -1, timeout) { }
   public Effect(Attr attr, int value, int timeout) : this(EffectType.Attr, (uint)attr, value, timeout) { }
   public Effect(EffectType type, uint flag, int value, int timeout)
-  { Type=type; Flag=flag; Value=value; Timeout=timeout;
+  {
+    Type=type; Flag=flag; Value=value; Timeout=timeout;
   }
 
   public EffectType Type;
@@ -207,8 +224,10 @@ public struct Effect
 
 #region EntityClass
 public abstract class EntityClass
-{ protected EntityClass()
-  { baseName     = "UNNAMED";
+{
+  protected EntityClass()
+  {
+    baseName     = "UNNAMED";
     description  = "UNDESCRIBED CREATURE";
     GroupSize    = new Range(1);
     CorpseChance = -1;
@@ -219,8 +238,10 @@ public abstract class EntityClass
   }
 
   public virtual bool CanPass(Entity e, TileType type)
-  { switch(type)
-    { case TileType.Border:
+  {
+    switch(type)
+    {
+      case TileType.Border:
         return false;
       case TileType.ShallowWater:
         // shallow water is deep for tiny creatures, but others are okay
@@ -228,30 +249,48 @@ public abstract class EntityClass
       case TileType.DeepWater:
         // deep water isn't so deep for gigantic greatures
         return Size==EntitySize.Gigantic || e.HasIntrinsic(Intrinsic.CanSwim|Intrinsic.Phasing);
-      case TileType.Altar: case TileType.Corridor: case TileType.DeepIce: case TileType.DirtSand:
-      case TileType.DownStairs: case TileType.Forest: case TileType.Grass: case TileType.Hill: case TileType.Hole:
-      case TileType.Ice:case TileType.OpenDoor: case TileType.Pit: case TileType.Portal: case TileType.Road:
-      case TileType.RoomFloor: case TileType.Town: case TileType.Tree: case TileType.UpStairs:
+      case TileType.Altar:
+      case TileType.Corridor:
+      case TileType.DeepIce:
+      case TileType.DirtSand:
+      case TileType.DownStairs:
+      case TileType.Forest:
+      case TileType.Grass:
+      case TileType.Hill:
+      case TileType.Hole:
+      case TileType.Ice:
+      case TileType.OpenDoor:
+      case TileType.Pit:
+      case TileType.Portal:
+      case TileType.Road:
+      case TileType.RoomFloor:
+      case TileType.Town:
+      case TileType.Tree:
+      case TileType.UpStairs:
         return !e.HasIntrinsic(Intrinsic.NoWalk);
       case TileType.ClosedDoor:
         return e.HasIntrinsic(Intrinsic.Amorphous|Intrinsic.Phasing); // amorphous creatures can slip under doors
       case TileType.Mountain:
         return Size>=EntitySize.Huge && !e.HasIntrinsic(Intrinsic.NoWalk) || e.HasIntrinsic(Intrinsic.Phasing);
-      case TileType.SolidRock: case TileType.Wall:
+      case TileType.SolidRock:
+      case TileType.Wall:
         return e.HasIntrinsic(Intrinsic.Tunnels) && !e.HasIntrinsic(Intrinsic.NoWalk) ||
-               e.HasIntrinsic(Intrinsic.Phasing);
-      case TileType.HardRock: case TileType.HardWall:
+             e.HasIntrinsic(Intrinsic.Phasing);
+      case TileType.HardRock:
+      case TileType.HardWall:
         return e.HasIntrinsic(Intrinsic.Phasing);
       default: return true;
     }
   }
 
   public int GetExpAt(int level)
-  { return level<2 ? 0 : level<11 ? 10<<level : level<21 ? 10000<<(level-11) : (level-20)*10000000;
+  {
+    return level<2 ? 0 : level<11 ? 10<<level : level<21 ? 10000<<(level-11) : (level-20)*10000000;
   }
 
   public int GetLevelAt(int exp)
-  { int val, level;
+  {
+    int val, level;
 
     if(exp<10000) { val=exp/20; level=1; }
     else if(exp<10000000) { val=exp/20000; level=11; }
@@ -272,14 +311,16 @@ public abstract class EntityClass
   public virtual Race GetRace(Entity e) { return race==Race.Player ? App.Player.OriginalRace : race; }
 
   public virtual void Initialize(Entity e)
-  { e.RawIntrinsics = Intrinsics;
+  {
+    e.RawIntrinsics = Intrinsics;
     e.RawAbilities  = Abilities;
     e.RawAilments   = Ailments;
     e.AIFlags       = AIFlags;
     e.Gender        = gender==Gender.Either ? Global.Coinflip() ? Gender.Female : Gender.Male : gender;
-    
+
     if(race!=Race.Invalid)
-    { int index = (int)(race==Race.Player ? App.Player.OriginalRace : race)*numRaceAttrs;
+    {
+      int index = (int)(race==Race.Player ? App.Player.OriginalRace : race)*numRaceAttrs;
       e.SetBaseAttr(Attr.Str, raceAttrs[index+0]);
       e.SetBaseAttr(Attr.Int, raceAttrs[index+1]);
       e.SetBaseAttr(Attr.Dex, raceAttrs[index+2]);
@@ -289,11 +330,13 @@ public abstract class EntityClass
   public virtual object InitializeData(Entity e) { return null; }
 
   public virtual bool IsDangerous(Entity e, Point pt)
-  { TileType tt = e.Map[pt].Type;
+  {
+    TileType tt = e.Map[pt].Type;
     if(tt!=TileType.Mountain && e.HasAbility(Ability.Levitating)) return false;
 
     switch(tt)
-    { case TileType.DeepWater:
+    {
+      case TileType.DeepWater:
         return Size!=EntitySize.Gigantic && !e.HasIntrinsic(Intrinsic.CanSwim|Intrinsic.Phasing);
       case TileType.Lava:
         return !e.HasAbility(Ability.FireRes);
@@ -304,15 +347,18 @@ public abstract class EntityClass
   }
 
   public virtual void LevelTo(Entity e, int level)
-  { Race race = GetRace(e);
+  {
+    Race race = GetRace(e);
     int hpBonus=0, mpBonus=0;
 
     switch(race)
-    { case Race.Human: hpBonus = mpBonus = 1; break;
+    {
+      case Race.Human: hpBonus = mpBonus = 1; break;
       default: throw new NotImplementedException("Unhandled race: "+race);
     }
 
-    { int str = e.GetBaseAttr(Attr.Str);
+    {
+      int str = e.GetBaseAttr(Attr.Str);
       if(str<4) hpBonus -= 2;
       else if(str<7) hpBonus--;
       else if(str<15) { }
@@ -324,7 +370,8 @@ public abstract class EntityClass
 
     int totalHpGain=0, totalMpGain=0;
     while(e.expLevel!=level)
-    { int hpGain = Math.Max(1, Global.Rand(1, 8) + hpBonus);
+    {
+      int hpGain = Math.Max(1, Global.Rand(1, 8) + hpBonus);
       int mpGain = Math.Max(0, Global.Rand(1, e.GetAttr(Attr.Int)/2+1) + mpBonus);
 
       if(level<e.XL) { hpGain=-hpGain; mpGain=-mpGain; e.expLevel--; }
@@ -340,7 +387,8 @@ public abstract class EntityClass
   }
 
   public virtual bool OnDeath(Entity e, Death type, string message)
-  { if(type==Death.Quit) return false;
+  {
+    if(type==Death.Quit) return false;
 
     bool genCorpse;
     if(type==Death.Petrified) throw new NotImplementedException(); // TODO: leave statue
@@ -351,7 +399,7 @@ public abstract class EntityClass
 
     if(genCorpse) LeaveCorpse(e);
     DropItems(e);
-    
+
     e.Map.Entities.Remove(e);
     return true;
   }
@@ -367,12 +415,14 @@ public abstract class EntityClass
   public Intrinsic Intrinsics;
   public Ability Abilities;
   public Ailment Ailments;
-  public AIFlag  AIFlags;
+  public AIFlag AIFlags;
   public EntitySize Size;
 
   protected void DropItems(Entity e)
-  { if(e.Inv!=null)
-    { foreach(Item i in e.Inv) e.Map.AddItem(e.Pos, i);
+  {
+    if(e.Inv!=null)
+    {
+      foreach(Item i in e.Inv) e.Map.AddItem(e.Pos, i);
       e.Inv.Clear();
     }
   }
@@ -386,33 +436,40 @@ public abstract class EntityClass
 
   const int numRaceAttrs = 6;
   static readonly byte[] raceAttrs = new byte[(int)Race.NumRaces*numRaceAttrs]
-  { // Str, Int, Dex (sum to ~18), Sight, Hearing, Smell
-    6, 6, 6, 95, 70, 25, // Human
-  };
+{ // Str, Int, Dex (sum to ~18), Sight, Hearing, Smell
+  6, 6, 6, 95, 70, 25, // Human
+};
 }
 #endregion
 
 #region Entity
 public class Entity
-{ public Entity(string name) : this(Global.GetEntityIndex(name)) { }
+{
+  public Entity(string name) : this(Global.GetEntityIndex(name)) { }
   public Entity(int index)
-  { expLevel=1; this.index=index;
+  {
+    expLevel=1; this.index=index;
     for(int i=0; i<(int)Attr.NumAttributes; i++) SetBaseAttr((Attr)i, 0); // set attributes to minimum allowed
     Class.Initialize(this);
   }
 
-  public Entity(XmlNode npc) : this(Xml.Attr(npc, "entity"))
-  { foreach(XmlNode item in npc.SelectNodes("give")) Pickup(new Item(item));
+  public Entity(XmlNode npc)
+    : this(Xml.Attr(npc, "entity"))
+  {
+    foreach(XmlNode item in npc.SelectNodes("give")) Pickup(new Item(item));
   }
 
   public Ability Abilities
-  { get { return (Ability)ApplyFlagEffect(EffectType.Ability, (uint)RawAbilities); }
+  {
+    get { return (Ability)ApplyFlagEffect(EffectType.Ability, (uint)RawAbilities); }
   }
   public Ailment Ailments
-  { get { return (Ailment)ApplyFlagEffect(EffectType.Ailment, (uint)RawAilments); }
+  {
+    get { return (Ailment)ApplyFlagEffect(EffectType.Ailment, (uint)RawAilments); }
   }
   public Intrinsic Intrinsics
-  { get { return (Intrinsic)ApplyFlagEffect(EffectType.Intrinsic, (uint)RawIntrinsics); }
+  {
+    get { return (Intrinsic)ApplyFlagEffect(EffectType.Intrinsic, (uint)RawIntrinsics); }
   }
 
   public int AC { get { return GetAttr(Attr.AC); } }
@@ -426,20 +483,25 @@ public class Entity
   public int VisionRange { get { return (GetAttr(Attr.Sight)+3)/4; } }
 
   public int HP
-  { get { return hp; }
+  {
+    get { return hp; }
     set { hp = Math.Min(value, MaxHP); }
   }
 
   public int MP
-  { get { return mp; }
+  {
+    get { return mp; }
     set { mp = Math.Min(value, MaxMP); }
   }
 
   public int Speed
-  { get
-    { int speed=GetAttr(Attr.Speed), pct;
+  {
+    get
+    {
+      int speed=GetAttr(Attr.Speed), pct;
       switch(CarryStress)
-      { case CarryStress.Normal: return speed;
+      {
+        case CarryStress.Normal: return speed;
         case CarryStress.Burdened: pct=60; break;
         case CarryStress.Strained: pct=40; break;
         case CarryStress.Stressed: pct=33; break;
@@ -453,24 +515,30 @@ public class Entity
 
   public string AName { get { return Global.Cap1(aName); } }
   public string aName
-  { get
-    { EntityClass ec = Class;
+  {
+    get
+    {
+      EntityClass ec = Class;
       if(ec.Name!=null) return Called(ec.Name);
       string baseName = ec.GetBaseName(this);
       return Called(Global.AorAn(baseName)+" "+baseName);
     }
   }
-  
+
   public string TheName
-  { get
-    { EntityClass ec = Class;
+  {
+    get
+    {
+      EntityClass ec = Class;
       return Called(ec.Name==null ? "The "+ec.GetBaseName(this) : ec.Name);
     }
   }
-  
+
   public string theName
-  { get
-    { EntityClass ec = Class;
+  {
+    get
+    {
+      EntityClass ec = Class;
       return Called(ec.Name==null ? "the "+ec.GetBaseName(this) : ec.Name);
     }
   }
@@ -480,8 +548,10 @@ public class Entity
   public int CarryWeight { get { return Inv==null ? 0 : Inv.Weight; } }
 
   public CarryStress CarryStress
-  { get
-    { int pct = CarryWeight*100/MaxCarryWeight;
+  {
+    get
+    {
+      int pct = CarryWeight*100/MaxCarryWeight;
       if(pct<(int)CarryStress.Burdened) return CarryStress.Normal;
       else if(pct<(int)CarryStress.Stressed) return CarryStress.Burdened;
       else if(pct<(int)CarryStress.Strained) return CarryStress.Stressed;
@@ -494,38 +564,48 @@ public class Entity
   public int MaxCarryWeight { get { return Str*6048; } } // 6048 grams (13.33 lbs) per Str point
 
   public object Data
-  { get
-    { if(!HasAIFlag(AIFlag.HasData))
-      { data = Class.InitializeData(this);
+  {
+    get
+    {
+      if(!HasAIFlag(AIFlag.HasData))
+      {
+        data = Class.InitializeData(this);
         AIFlags |= AIFlag.HasData;
       }
       return data;
     }
 
     set
-    { AIFlags |= AIFlag.HasData;
+    {
+      AIFlags |= AIFlag.HasData;
       data = value;
     }
   }
 
   // gets or sets our current experience level. this does not print any output when the level is changed
   public int XL
-  { get { return expLevel; }
+  {
+    get { return expLevel; }
     set
-    { if(expLevel!=value)
-      { exp = Class.GetExpAt(value);
+    {
+      if(expLevel!=value)
+      {
+        exp = Class.GetExpAt(value);
         LevelTo(value, false);
       }
     }
   }
-  
+
   // gets or sets our total number of experience points. setting this may change our current experience level, but does
   // not print any output when it does so
   public int XP
-  { get { return exp; }
+  {
+    get { return exp; }
     set
-    { if(exp!=value)
-      { int newLevel = Class.GetLevelAt(value);
+    {
+      if(exp!=value)
+      {
+        int newLevel = Class.GetLevelAt(value);
         exp = value;
         if(newLevel != XL) LevelTo(newLevel, false);
       }
@@ -537,8 +617,10 @@ public class Entity
   public int Gold { get { return HowMuchGold(false); } }
 
   public HungerLevel HungerLevel
-  { get
-    { if(food<(int)HungerLevel.Starved) return HungerLevel.Starved;
+  {
+    get
+    {
+      if(food<(int)HungerLevel.Starved) return HungerLevel.Starved;
       else if(food<(int)HungerLevel.Fainting) return HungerLevel.Fainting;
       else if(food<(int)HungerLevel.Weak) return HungerLevel.Weak;
       else if(food<(int)HungerLevel.Hungry) return HungerLevel.Hungry;
@@ -549,7 +631,8 @@ public class Entity
   }
 
   public int Stench
-  { get { return stench; }
+  {
+    get { return stench; }
     set { stench = Math.Max(0, Math.Min(value, Map.MaxScentAdd)); }
   }
 
@@ -559,21 +642,26 @@ public class Entity
   public int Y { get { return Pos.Y; } set { Pos.Y=value; } }
 
   public void AddEffect(Effect effect, EffectCombo timeout, EffectCombo value)
-  { for(int i=0; i<numEffects; i++)
+  {
+    for(int i=0; i<numEffects; i++)
       if(effects[i].Type==effect.Type && effects[i].Flag==effects[i].Flag)
-      { if(effect.Value != effects[i].Value && // flag effects that cancel out
-           (effect.Type==EffectType.Ability || effect.Type==EffectType.Ailment || effect.Type==EffectType.Attr ||
-            effect.Type==EffectType.Intrinsic))
-        { if(effects[i].Timeout > effect.Timeout) effects[i].Timeout -= effect.Timeout;
+      {
+        if(effect.Value != effects[i].Value && // flag effects that cancel out
+         (effect.Type==EffectType.Ability || effect.Type==EffectType.Ailment || effect.Type==EffectType.Attr ||
+          effect.Type==EffectType.Intrinsic))
+        {
+          if(effects[i].Timeout > effect.Timeout) effects[i].Timeout -= effect.Timeout;
           else if(effects[i].Timeout < effect.Timeout) effects[i] = effect;
           else effects[i]=effects[--numEffects];
         }
         else // otherwise, effects that need to be combined
-        { int newValue;
+        {
+          int newValue;
           switch(value)
-          { case EffectCombo.Greater: newValue = Math.Max(effects[i].Value, effect.Value); break;
+          {
+            case EffectCombo.Greater: newValue = Math.Max(effects[i].Value, effect.Value); break;
             case EffectCombo.KeepOld: newValue = effects[i].Value; break;
-            case EffectCombo.Lesser:  newValue = Math.Min(effects[i].Value, effect.Value); break;
+            case EffectCombo.Lesser: newValue = Math.Min(effects[i].Value, effect.Value); break;
             case EffectCombo.NoChange: newValue = 0; break;
             case EffectCombo.Replace: newValue = effect.Value; break;
             case EffectCombo.Sum: newValue = effects[i].Value + effect.Value; break;
@@ -582,9 +670,10 @@ public class Entity
 
           bool keep = false;
           switch(timeout)
-          { case EffectCombo.Greater: if(effect.Timeout>=effects[i].Timeout) keep = true; break;
+          {
+            case EffectCombo.Greater: if(effect.Timeout>=effects[i].Timeout) keep = true; break;
             case EffectCombo.KeepOld: keep = true; break;
-            case EffectCombo.Lesser:  if(effect.Timeout<=effects[i].Timeout) keep = true; break;
+            case EffectCombo.Lesser: if(effect.Timeout<=effects[i].Timeout) keep = true; break;
             case EffectCombo.Sum: effects[i].Timeout += effect.Timeout; keep = true; break;
           }
 
@@ -595,31 +684,36 @@ public class Entity
       }
 
     if(effects==null || numEffects==effects.Length)
-    { Effect[] narr = new Effect[numEffects==0 ? 4 : numEffects*2];
+    {
+      Effect[] narr = new Effect[numEffects==0 ? 4 : numEffects*2];
       if(numEffects!=0) effects.CopyTo(narr, 0);
       effects = narr;
     }
 
-    effects[numEffects++] = effect; 
+    effects[numEffects++] = effect;
   }
 
   public int AlterBaseAttr(Attr attribute, int amount)
-  { return SetBaseAttr(attribute, GetBaseAttr(attribute)+amount);
+  {
+    return SetBaseAttr(attribute, GetBaseAttr(attribute)+amount);
   }
 
   public int GetBaseAttr(Attr attr) // gets a raw attribute value (no modifiers)
-  { if(attr<Attr.NumAttributes) return attrs[(int)attr];
+  {
+    if(attr<Attr.NumAttributes) return attrs[(int)attr];
     else
       switch(attr)
-      { case Attr.Hearing: return Class.GetHearing(this);
-        case Attr.Sight:   return Class.GetSight(this);
-        case Attr.Smell:   return Class.GetSmell(this);
+      {
+        case Attr.Hearing: return Class.GetHearing(this);
+        case Attr.Sight: return Class.GetSight(this);
+        case Attr.Smell: return Class.GetSmell(this);
         default: throw new ArgumentException("Unknown attribute: "+attr);
       }
   }
 
   public int SetBaseAttr(Attr attribute, int value) // sets a base value
-  { return attrs[(int)attribute] = (int)ClipAttrValue(attribute, value);
+  {
+    return attrs[(int)attribute] = (int)ClipAttrValue(attribute, value);
   }
 
   public bool CanPass(TileType type) { return Class.CanPass(this, type); }
@@ -627,8 +721,10 @@ public class Entity
   public bool CanSee(Point pt) { return LookAt(pt)!=Direction.Invalid; }
 
   public bool Die(Death type)
-  { switch(type)
-    { case Death.Choking: return OnDeath(Death.Choking, "choked to death");
+  {
+    switch(type)
+    {
+      case Death.Choking: return OnDeath(Death.Choking, "choked to death");
       case Death.Quit: return OnDeath(Death.Quit, "quit");
       case Death.Starvation: return OnDeath(Death.Starvation, "starved to death");
       default: throw new NotSupportedException();
@@ -641,18 +737,22 @@ public class Entity
   public int DistanceTo(Point pt) { return Math.Min(Math.Abs(X-pt.X), Math.Abs(Y-pt.Y)); }
 
   public void Drop(Item item) // removes an item from the inventory and drops it
-  { Inv.Remove(item);
+  {
+    Inv.Remove(item);
     if(OnDrop(item))
-    { item.OnDrop(this);
+    {
+      item.OnDrop(this);
       Map.AddItem(Pos, item);
     }
   }
 
   public Item Drop(Item item, int count) // removes an item from the inventory and drops it
-  { if(count==item.Count) Inv.Remove(item);
+  {
+    if(count==item.Count) Inv.Remove(item);
     else item = item.Split(count);
     if(OnDrop(item))
-    { item.OnDrop(this);
+    {
+      item.OnDrop(this);
       Map.AddItem(Pos, item);
     }
     return item;
@@ -660,7 +760,8 @@ public class Entity
 
   // returns true if the given hand is holding something
   public bool Equipped(Item item) // returns true if the given item is equipped
-  { if(Hands==null) return false;
+  {
+    if(Hands==null) return false;
     for(int i=0; i<Hands.Length; i++) if(Hands[i]==item) return true;
     return false;
   }
@@ -670,29 +771,37 @@ public class Entity
   public virtual void Exercise(Skill skill) { }
 
   public HungerLevel GainNutrition(int amount)
-  { if(this!=App.Player)
-    { food += amount;
+  {
+    if(this!=App.Player)
+    {
+      food += amount;
       return HungerLevel;
     }
     else
-    { HungerLevel oldLevel = HungerLevel;
+    {
+      HungerLevel oldLevel = HungerLevel;
       food += amount;
       HungerLevel newLevel = HungerLevel;
 
       if(oldLevel!=newLevel)
-      { if(oldLevel<newLevel) // gaining food
-        { if(newLevel==HungerLevel.Stuffed) App.IO.Print("You're having a hard time getting it all down.");
+      {
+        if(oldLevel<newLevel) // gaining food
+        {
+          if(newLevel==HungerLevel.Stuffed) App.IO.Print("You're having a hard time getting it all down.");
           else if(newLevel==HungerLevel.Choked)
-          { App.IO.Print("You choke over your food.");
+          {
+            App.IO.Print("You choke over your food.");
             Die(Death.Choking);
           }
         }
         else // losing food
-        { if(newLevel==HungerLevel.Hungry) App.IO.Print(Color.Warning, "You feel hungry.");
+        {
+          if(newLevel==HungerLevel.Hungry) App.IO.Print(Color.Warning, "You feel hungry.");
           else if(newLevel==HungerLevel.Weak) App.IO.Print(Color.Warning, "You need food, badly!");
           else if(newLevel==HungerLevel.Fainting) App.IO.Print(Color.Dire, "You feel lightheaded.");
           else if(newLevel==HungerLevel.Starved)
-          { App.IO.Print("You faint from hunger! You don't wake up.");
+          {
+            App.IO.Print("You faint from hunger! You don't wake up.");
             Die(Death.Starvation);
           }
         }
@@ -703,16 +812,19 @@ public class Entity
   }
 
   public int GetAttr(Attr attr)
-  { float value = GetBaseAttr(attr);
+  {
+    float value = GetBaseAttr(attr);
 
     if(Slots!=null)
       for(int i=0; i<Slots.Length; i++) if(Slots[i]!=null) value = Slots[i].Modify(attr, value);
 
     if(Hands!=null)
-    { Item prevHand = null;
+    {
+      Item prevHand = null;
       for(int i=0; i<Hands.Length; i++)
         if(Hands[i]!=null && Hands[i]!=prevHand)
-        { prevHand = Hands[i];
+        {
+          prevHand = Hands[i];
           value = prevHand.Modify(attr, value);
         }
     }
@@ -725,12 +837,14 @@ public class Entity
   }
 
   public int GetEffectValue(EffectType type)
-  { for(int i=0; i<numEffects; i++) if(effects[i].Type==type) return effects[i].Value;
+  {
+    for(int i=0; i<numEffects; i++) if(effects[i].Type==type) return effects[i].Value;
     return 0;
   }
 
   public Item GetGold(int amount, bool acceptLess)
-  { if(!acceptLess && amount>Gold) return null;
+  {
+    if(!acceptLess && amount>Gold) return null;
     return GetGold(amount, Inv);
   }
 
@@ -754,7 +868,8 @@ public class Entity
   public int HowMuchGold(bool recurse) { return Inv==null ? 0 : HowMuchGold(Inv, recurse); }
 
   public void Invoke(Item item) // invoke an item
-  { OnInvoke(item);
+  {
+    OnInvoke(item);
     if(item.Invoke(this)) Inv.Remove(item);
   }
 
@@ -767,14 +882,17 @@ public class Entity
   // levels the character up or down to the given level. if 'display' is true, a message may be printed regarding the
   // change
   public void LevelTo(int level, bool display)
-  { if(level==expLevel) return;
+  {
+    if(level==expLevel) return;
 
     int oldLevel = expLevel;
     Class.LevelTo(this, level);
 
     if(display)
-    { if(this==App.Player)
-      { if(level>oldLevel) App.IO.Print("You feel more experienced! Welcome to level {0}.", level);
+    {
+      if(this==App.Player)
+      {
+        if(level>oldLevel) App.IO.Print("You feel more experienced! Welcome to level {0}.", level);
         else App.IO.Print("You just lost some experience! Goodbye level {0}.", oldLevel);
       }
       else if(App.Player.CanSee(this))
@@ -784,25 +902,29 @@ public class Entity
 
   // returns the direction that would bring us closest to the entity if we can see it, or Direction.Invalid otherwise
   public Direction LookAt(Entity e)
-  { if(Map!=e.Map || e.HasAilment(Ailment.Invisible) && !HasAbility(Ability.SeeInvisible) ||
-       HasAilment(Ailment.Blind) && (!HasAbilities(Ability.Clairvoyant) || e.HasIntrinsic(Intrinsic.Mindless)))
+  {
+    if(Map!=e.Map || e.HasAilment(Ailment.Invisible) && !HasAbility(Ability.SeeInvisible) ||
+     HasAilment(Ailment.Blind) && (!HasAbilities(Ability.Clairvoyant) || e.HasIntrinsic(Intrinsic.Mindless)))
       return Direction.Invalid;
     return LookAt(e.Pos);
   }
 
   // return the direction that brings us closest to 'pt' if we can see it, or Direction.Invalid otherwise
   public Direction LookAt(Point pt)
-  { if(pt==Pos) return Direction.Self;
+  {
+    if(pt==Pos) return Direction.Self;
 
     int x2 = pt.X-X, y2 = pt.Y-Y, light=VisionRange;
     int x=0, y=0, dx=Math.Abs(x2), dy=Math.Abs(y2), xi=Math.Sign(x2), yi=Math.Sign(y2), r, ru, p;
     Point off = new Point();
     if(dx>=dy)
-    { r=dy*2; ru=r-dx*2; p=r-dx;
+    {
+      r=dy*2; ru=r-dx*2; p=r-dx;
       off.X = xi;
       if(p>0) off.Y = yi;
       do
-      { if(p>0) { y+=yi; p+=ru; }
+      {
+        if(p>0) { y+=yi; p+=ru; }
         else p+=r;
         x+=xi; dx--;
         if(!CanPass(Map[x+X, y+Y].Type) || Math.Sqrt(x*x+y*y)-0.5>light) return Direction.Invalid;
@@ -810,11 +932,13 @@ public class Entity
       } while(dx>=0);
     }
     else
-    { r=dx*2; ru=r-dy*2; p=r-dy;
+    {
+      r=dx*2; ru=r-dy*2; p=r-dy;
       if(p>0) off.X = xi;
       off.Y = yi;
       do
-      { if(p>0) { x+=xi; p+=ru; }
+      {
+        if(p>0) { x+=xi; p+=ru; }
         else p+=r;
         y+=yi; dy--;
         if(!CanPass(Map[x+X, y+Y].Type) || Math.Sqrt(x*x+y*y)-0.5>light) return Direction.Invalid;
@@ -827,11 +951,14 @@ public class Entity
 
   public void MemorizeSpell(Spell spell) { MemorizeSpell(spell, -1); }
   public void MemorizeSpell(Spell spell, int memory)
-  { if(Spells==null) Spells = new SpellMemory[1] { new SpellMemory(spell, memory) };
+  {
+    if(Spells==null) Spells = new SpellMemory[1] { new SpellMemory(spell, memory) };
     else
-    { for(int i=0; i<Spells.Length; i++)
+    {
+      for(int i=0; i<Spells.Length; i++)
         if(Spells[i].Spell==spell)
-        { if(memory==-1) Spells[i].Memory = -1;
+        {
+          if(memory==-1) Spells[i].Memory = -1;
           else Spells[i].Memory = Math.Max(memory, Spells[i].Memory);
           return;
         }
@@ -846,7 +973,8 @@ public class Entity
   public virtual bool OnDeath(Death type, string message) { return Class.OnDeath(this, type, message); }
 
   public virtual bool OnDrop(Item item) // returns 'true' if the item should be added to the map
-  { Shop shop = Map.GetShop(Pos);
+  {
+    Shop shop = Map.GetShop(Pos);
     if(shop!=null && shop.Shopkeeper!=null) item.Shop = shop; // gives the item to the shopkeeper, if there is one
     return true;
   }
@@ -873,26 +1001,30 @@ public class Entity
   // removes an item from 'inv' and places it in our inventory. return the new inventory item if it was able to be
   // added, and null if it could not (eg, inventory is full)
   public Item Pickup(IInventory inv, int index)
-  { Item item = Pickup(inv[index], inv);
+  {
+    Item item = Pickup(inv[index], inv);
     if(item!=null) inv.RemoveAt(index);
     return item;
   }
 
   public Item Pickup(IInventory inv, Item item) // ditto
-  { Item ret = Pickup(item, inv);
+  {
+    Item ret = Pickup(item, inv);
     if(ret!=null) inv.Remove(item);
     return ret;
   }
 
   public virtual void Think()
-  { int turn = ++turns;
+  {
+    int turn = ++turns;
     Class.Think(this);
-    
+
     // each turn, consume base amount (~10% as much while sleeping) if carnivorous or herbivorous
     int food = 0;
     if(HasIntrinsic(Intrinsic.Carnivore|Intrinsic.Herbivore) && (!HasAilment(Ailment.Sleeping) || Global.OneIn(10)))
       switch(Class.Size)
-      { case EntitySize.Tiny: food = Global.OneIn(3) ? 1 : 0; break;
+      {
+        case EntitySize.Tiny: food = Global.OneIn(3) ? 1 : 0; break;
         case EntitySize.Small: food = Global.Coinflip() ? 1 : 0; break;
         case EntitySize.Medium: food = 1; break;
         case EntitySize.Large: food = Global.Coinflip() ? 2 : 1; break;
@@ -901,17 +1033,20 @@ public class Entity
       }
 
     if((turn&1)!=0) // on odd turns
-    { if(HasAbility(Ability.Regenerates)) food++; // regeneration takes an additional one every odd turn
+    {
+      if(HasAbility(Ability.Regenerates)) food++; // regeneration takes an additional one every odd turn
       if(CarryStress>=CarryStress.Stressed) food++; // plus, we need more food when carrying more
     }
     int mod20 = turn%20+1;
     if(mod20==4)
-    { Item ring = GetSlot(Slot.LRing);
+    {
+      Item ring = GetSlot(Slot.LRing);
       if(ring!=null) food += ((Ring)ring.Class).ExtraHunger; // extra food on 4th turn of 20 if wearing left ring
     }
     else if(mod20==8 && GetSlot(Slot.Neck)!=null) food++; // extra food on 8th turn of 20 if wearing amulet
     else if(mod20==12)
-    { Item ring = GetSlot(Slot.RRing);
+    {
+      Item ring = GetSlot(Slot.RRing);
       if(ring!=null) food += ((Ring)ring.Class).ExtraHunger; // extra food on 12th turn of 20 if wearing right ring
     }
 
@@ -919,25 +1054,32 @@ public class Entity
   }
 
   public virtual void Tick()
-  { if(Inv!=null) Tick(Inv);
+  {
+    if(Inv!=null) Tick(Inv);
     Class.Tick(this);
   }
 
   public void TrySpellDamage(Spell spell, Entity caster, Item item, ref Damage damage)
-  { throw new NotImplementedException();
+  {
+    throw new NotImplementedException();
   }
 
   // unequips an item if possible. returns true if item could be unequipped, or it was not equipped in the first place
   public bool TryUnequip(Item item)
-  { if(Equipped(item))
-    { if(item.Cursed)
-      { if(this==App.Player)
-        { App.IO.Print("The {0} is stuck to your {1}!", item.GetFullName(),
+  {
+    if(Equipped(item))
+    {
+      if(item.Cursed)
+      {
+        if(this==App.Player)
+        {
+          App.IO.Print("The {0} is stuck to your {1}!", item.GetFullName(),
                        item.Type==ItemType.Shield ? "arm" : "hand");
           item.Status |= ItemStatus.KnowCB;
         }
         else if(App.Player.CanSee(this))
-        { App.IO.Print("{0} is unable to drop {1}!", TheName, item.GetFullName());
+        {
+          App.IO.Print("{0} is unable to drop {1}!", TheName, item.GetFullName());
           item.Status |= ItemStatus.KnowCB;
         }
         return false;
@@ -950,9 +1092,11 @@ public class Entity
 
   // unequips an item. it's assumed that the item is currently equipped
   public void Unequip(Item item)
-  { for(int i=0; i<Hands.Length; i++)
+  {
+    for(int i=0; i<Hands.Length; i++)
       if(Hands[i]==item)
-      { Hands[i] = null;
+      {
+        Hands[i] = null;
         OnUnequip(item);
         item.OnUnequip(this);
         CheckFlags();
@@ -965,21 +1109,30 @@ public class Entity
   // returns a list of creatures visible from this position
   public Entity[] VisibleCreatures() { return VisibleCreatures(VisibleTiles()); }
   public Entity[] VisibleCreatures(Point[] vis) // FIXME: take into account clairvoyance, etc
-  { foreach(Entity e in Map.Entities)
+  {
+    List<Entity> list = new List<Entity>();
+    foreach(Entity e in Map.Entities)
+    {
       if(e!=this && (!e.HasAilment(Ailment.Invisible) || HasAbility(Ability.SeeInvisible)))
-        for(int j=0; j<vis.Length; j++) if(vis[j]==e.Pos) { list.Add(e); break; }
-    Entity[] ret = (Entity[])list.ToArray(typeof(Entity));
-    list.Clear();
-    return ret;
+      {
+        for(int j=0; j<vis.Length; j++)
+        {
+          if(vis[j] == e.Pos) { list.Add(e); break; }
+        }
+      }
+    }
+    return list.ToArray();
   }
 
   // returns a list of tiles visible from this position
   public Point[] VisibleTiles()
-  { int x=0, y=VisionRange*4, s=1-y;
+  {
+    int x=0, y=VisionRange*4, s=1-y;
     visPts = 0;
     VisiblePoint(0, 0);
     while(x<=y)
-    { VisibleLine(x, y);
+    {
+      VisibleLine(x, y);
       VisibleLine(x, -y);
       VisibleLine(-x, y);
       VisibleLine(-x, -y);
@@ -994,7 +1147,8 @@ public class Entity
 
     Point[] ret = new Point[visPts];
     for(visPts--; visPts>=0; visPts--)
-    { y = Math.DivRem(vis[visPts], Map.Width, out x);
+    {
+      y = Math.DivRem(vis[visPts], Map.Width, out x);
       ret[visPts] = new Point(x, y);
     }
     return ret;
@@ -1003,7 +1157,8 @@ public class Entity
   // returns true if the given item is being worn
   public bool Wearing(Slot slot) { return Slots!=null && Slots[(int)slot]!=null; }
   public bool Wearing(Item item)
-  { if(Slots==null) return false;
+  {
+    if(Slots==null) return false;
     for(int i=0; i<Slots.Length; i++) if(Slots[i]==item) return true;
     return false;
   }
@@ -1024,13 +1179,17 @@ public class Entity
   public Gender Gender;
 
   protected void CheckFlags() // check if our flags have changed and call OnFlagsChanged if so
-  { throw new NotImplementedException();
+  {
+    throw new NotImplementedException();
   }
 
   uint ApplyFlagEffect(EffectType type, uint flags)
-  { for(int i=0; i<numEffects; i++)
-    { if(effects[i].Type==type)
-      { if(effects[i].Value==1) flags |= effects[i].Flag;
+  {
+    for(int i=0; i<numEffects; i++)
+    {
+      if(effects[i].Type==type)
+      {
+        if(effects[i].Value==1) flags |= effects[i].Flag;
         else flags &= ~effects[i].Flag;
       }
     }
@@ -1040,78 +1199,112 @@ public class Entity
   string Called(string baseName) { return Name==null ? baseName : baseName + " (called " + Name + ")"; }
 
   Item GetGold(int amount, IInventory inv)
-  { Item ret = null;
-    ArrayList remove = null;
+  {
+    Item ret = null;
+    List<Item> toRemove = null;
 
     foreach(Item i in inv)
-      if(i.Type==ItemType.Gold)
-      { if(i.Count>amount)
-        { if(ret==null) ret = i.Split(amount);
-          else { ret.Count+=amount; i.Count-=amount; }
+    {
+      if(i.Type == ItemType.Gold)
+      {
+        if(i.Count > amount)
+        {
+          if(ret == null) ret = i.Split(amount);
+          else
+          { 
+            ret.Count += amount; 
+            i.Count -= amount; 
+          }
           return ret;
         }
         else
-        { if(remove==null) remove = new ArrayList();
-          remove.Add(i);
-          if(ret==null) ret = (Item)i;
+        {
+          if(toRemove == null) toRemove = new List<Item>();
+          toRemove.Add(i);
+          if(ret == null) ret = i;
           else ret.Count += i.Count;
           amount -= i.Count;
         }
       }
+    }
 
-    foreach(Item i in remove) inv.Remove(i);
+    if(toRemove != null)
+    {
+      foreach(Item i in toRemove) inv.Remove(i);
+    }
 
-    if(amount>0)
+    // if we still don't have enough gold, search though nested containers as well
+    if(amount > 0)
+    {
       foreach(Item i in inv)
-        if(i.Type==ItemType.Container)
-        { Item gold = GetGold(amount, (IInventory)i.Data);
-          if(gold!=null)
-          { if(ret==null) ret = gold;
+      {
+        if(i.Type == ItemType.Container)
+        {
+          Item gold = GetGold(amount, (IInventory)i.Data);
+          if(gold != null)
+          {
+            if(ret == null) ret = gold;
             else ret.Count += gold.Count;
             amount -= gold.Count;
-            if(amount==0) break;
+            if(amount == 0) break;
           }
         }
+      }
+    }
 
     return ret;
   }
 
   int HowMuchGold(IInventory container, bool recurse)
-  { int total = 0;
+  {
+    int total = 0;
     foreach(Item item in container)
-    { if(item.Type==ItemType.Gold) total += item.Count;
-      else if(recurse && item.Type==ItemType.Container) total += HowMuchGold((IInventory)item.Data, recurse);
+    {
+      if(item.Type == ItemType.Gold) total += item.Count;
+      else if(recurse && item.Type == ItemType.Container) total += HowMuchGold((IInventory)item.Data, recurse);
     }
     return total;
   }
 
   void Tick(IInventory container)
-  { ArrayList remove = null;
+  {
+    List<Item> toRemove = null;
     foreach(Item i in container)
-    { if(i.Tick(this, container))
-      { if(remove==null) remove = new ArrayList();
-        remove.Add(i);
+    {
+      if(i.Tick(this, container))
+      {
+        if(toRemove == null) toRemove = new List<Item>();
+        toRemove.Add(i);
       }
-      else if(i.Type==ItemType.Container) Tick((IInventory)i.Data);
+      else if(i.Type == ItemType.Container) Tick((IInventory)i.Data);
     }
-    if(remove!=null) foreach(Item i in remove) container.Remove(i);
+
+    if(toRemove != null)
+    {
+      foreach(Item i in toRemove) container.Remove(i);
+    }
   }
 
   void VisibleLine(int x2, int y2)
-  { int x=0, y=0, dx=Math.Abs(x2), dy=Math.Abs(y2), xi=Math.Sign(x2), yi=Math.Sign(y2), r, ru, p, light=VisionRange;
+  {
+    int x=0, y=0, dx=Math.Abs(x2), dy=Math.Abs(y2), xi=Math.Sign(x2), yi=Math.Sign(y2), r, ru, p, light=VisionRange;
     if(dx>=dy)
-    { r=dy*2; ru=r-dx*2; p=r-dx;
+    {
+      r=dy*2; ru=r-dx*2; p=r-dx;
       do
-      { if(p>0) { y+=yi; p+=ru; }
+      {
+        if(p>0) { y+=yi; p+=ru; }
         else p+=r;
         x+=xi; dx--;
         if(Math.Sqrt(x*x+y*y)-0.5>light) break;
       } while(dx>=0 && VisiblePoint(x, y));
     }
     else
-    { r=dx*2; ru=r-dy*2; p=r-dy;
+    {
+      r=dx*2; ru=r-dy*2; p=r-dy;
       do
-      { if(p>0) { x+=xi; p+=ru; }
+      {
+        if(p>0) { x+=xi; p+=ru; }
         else p+=r;
         y+=yi; dy--;
         if(Math.Sqrt(x*x+y*y)-0.5>light) break;
@@ -1120,12 +1313,14 @@ public class Entity
   }
 
   bool VisiblePoint(int x, int y)
-  { x += Pos.X; y += Pos.Y;
+  {
+    x += Pos.X; y += Pos.Y;
     TileType type = Map[x, y].Type;
     if(type==TileType.Border) return false;
 
     if(visPts==vis.Length)
-    { int[] narr = new int[visPts*2];
+    {
+      int[] narr = new int[visPts*2];
       Array.Copy(vis, narr, visPts);
       vis = narr;
     }
@@ -1143,13 +1338,22 @@ public class Entity
   int exp, index, hp, mp, food, stench, turns, numEffects;
 
   static float ClipAttrValue(Attr attr, float value)
-  { if(value<0) value = 0;
+  {
+    if(value<0) value = 0;
     else
       switch(attr)
-      { case Attr.Speed: case Attr.Stealth: case Attr.Sight: case Attr.Hearing: case Attr.Smell:
+      {
+        case Attr.Speed:
+        case Attr.Stealth:
+        case Attr.Sight:
+        case Attr.Hearing:
+        case Attr.Smell:
           if(value>100) value = 100;
           break;
-        case Attr.EV: case Attr.Str: case Attr.Int: case Attr.Dex:
+        case Attr.EV:
+        case Attr.Str:
+        case Attr.Int:
+        case Attr.Dex:
           if(value>25) value = 25;
           else if(value<1) value = 1;
           break;
@@ -1157,7 +1361,6 @@ public class Entity
     return value;
   }
 
-  static ArrayList list = new ArrayList(); // an arraylist used in some places (ie VisibleCreatures)
   static int[] vis = new int[128]; // vis point buffer
   static int visPts; // number of points in buffer
 }
@@ -1165,7 +1368,8 @@ public class Entity
 
 #region SpellMemory
 public struct SpellMemory
-{ public SpellMemory(Spell spell, int memory) { Spell=spell; Memory=memory; }
+{
+  public SpellMemory(Spell spell, int memory) { Spell=spell; Memory=memory; }
   public readonly Spell Spell;
   public int Memory;
 }
@@ -1173,32 +1377,40 @@ public struct SpellMemory
 
 #region XmlEntityClass
 public class XmlEntityClass : EntityClass
-{ protected XmlEntityClass() { }
+{
+  protected XmlEntityClass() { }
 
-  public XmlEntityClass(XmlNode node, Hashtable idcache)
-  { XmlDocument doc = node.OwnerDocument;
-    Stack stack = new Stack();
-    
+  public XmlEntityClass(XmlNode node, Dictionary<string,XmlNode> idcache)
+  {
+    XmlDocument doc = node.OwnerDocument;
+    Stack<XmlNode> stack = new Stack<XmlNode>();
+
     stack.Push(node);
     while(node.Attributes["inherit"]!=null)
-    { string bid = Xml.Attr(node, "inherit");
-      node = (XmlNode)idcache[bid];
-      if(node==null)
-      { node = doc.SelectSingleNode("//entity[@id='"+bid+"']");
+    {
+      string bid = Xml.Attr(node, "inherit");
+      if(!idcache.TryGetValue(bid, out node))
+      {
+        node = doc.SelectSingleNode("//entity[@id='"+bid+"']");
         if(node==null) throw new ArgumentException("No such entity: "+bid);
         idcache[bid] = node;
       }
       stack.Push(node);
     }
-    
+
     Difficulty = 1;
 
-    ArrayList attacks=new ArrayList(), resists=new ArrayList(), confers=new ArrayList(), items=new ArrayList();
+    List<Attack> attacks = new List<Attack>();
+    List<Conference> confers = new List<Conference>();
+    List<XmlNode> items = new List<XmlNode>();
     do
-    { node = (XmlNode)stack.Pop();
+    {
+      node = (XmlNode)stack.Pop();
       foreach(XmlAttribute attr in node.Attributes)
+      {
         switch(attr.Name)
-        { case "abilities": Abilities = Xml.Abilities(attr); break;
+        {
+          case "abilities": Abilities = Xml.Abilities(attr); break;
           case "aiFlags": AIFlags = Xml.AIFlags(attr); break;
           case "ailments": Ailments = Xml.Ailments(attr); break;
           case "chance": SpawnChance = int.Parse(attr.Value); break;
@@ -1225,16 +1437,21 @@ public class XmlEntityClass : EntityClass
             break;
 
           default:
-            if(extraAttrs==null) extraAttrs = new SortedList();
+            if(extraAttrs==null) extraAttrs = new SortedList<string,string>();
             extraAttrs[attr.Name] = attr.Value;
             break;
         }
+      }
 
       foreach(XmlNode child in node.ChildNodes)
-        if(child.NodeType==XmlNodeType.Element)
+      {
+        if(child.NodeType == XmlNodeType.Element)
+        {
           switch(child.LocalName)
-          { case "attack":
-            { Attack a = new Attack(child);
+          {
+            case "attack":
+            {
+              Attack a = new Attack(child);
               if(a.Type==AttackType.Weapon) HasWeaponAttack = true;
               else if(a.Type==AttackType.Spell) HasSpellAttack = true;
               else attacks.Add(a);
@@ -1243,16 +1460,20 @@ public class XmlEntityClass : EntityClass
             case "confer": confers.Add(new Conference(child)); break;
             case "description": description = Xml.BlockToString(node.InnerText); break;
             case "give": items.Add(child); break;
+            case "resist": throw new NotImplementedException("resistances");
           }
+        }
+      }
     } while(stack.Count!=0);
 
-    InitialItems = items.Count==0 ? null : (XmlNode[])items.ToArray(typeof(XmlNode));
-    Attacks = attacks.Count==0 ? null : (Attack[])attacks.ToArray(typeof(Attack));
-    Confers = confers.Count==0 ? null : (Conference[])confers.ToArray(typeof(Conference));
+    InitialItems = items.Count==0 ? null : items.ToArray();
+    Attacks = attacks.Count==0 ? null : attacks.ToArray();
+    Confers = confers.Count==0 ? null : confers.ToArray();
   }
 
   public override void Initialize(Entity e)
-  { base.Initialize(e);
+  {
+    base.Initialize(e);
     for(int i=0; i<BaseAttributes.Length; i++) e.SetBaseAttr((Attr)i, BaseAttributes[i].RandValue());
     if(InitialItems!=null) foreach(XmlNode node in InitialItems) e.Pickup(new Item(node));
   }
@@ -1264,10 +1485,11 @@ public class XmlEntityClass : EntityClass
 
   protected string GetExtraAttr(string name) { return extraAttrs==null ? null : (string)extraAttrs[name]; }
 
-  IDictionary extraAttrs;
+  SortedList<string,string> extraAttrs;
 
-  public static EntityClass Make(XmlNode node, Hashtable idcache)
-  { string type = Xml.Attr(node, "type");
+  public static EntityClass Make(XmlNode node, Dictionary<string,XmlNode> idcache)
+  {
+    string type = Xml.Attr(node, "type");
     if(Xml.IsEmpty(type)) return new XmlEntityClass(node, idcache);
     else throw new NotImplementedException();
   }

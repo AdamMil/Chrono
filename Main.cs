@@ -4,7 +4,8 @@ namespace Chrono
 {
 
 public sealed class App
-{ App() { }
+{
+  App() { }
 
   public static Dungeon World = new Dungeon("overworld");
   public static Player Player;
@@ -12,7 +13,8 @@ public sealed class App
   public static bool IsQuitting;
 
   public static void Main()
-  { IO = new ConsoleIO();
+  {
+    IO = new ConsoleIO();
     IO.SetTitle("Chrono 0.05");
     IO.Print("Chrono 0.05 by Adam Milazzo");
     IO.Print();
@@ -31,7 +33,8 @@ public sealed class App
     Player.Pickup(new Item("builtin/Gold")).Count = 100;
 
     foreach(Item i in Player.Inv)
-    { Player.AddKnowledge(i.Class);
+    {
+      Player.AddKnowledge(i.Class);
       i.Identify();
       i.Uncurse();
     }
@@ -42,10 +45,11 @@ public sealed class App
 
     IO.Render(Player);
     while(!IsQuitting)
-    { try { Player.Map.Simulate(); }
+    {
+      try { Player.Map.Simulate(); }
       catch(Exception e) { App.IO.Print("{0} occurred: {1}", e.GetType().Name, e.Message); }
     }
-    
+
     if(Player.HP>0) Save();
   }
 

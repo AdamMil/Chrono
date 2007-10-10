@@ -6,7 +6,8 @@ namespace Chrono
 
 #region Shield
 public abstract class Shield : ItemClass
-{ protected Shield() { Type = ItemType.Shield; }
+{
+  protected Shield() { Type = ItemType.Shield; }
 
   public int BlockChance;
 }
@@ -14,8 +15,10 @@ public abstract class Shield : ItemClass
 
 #region XmlShield
 public sealed class XmlShield : Shield
-{ public XmlShield(XmlNode node)
-  { ItemClass.Init(this, node);
+{
+  public XmlShield(XmlNode node)
+  {
+    ItemClass.Init(this, node);
     BlockChance = Xml.Int(node, "blockChance");
   }
 }

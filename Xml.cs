@@ -5,12 +5,11 @@ using System.Xml;
 namespace Chrono
 {
 
-public class Xml
-{ Xml() { }
-
+public static class Xml
+{
   public static Ability Abilities(XmlAttribute node) { return node==null ? Ability.None : Abilities(node.Value); }
   public static Ability Abilities(string list) { return (Ability)FlagList(typeof(Ability), list); }
-  
+
   public static Ailment Ailments(XmlAttribute node) { return node==null ? Ailment.None : Ailments(node.Value); }
   public static Ailment Ailments(string list) { return (Ailment)FlagList(typeof(Ailment), list); }
 
@@ -19,7 +18,8 @@ public class Xml
 
   public static string Attr(XmlNode node, string attr) { return Attr(node, attr, null); }
   public static string Attr(XmlNode node, string attr, string defaultValue)
-  { if(node==null) return defaultValue;
+  {
+    if(node==null) return defaultValue;
     XmlAttribute an = node.Attributes[attr];
     return an==null ? defaultValue : an.Value;
   }
@@ -28,7 +28,8 @@ public class Xml
 
   public static string[] BlockToArray(string block) { return BlockToArray(block, false); }
   public static string[] BlockToArray(string block, bool collapseLines)
-  { if(block==null || block=="") return new string[0];
+  {
+    if(block==null || block=="") return new string[0];
 
     block = ltbl.Replace(block.Replace("\r", ""), ""); // remove CRs, and leading and trailing blank lines
     Match m = lspc.Match(block); // TODO: this should be the amount that can be removed uniformly from nonblank lines
@@ -40,15 +41,18 @@ public class Xml
     int pos, oldPos=0;
     string last=null;
     do
-    { string temp;
+    {
+      string temp;
       pos = block.IndexOf('\n', oldPos);
 
       if(pos==oldPos)
-      { list.Add("");
+      {
+        list.Add("");
         last = null;
       }
       else
-      { temp = trim.Replace(pos==-1 ? block.Substring(oldPos) : block.Substring(oldPos, pos-oldPos), "");
+      {
+        temp = trim.Replace(pos==-1 ? block.Substring(oldPos) : block.Substring(oldPos, pos-oldPos), "");
         if(last==null) list.Add(last=temp);
         else list[list.Count-1] = last = last+' '+temp;
       }
@@ -60,7 +64,8 @@ public class Xml
 
   public static string BlockToString(string block) { return BlockToString(block, true); }
   public static string BlockToString(string block, bool collapseLines)
-  { if(block==null || block=="") return "";
+  {
+    if(block==null || block=="") return "";
 
     block = ltbl.Replace(block.Replace("\r", ""), ""); // remove CRs, and leading and trailing blank lines
     Match m = lspc.Match(block); // TODO: this should be the amount that can be removed uniformly from nonblank lines
@@ -72,14 +77,17 @@ public class Xml
     int pos, oldPos=0;
     bool nl=true;
     do
-    { pos = block.IndexOf('\n', oldPos);
+    {
+      pos = block.IndexOf('\n', oldPos);
 
       if(pos==oldPos)
-      { if(!nl) { sb.Append('\n'); nl=true; }
+      {
+        if(!nl) { sb.Append('\n'); nl=true; }
         sb.Append('\n');
       }
       else
-      { if(!nl) sb.Append(' ');
+      {
+        if(!nl) sb.Append(' ');
         else nl=false;
         sb.Append(trim.Replace(pos==-1 ? block.Substring(oldPos) : block.Substring(oldPos, pos-oldPos), ""));
       }
@@ -97,18 +105,21 @@ public class Xml
   public static EntitySize EntitySize(string str) { return (EntitySize)Enum.Parse(typeof(EntitySize), str); }
 
   public static uint FlagList(Type enumType, string list)
-  { uint flags = 0;
+  {
+    uint flags = 0;
     if(!IsEmpty(list)) foreach(string str in List(list)) flags |= Convert.ToUInt32(Enum.Parse(enumType, str));
     return flags;
   }
 
   public static float Float(XmlAttribute attr) { return Float(attr, 0); }
   public static float Float(XmlAttribute attr, float defaultValue)
-  { return attr==null ? defaultValue : float.Parse(attr.Value);
+  {
+    return attr==null ? defaultValue : float.Parse(attr.Value);
   }
   public static float Float(XmlNode node, string attr) { return Float(node.Attributes[attr], 0); }
   public static float Float(XmlNode node, string attr, float defaultValue)
-  { return Float(node.Attributes[attr], defaultValue);
+  {
+    return Float(node.Attributes[attr], defaultValue);
   }
 
   public static Gender Gender(XmlAttribute attr) { return Gender(attr.Value); }
@@ -116,11 +127,13 @@ public class Xml
 
   public static int Int(XmlAttribute attr) { return Int(attr, 0); }
   public static int Int(XmlAttribute attr, int defaultValue)
-  { return attr==null ? defaultValue : int.Parse(attr.Value);
+  {
+    return attr==null ? defaultValue : int.Parse(attr.Value);
   }
   public static int Int(XmlNode node, string attr) { return Int(node.Attributes[attr], 0); }
   public static int Int(XmlNode node, string attr, int defaultValue)
-  { return Int(node.Attributes[attr], defaultValue);
+  {
+    return Int(node.Attributes[attr], defaultValue);
   }
 
   public static Intrinsic Intrinsics(XmlAttribute node) { return node==null ? Intrinsic.None : Intrinsics(node.Value); }
@@ -143,27 +156,31 @@ public class Xml
 
   public static int RangeInt(string range) { return RangeInt(range, 0); }
   public static int RangeInt(string range, int defaultValue)
-  { return range==null || range=="" ? defaultValue : new Range(range, defaultValue).RandValue();
+  {
+    return range==null || range=="" ? defaultValue : new Range(range, defaultValue).RandValue();
   }
 
   public static int RangeInt(XmlAttribute range) { return RangeInt(range, 0); }
   public static int RangeInt(XmlAttribute range, int defaultValue)
-  { return range==null ? defaultValue : RangeInt(range.Value);
+  {
+    return range==null ? defaultValue : RangeInt(range.Value);
   }
 
   public static int RangeInt(XmlNode node, string attr) { return RangeInt(node.Attributes[attr], 0); }
   public static int RangeInt(XmlNode node, string attr, int defaultValue)
-  { return RangeInt(node.Attributes[attr], defaultValue);
+  {
+    return RangeInt(node.Attributes[attr], defaultValue);
   }
 
   public static string String(XmlAttribute str) { return str==null ? null : str.Value; }
   public static string String(XmlAttribute str, string defaultValue) { return str==null ? defaultValue : str.Value; }
   public static string String(XmlNode node, string attr) { return String(node.Attributes[attr]); }
-  
+
   public static int Weight(XmlNode node, string attr) { return Weight(node.Attributes[attr]); }
   public static int Weight(XmlAttribute attr) { return attr==null ? 0 : Weight(attr.Value); }
   public static int Weight(string str)
-  { if(IsEmpty(str)) return 0;
+  {
+    if(IsEmpty(str)) return 0;
     Match m = weight.Match(str);
     if(!m.Success) throw new ArgumentException("'"+str+"' is not a valid weight");
     double d = double.Parse(m.Groups[1].Value);

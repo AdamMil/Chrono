@@ -8,11 +8,6 @@ using Point=System.Drawing.Point;
 namespace Chrono
 {
 
-#region Attributes
-[AttributeUsage(AttributeTargets.Class)]
-public sealed class NoCloneAttribute : Attribute { }
-#endregion
-
 #region Enums
 public enum Direction : byte
 {
@@ -192,14 +187,12 @@ public static class ItemComparer
 #endregion
 
 #region Global
-public sealed class Global
+public static class Global
 {
-  Global() { }
-
   static Global()
   {
-    LoadEntities();
     LoadItems();
+    LoadEntities();
   }
 
   public static string AorAn(string s)
@@ -423,6 +416,7 @@ public sealed class Global
 
     Dictionary<string, XmlNode> idcache = new Dictionary<string, XmlNode>();
 
+    // TODO: what is the difference between name and fullname???
     foreach(XmlNode node in doc.SelectNodes("//entity[@fullName]"))
     {
       entityNames[node.Attributes["fullName"].Value] = classes.Count;
@@ -431,7 +425,7 @@ public sealed class Global
 
     foreach(XmlNode node in doc.SelectNodes("//entity[@name]"))
     {
-      if(node.Attributes["fullName"]==null)
+      if(node.Attributes["fullName"] == null)
       {
         entityNames[node.Attributes["name"].Value] = classes.Count;
         classes.Add(XmlEntityClass.Make(node, idcache));
@@ -472,9 +466,9 @@ public sealed class Global
     XmlDocument doc = LoadXml("items.xml");
     foreach(XmlNode node in doc.DocumentElement.ChildNodes)
     {
-      if(node.NodeType==XmlNodeType.Element && node.LocalName!="randomNames")
+      if(node.NodeType == XmlNodeType.Element && node.LocalName != "randomNames")
       {
-        ItemClass ic = ItemClass.FromXml(node);
+        ItemClass ic = ItemClass.Make(node);
         List<ItemClass> list = lists[(int)ic.Type];
         if(list == null) lists[(int)ic.Type] = list = new List<ItemClass>();
         names[ic.Type.ToString().ToLower()+"/"+node.Attributes["name"].Value] = new ItemIndex(ic.Type, list.Count);

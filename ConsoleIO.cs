@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Point=System.Drawing.Point;
 using Rectangle=System.Drawing.Rectangle;
+using AdamMil.Utilities;
 
 namespace Chrono
 {
@@ -1067,7 +1068,7 @@ Ctrl-P - see old messages";
       for(int i=0, y=rect.Top; y<rect.Bottom; y++)
         for(int x=rect.Left; x<rect.Right; i++, x++)
           buf[i] = TileToChar(map[x, y], true);
-      unsafe { fixed(bool* visp=vis) GameLib.Interop.Unsafe.Fill(visp, 1, size); }
+      unsafe { fixed(bool* visp=vis) Unsafe.Fill(visp, 1, size); }
       RenderEntities(map.Entities, vpts, rect);
     }
     else

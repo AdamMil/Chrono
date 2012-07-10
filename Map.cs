@@ -6,6 +6,7 @@ using AdamMil.Collections;
 using Point=System.Drawing.Point;
 using Rectangle=System.Drawing.Rectangle;
 using Size=System.Drawing.Size;
+using Vector = AdamMil.Mathematics.Geometry.TwoD.Vector;
 
 namespace Chrono
 {
@@ -410,7 +411,7 @@ namespace Chrono
         if(e != source) // except for the one that generated it...
         {
           int vol = map[e.Y, e.X].Sound;
-          if(vol>0) e.OnNoise(source, type, vol);
+          if(vol > 0) e.OnNoise(source, type, vol);
         }
       }
     }
@@ -418,12 +419,21 @@ namespace Chrono
     public Point RandomTile(TileType type)
     {
       int tries = Width*Height;
-      while(tries-->0)
+      
+      while(tries-- > 0)
       {
         int x = Global.Rand(Width), y = Global.Rand(Height);
-        if(map[y, x].Type==type) return new Point(x, y);
+        if(map[y, x].Type == type) return new Point(x, y);
       }
-      for(int y=0; y<Height; y++) for(int x=0; x<Width; x++) if(map[y, x].Type==type) return new Point(x, y);
+
+      for(int y=0; y<Height; y++)
+      {
+        for(int x=0; x<Width; x++)
+        {
+          if(map[y, x].Type==type) return new Point(x, y);
+        }
+      }
+      
       throw new ArgumentException("No such tile on this map!");
     }
 
@@ -432,13 +442,17 @@ namespace Chrono
       Rectangle area = shop.ItemArea;
       bool stocked = false;
       for(int y=area.Y; y<area.Bottom; y++)
+      {
         for(int x=area.X; x<area.Right; x++)
+        {
           if(!HasItems(x, y))
           {
             AddItem(x, y, new Item(shop.Type.RandItem()));
             if(!fullyStock) return true;
             stocked = true;
           }
+        }
+      }
       return stocked;
     }
 
@@ -447,7 +461,7 @@ namespace Chrono
 
     /*
       map time is measured in real time, with each tick being equal to 15 seconds.
-      a creature with maximum speed (100) would be able to a turn each 1/10 tick (or 1.5 seconds)
+      a creature with maximum speed (100) would be able to have a turn each 1/10 tick (or 1.5 seconds)
       a creature with a speed of 33 would be able to take a turn each 100/33 * 1/10 tick (= 1/3 tick = 5 seconds) 
     
       if an entity is passed in returnAfter, the procedure will return when it becomes that entity's turn.
@@ -456,9 +470,10 @@ namespace Chrono
       and when Simulate(foo) -> Simulate(foo) ultimately returns, two of foo's turns will have elapsed.
     */
     public void Simulate() { Simulate(null); }
+
     public void Simulate(Entity returnAfter)
     {
-      bool addedReturn = returnAfter==null; // if no entity is passed, the condition is always met (normal operation)
+      bool addedReturn = returnAfter == null; // if no entity is passed, the condition is always met (normal operation)
 
       while(thinkQueue.Count==0 || !addedReturn) // if the think queue is empty, or we need to wait for an entity...
       {
@@ -474,10 +489,10 @@ namespace Chrono
         foreach(Entity e in Entities) // add all the entities that will think in a single pass
         {
           e.Timer += e.Speed;
-          if(e.Timer>=100)
+          if(e.Timer >= 100)
           {
             e.Timer -= 100;
-            if(e==returnAfter) addedReturn = true;
+            if(e == returnAfter) addedReturn = true;
             thinkQueue.Enqueue(e);
           }
         }
@@ -781,8 +796,8 @@ namespace Chrono
             tryagain:
             for(tri=0; tri<25; tri++)
             {
-              GameLib.Mathematics.TwoD.Vector v = new GameLib.Mathematics.TwoD.Vector(0, -range.RandValue());
-              v.Rotate(Global.Rand(amin, amax) * GameLib.Mathematics.MathConst.DegreesToRadians);
+              Vector v = new Vector(0, -range.RandValue());
+              v.Rotate(Global.Rand(amin, amax) * AdamMil.Mathematics.Geometry.MathConst.DegreesToRadians);
               pt = v.ToPoint().ToPoint();
               pt.X += rp.X;
               pt.Y += rp.Y;

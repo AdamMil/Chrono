@@ -409,6 +409,7 @@ public abstract class EntityClass
 
   public string Name;
   public Conference[] Confers;
+  public Resistance[] Resists;
   public Range GroupSize;
   public int CorpseChance, Difficulty, Index, KillExp, Weight, Nutrition; // CorpseChance from 0-100, or -1 for default
   public int MaxSpawn, SpawnChance; // MaxSpawn is maximum number that will be randomly generated
@@ -417,6 +418,13 @@ public abstract class EntityClass
   public Ailment Ailments;
   public AIFlag AIFlags;
   public EntitySize Size;
+
+  public static EntityClass Make(XmlNode node, Dictionary<string, XmlNode> idcache)
+  {
+    string type = Xml.Attr(node, "type");
+    if(Xml.IsEmpty(type)) return new XmlEntityClass(node, idcache);
+    else throw new NotImplementedException();
+  }
 
   protected void DropItems(Entity e)
   {
@@ -435,10 +443,11 @@ public abstract class EntityClass
   protected Gender gender;
 
   const int numRaceAttrs = 6;
+
   static readonly byte[] raceAttrs = new byte[(int)Race.NumRaces*numRaceAttrs]
-{ // Str, Int, Dex (sum to ~18), Sight, Hearing, Smell
-  6, 6, 6, 95, 70, 25, // Human
-};
+  { // Str, Int, Dex (sum to ~18), Sight, Hearing, Smell
+    6, 6, 6, 95, 70, 25, // Human
+  };
 }
 #endregion
 
@@ -446,15 +455,16 @@ public abstract class EntityClass
 public class Entity
 {
   public Entity(string name) : this(Global.GetEntityIndex(name)) { }
+
   public Entity(int index)
   {
-    expLevel=1; this.index=index;
+    this.expLevel = 1;
+    this.classIndex    = index;
     for(int i=0; i<(int)Attr.NumAttributes; i++) SetBaseAttr((Attr)i, 0); // set attributes to minimum allowed
     Class.Initialize(this);
   }
 
-  public Entity(XmlNode npc)
-    : this(Xml.Attr(npc, "entity"))
+  public Entity(XmlNode npc) : this(Xml.Attr(npc, "entity"))
   {
     foreach(XmlNode item in npc.SelectNodes("give")) Pickup(new Item(item));
   }
@@ -463,10 +473,12 @@ public class Entity
   {
     get { return (Ability)ApplyFlagEffect(EffectType.Ability, (uint)RawAbilities); }
   }
+
   public Ailment Ailments
   {
     get { return (Ailment)ApplyFlagEffect(EffectType.Ailment, (uint)RawAilments); }
   }
+
   public Intrinsic Intrinsics
   {
     get { return (Intrinsic)ApplyFlagEffect(EffectType.Intrinsic, (uint)RawIntrinsics); }
@@ -543,7 +555,7 @@ public class Entity
     }
   }
 
-  public EntityClass Class { get { return Global.GetEntityClass(index); } }
+  public EntityClass Class { get { return Global.GetEntityClass(classIndex); } }
 
   public int CarryWeight { get { return Inv==null ? 0 : Inv.Weight; } }
 
@@ -1335,34 +1347,43 @@ public class Entity
   object data;
   Effect[] effects;
   int[] attrs = new int[(int)Attr.NumAttributes];
-  int exp, index, hp, mp, food, stench, turns, numEffects;
+  int exp, classIndex, hp, mp, food, stench, turns, numEffects;
 
   static float ClipAttrValue(Attr attr, float value)
   {
     if(value<0) value = 0;
     else
+    {
       switch(attr)
       {
-        case Attr.Speed:
-        case Attr.Stealth:
-        case Attr.Sight:
-        case Attr.Hearing:
-        case Attr.Smell:
+        case Attr.Speed: case Attr.Stealth: case Attr.Sight: case Attr.Hearing: case Attr.Smell:
           if(value>100) value = 100;
           break;
-        case Attr.EV:
-        case Attr.Str:
-        case Attr.Int:
-        case Attr.Dex:
+        case Attr.EV: case Attr.Str: case Attr.Int: case Attr.Dex:
           if(value>25) value = 25;
           else if(value<1) value = 1;
           break;
       }
+    }
     return value;
   }
 
   static int[] vis = new int[128]; // vis point buffer
   static int visPts; // number of points in buffer
+}
+#endregion
+
+#region Resistance
+public struct Resistance // sync with common.xsd
+{
+  public Resistance(XmlNode node)
+  {
+    Type   = (DamageType)Enum.Parse(typeof(DamageType), Xml.Attr(node, "type"));
+    Amount = new Range(node.Attributes["amount"], 100);
+  }
+
+  public Range Amount; // 0-100%
+  public DamageType Type;
 }
 #endregion
 
@@ -1403,6 +1424,8 @@ public class XmlEntityClass : EntityClass
     List<Attack> attacks = new List<Attack>();
     List<Conference> confers = new List<Conference>();
     List<XmlNode> items = new List<XmlNode>();
+    List<Resistance> resists = new List<Resistance>();
+
     do
     {
       node = (XmlNode)stack.Pop();
@@ -1460,15 +1483,16 @@ public class XmlEntityClass : EntityClass
             case "confer": confers.Add(new Conference(child)); break;
             case "description": description = Xml.BlockToString(node.InnerText); break;
             case "give": items.Add(child); break;
-            case "resist": throw new NotImplementedException("resistances");
+            case "resist": resists.Add(new Resistance(child)); break;
           }
         }
       }
     } while(stack.Count!=0);
 
-    InitialItems = items.Count==0 ? null : items.ToArray();
-    Attacks = attacks.Count==0 ? null : attacks.ToArray();
-    Confers = confers.Count==0 ? null : confers.ToArray();
+    InitialItems = items.Count == 0 ? null : items.ToArray();
+    Attacks = attacks.Count == 0 ? null : attacks.ToArray();
+    Confers = confers.Count == 0 ? null : confers.ToArray();
+    Resists = resists.Count == 0 ? null : resists.ToArray();
   }
 
   public override void Initialize(Entity e)
@@ -1486,13 +1510,6 @@ public class XmlEntityClass : EntityClass
   protected string GetExtraAttr(string name) { return extraAttrs==null ? null : (string)extraAttrs[name]; }
 
   SortedList<string,string> extraAttrs;
-
-  public static EntityClass Make(XmlNode node, Dictionary<string,XmlNode> idcache)
-  {
-    string type = Xml.Attr(node, "type");
-    if(Xml.IsEmpty(type)) return new XmlEntityClass(node, idcache);
-    else throw new NotImplementedException();
-  }
 }
 #endregion
 

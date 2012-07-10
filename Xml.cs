@@ -188,10 +188,10 @@ public static class Xml
     return (int)Math.Round(d);
   }
 
-  static Regex ltbl   = new Regex(@"^(?:\s*\n)+|\s+$", RegexOptions.Singleline);
-  static Regex lspc   = new Regex(@"^\s+", RegexOptions.Singleline);
-  static Regex split  = new Regex(@"\s+", RegexOptions.Singleline);
-  static Regex weight = new Regex(@"(\d+(?:\.\d+)?|\.\d+)(g|kg)", RegexOptions.Singleline);
+  static readonly Regex ltbl   = new Regex(@"^(?:\s*\n)+|\s+$", RegexOptions.Singleline);
+  static readonly Regex lspc   = new Regex(@"^\s+", RegexOptions.Singleline);
+  static readonly Regex split  = new Regex(@"\s+", RegexOptions.Singleline);
+  static readonly Regex weight = new Regex(@"(\d+(?:\.\d+)?|\.\d+)(g|kg)", RegexOptions.Singleline);
 }
 
 } // namespace Chrono

@@ -46,6 +46,6 @@
 </tool>
 
 <!-- wands -->
-<wand spell="Fire" charges="3:7" effectDesc="Flames fly from the wand." chance="0.1" value="200"/>
+<wand name="fire" spell="Fire" charges="3:7" effectDesc="Flames fly from the wand." chance="0.1" value="200"/>
 
 </items:items>

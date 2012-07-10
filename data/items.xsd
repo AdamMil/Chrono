@@ -179,9 +179,11 @@
       <xs:element name="item" type="item"/>
       <xs:element name="armor" type="armor"/>
       <xs:element name="food" type="food"/>
+      <xs:element name="potion" type="potion" />
       <xs:element name="ring" type="ring"/>
       <xs:element name="scroll" type="scroll"/>
       <xs:element name="shield" type="shield"/>
+      <xs:element name="spellbook" type="spellbook" />
       <xs:element name="tool" type="tool"/>
       <xs:element name="wand" type="wand"/>
     </xs:choice>

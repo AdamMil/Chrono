@@ -20,9 +20,9 @@
 
   <entity name="fire ant" inherit="_ant" chance="8" level="3">
     <attack amount="2d4" type="Bite" chance="50"/>
-    <attack amount="2d4" type="Bite" damage="Fire"/>
-    <resist type="Fire"/>
-    <confer type="Fire" chance="30"/>
+    <attack amount="2d4" type="Bite" damage="Heat"/>
+    <resist type="Heat"/>
+    <confer type="Heat" chance="30"/>
   </entity>
 </entityGroup>
 

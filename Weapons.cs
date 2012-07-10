@@ -6,8 +6,8 @@ namespace Chrono
 
 public enum DamageType : byte
 {
-  Acid, Cold, Direct, DrainDex, DrainInt, DrainStr, Electricity, Heat, Magic, Physical, Poison, Sicken, Slow,
-  Stun, Paralyse, Petrify, Teleport, StealGold, StealItem, Blind
+  Acid, Blind, Cold, Direct, DrainDex, DrainInt, DrainStr, Electricity, Heat, Magic, Paralyse, Petrify, Physical,
+  Poison, Sicken, Slow, StealGold, StealItem, Stun, Teleport,
 }
 
 public enum WeaponClass

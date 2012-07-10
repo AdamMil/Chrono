@@ -531,7 +531,9 @@ public abstract class ItemClass
   public byte BlessedChance, CursedChance; // 0-100% chance of being generated blessed/cursed
   public bool Identified, RandomName, ShowEnchantment, ShowCB;
 
-  public static ItemClass FromXml(XmlNode node)
+  public static string GetVerbS(Item item) { return item.Count==1 ? "s" : ""; }
+
+  public static ItemClass Make(XmlNode node)
   {
     switch(node.LocalName)
     {
@@ -549,8 +551,6 @@ public abstract class ItemClass
       default: throw new NotImplementedException("unknown xml item type: "+node.LocalName);
     }
   }
-
-  public static string GetVerbS(Item item) { return item.Count==1 ? "s" : ""; }
 
   protected string name, idName, prefix, pluralPrefix, pluralSuffix, idPrefix, idPluralPrefix, idPluralSuffix,
                    shortDesc, longDesc, idShortDesc, idLongDesc;

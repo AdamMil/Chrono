@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <xs:schema xmlns="http://www.adammil.net/Chrono/socialGroups"
            xmlns:xs="http://www.w3.org/2001/XMLSchema"
-           targetNamespace="http://www.adammil.net/Chrono/socialGroups"
-           elementFormDefault="qualified">
+           targetNamespace="http://www.adammil.net/Chrono/socialGroups">
 
   <xs:complexType name="group">
     <xs:attribute name="name" type="xs:ID" use="required"/>

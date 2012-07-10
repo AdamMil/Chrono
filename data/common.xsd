@@ -37,12 +37,13 @@
     <xs:enumeration value="DrainInt"/>
     <xs:enumeration value="DrainStr"/>
     <xs:enumeration value="Electricity"/>
-    <xs:enumeration value="Fire"/>
+    <xs:enumeration value="Heat"/>
     <xs:enumeration value="Magic"/>
     <xs:enumeration value="Paralyse"/>
     <xs:enumeration value="Petrify"/>
     <xs:enumeration value="Physical"/>
     <xs:enumeration value="Poison"/>
+    <xs:enumeration value="Sicken"/>
     <xs:enumeration value="Slow"/>
     <xs:enumeration value="StealGold"/>
     <xs:enumeration value="StealItem"/>
